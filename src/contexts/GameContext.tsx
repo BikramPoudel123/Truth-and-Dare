@@ -1,12 +1,13 @@
 import { SERVER_URL } from "@/constants/server";
+import { GameMood } from "@/data/moods";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from "react";
 
 const generateUUID = () =>
@@ -46,10 +47,13 @@ export interface Media {
 export interface GameContextType {
   ws: WebSocket | null;
   isConnected: boolean;
+  playersOnline: number;
   profilePic: string | null;
   setProfilePic: (uri: string | null) => void;
   interests: string[];
   setInterests: (v: string[]) => void;
+  gameMood: GameMood;
+  setGameMood: (mood: GameMood) => void;
   players: Player[];
   currentTurn: number;
   phase:
@@ -98,6 +102,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [playersOnline, setPlayersOnline] = useState(0);
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentTurn, setCurrentTurn] = useState(0);
   const [phase, setPhase] = useState<GameContextType["phase"]>("connecting");
@@ -114,6 +119,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [responderName, setResponderName] = useState<string | null>(null);
   const [profilePic, setProfilePicState] = useState<string | null>(null);
   const [interests, setInterestsState] = useState<string[]>([]);
+  const [gameMood, setGameMood] = useState<GameMood>("casual");
 
   // Use refs for values needed inside callbacks to avoid stale closures
   const roomIdRef = useRef<string | null>(null);
@@ -153,6 +159,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const handleMessage = useCallback((message: any) => {
     console.log("Message:", message.type);
     switch (message.type) {
+      case "players_online":
+        setPlayersOnline(message.count);
+        break;
+
       case "room_created":
         roomIdRef.current = message.room_id;
         setRoomId(message.room_id);
@@ -570,10 +580,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const value: GameContextType = {
     ws,
     isConnected,
+    playersOnline,
     profilePic,
     setProfilePic,
     interests,
     setInterests,
+    gameMood,
+    setGameMood,
     players,
     currentTurn,
     phase,

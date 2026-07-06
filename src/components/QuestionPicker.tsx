@@ -2,7 +2,7 @@
  * QuestionPicker — modal shown to the asker during question_set phase.
  * They can browse the local question bank OR community posts and tap one to fill the input.
  */
-import { QUESTIONS, QCategory, Question } from "@/data/questions";
+import { QUESTIONS, QCategory, QTag, Question } from "@/data/questions";
 import { SERVER_URL } from "@/constants/server";
 import { useEffect, useState } from "react";
 import {
@@ -23,11 +23,12 @@ interface CommunityPost { id: string; author: string; type: string; text: string
 interface Props {
   visible: boolean;
   mode: "truth" | "dare" | null;
+  moodTags?: string[];
   onSelect: (text: string) => void;
   onClose: () => void;
 }
 
-export function QuestionPicker({ visible, mode, onSelect, onClose }: Props) {
+export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: Props) {
   const [tab, setTab] = useState<"bank" | "community">("bank");
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
@@ -46,9 +47,10 @@ export function QuestionPicker({ visible, mode, onSelect, onClose }: Props) {
     setLoadingCommunity(false);
   };
 
-  // Filter question bank by current mode
+  // Filter question bank by current mode and mood tags
   const bankQuestions: Question[] = QUESTIONS.filter(
-    q => !mode || q.type === (mode as QCategory)
+    q => (!mode || q.type === (mode as QCategory)) &&
+         (!moodTags || moodTags.length === 0 || q.tags.some(t => moodTags.includes(t)))
   );
 
   // Filter community by current mode

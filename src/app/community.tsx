@@ -14,19 +14,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
 
-const BG = "#f8faff",
-  CARD = "#ffffff",
-  BLUE = "#3b82f6";
-const BLUE_D = "#1d4ed8",
-  BLUE_L = "#eff6ff",
-  BLUE_M = "#bfdbfe";
-const TEXT = "#0f172a",
-  SUB = "#64748b",
-  HINT = "#94a3b8",
-  BORDER = "#e2e8f0";
-
-// Derive HTTP base from SERVER_URL (ws:// → http://)
 function getHttpBase() {
   return SERVER_URL.replace(/^ws:\/\//, "http://")
     .replace(/^wss:\/\//, "https://")
@@ -157,7 +146,7 @@ export default function CommunityScreen() {
           <Text
             style={[
               s.postTypeText,
-              { color: item.type === "truth" ? BLUE_D : "#c2410c" },
+              { color: item.type === "truth" ? COLORS.purple : COLORS.orange },
             ]}
           >
             {item.type === "truth" ? "👁 TRUTH" : "🔥 DARE"}
@@ -185,7 +174,6 @@ export default function CommunityScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        {/* Header */}
         <View style={s.header}>
           <View style={{ flex: 1 }}>
             <Text style={s.title}>Community</Text>
@@ -193,7 +181,6 @@ export default function CommunityScreen() {
           </View>
         </View>
 
-        {/* Compose */}
         <View style={s.compose}>
           <View style={s.composeTypeRow}>
             {(["truth", "dare"] as const).map((t) => (
@@ -202,7 +189,7 @@ export default function CommunityScreen() {
                 style={[
                   s.composeTypeBtn,
                   postType === t &&
-                    (t === "truth" ? s.composeTruth : s.composeDare),
+                    { backgroundColor: t === "truth" ? COLORS.purple : COLORS.orange, borderColor: t === "truth" ? COLORS.purple : COLORS.orange },
                 ]}
                 onPress={() => setPostType(t)}
                 activeOpacity={0.8}
@@ -226,7 +213,7 @@ export default function CommunityScreen() {
                   ? "Share a truth question..."
                   : "Share a dare..."
               }
-              placeholderTextColor={HINT}
+              placeholderTextColor={COLORS.subAlt}
               value={postText}
               onChangeText={setPostText}
               multiline
@@ -247,17 +234,16 @@ export default function CommunityScreen() {
           </View>
         </View>
 
-        {/* Filter */}
         <View style={s.filterRow}>
           {(["all", "truth", "dare"] as const).map((f) => (
             <TouchableOpacity
               key={f}
-              style={[s.filterBtn, filter === f && s.filterBtnActive]}
+              style={[s.filterBtn, filter === f && { backgroundColor: `${COLORS.purple}20`, borderColor: COLORS.purple }]}
               onPress={() => setFilter(f)}
               activeOpacity={0.8}
             >
               <Text
-                style={[s.filterBtnTxt, filter === f && s.filterBtnTxtActive]}
+                style={[s.filterBtnTxt, filter === f && { color: COLORS.text }]}
               >
                 {f === "all" ? "All" : f === "truth" ? "👁 Truth" : "🔥 Dare"}
               </Text>
@@ -271,8 +257,8 @@ export default function CommunityScreen() {
           <View
             style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
           >
-            <ActivityIndicator size="large" color={BLUE} />
-            <Text style={{ color: HINT, marginTop: 12 }}>Loading posts...</Text>
+            <ActivityIndicator size="large" color={COLORS.purple} />
+            <Text style={{ color: COLORS.sub, marginTop: 12 }}>Loading posts...</Text>
           </View>
         ) : (
           <FlatList
@@ -299,56 +285,48 @@ export default function CommunityScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: BG },
+  safe: { flex: 1, backgroundColor: COLORS.bg },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: CARD,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
     gap: 12,
   },
-  title: { color: TEXT, fontSize: 18, fontWeight: "900" },
-  subtitle: { color: SUB, fontSize: 12, marginTop: 1 },
+  title: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
+  subtitle: { color: COLORS.sub, fontSize: 12, marginTop: 1 },
   compose: {
-    backgroundColor: CARD,
     padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
     gap: 8,
   },
   composeTypeRow: { flexDirection: "row", gap: 8 },
   composeTypeBtn: {
     flex: 1,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: RADIUS.small,
     alignItems: "center",
-    backgroundColor: BG,
+    backgroundColor: "rgba(23, 19, 50, 0.6)",
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: COLORS.border,
   },
-  composeTruth: { backgroundColor: BLUE, borderColor: BLUE },
-  composeDare: { backgroundColor: "#f97316", borderColor: "#f97316" },
-  composeTypeTxt: { fontSize: 13, fontWeight: "700", color: SUB },
+  composeTypeTxt: { fontSize: 13, fontWeight: "700", color: COLORS.sub },
   composeRow: { flexDirection: "row", gap: 8, alignItems: "flex-end" },
   composeInput: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: "rgba(23, 19, 50, 0.5)",
     borderWidth: 1.5,
-    borderColor: BLUE_M,
-    borderRadius: 12,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.small,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: TEXT,
+    color: COLORS.text,
     fontSize: 14,
     minHeight: 44,
     textAlignVertical: "top",
   },
   composeBtn: {
-    backgroundColor: BLUE,
-    borderRadius: 12,
+    backgroundColor: COLORS.purple,
+    borderRadius: RADIUS.small,
     paddingHorizontal: 18,
     paddingVertical: 13,
     alignItems: "center",
@@ -362,61 +340,52 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
-    backgroundColor: CARD,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
   },
   filterBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: BG,
+    borderRadius: RADIUS.small,
+    backgroundColor: "rgba(23, 19, 50, 0.6)",
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: COLORS.border,
   },
-  filterBtnActive: { backgroundColor: BLUE_L, borderColor: BLUE_M },
-  filterBtnTxt: { fontSize: 12, fontWeight: "700", color: SUB },
-  filterBtnTxtActive: { color: BLUE_D },
-  postCount: { color: HINT, fontSize: 11, fontWeight: "700" },
+  filterBtnTxt: { fontSize: 12, fontWeight: "700", color: COLORS.sub },
+  postCount: { color: COLORS.subAlt, fontSize: 11, fontWeight: "700" },
   list: { padding: 16, gap: 12 },
   postCard: {
-    backgroundColor: CARD,
-    borderRadius: 16,
+    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    borderRadius: RADIUS.cardSm,
     padding: 16,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: COLORS.border,
     gap: 10,
-    shadowColor: "#94a3b8",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 2,
+    ...SHADOWS.subtle,
   },
   postTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   postAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: BLUE_L,
+    backgroundColor: `${COLORS.purple}20`,
     alignItems: "center",
     justifyContent: "center",
   },
-  postAvatarTxt: { color: BLUE_D, fontSize: 13, fontWeight: "800" },
-  postAuthor: { color: TEXT, fontSize: 13, fontWeight: "700" },
-  postTime: { color: HINT, fontSize: 11 },
+  postAvatarTxt: { color: COLORS.purple, fontSize: 13, fontWeight: "800" },
+  postAuthor: { color: COLORS.text, fontSize: 13, fontWeight: "700" },
+  postTime: { color: COLORS.subAlt, fontSize: 11 },
   postTypeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   postTypeTruth: {
-    backgroundColor: BLUE_L,
+    backgroundColor: `${COLORS.purple}15`,
     borderWidth: 1,
-    borderColor: BLUE_M,
+    borderColor: `${COLORS.purple}30`,
   },
   postTypeDare: {
-    backgroundColor: "#fff7ed",
+    backgroundColor: `${COLORS.orange}15`,
     borderWidth: 1,
-    borderColor: "#fed7aa",
+    borderColor: `${COLORS.orange}30`,
   },
   postTypeText: { fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  postText: { color: TEXT, fontSize: 14, lineHeight: 21, fontWeight: "500" },
+  postText: { color: COLORS.text, fontSize: 14, lineHeight: 21, fontWeight: "500" },
   postActions: { flexDirection: "row", alignItems: "center" },
   likeBtn: {
     flexDirection: "row",
@@ -425,13 +394,13 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: BG,
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: COLORS.border,
   },
-  likeBtnActive: { backgroundColor: "#fef2f2", borderColor: "#fecaca" },
-  likeBtnText: { fontSize: 13, fontWeight: "700", color: TEXT },
+  likeBtnActive: { backgroundColor: `${COLORS.pink}20`, borderColor: `${COLORS.pink}40` },
+  likeBtnText: { fontSize: 13, fontWeight: "700", color: COLORS.text },
   empty: { alignItems: "center", paddingTop: 60, gap: 10 },
   emptyIcon: { fontSize: 48 },
-  emptyText: { color: HINT, fontSize: 14, textAlign: "center" },
+  emptyText: { color: COLORS.sub, fontSize: 14, textAlign: "center" },
 });

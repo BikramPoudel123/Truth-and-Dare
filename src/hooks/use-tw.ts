@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export function useTw() {
-  const { isDark } = useColorScheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   return useMemo(
     () => ({

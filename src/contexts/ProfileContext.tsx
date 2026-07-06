@@ -10,10 +10,18 @@ import React, {
 import { SERVER_URL } from "@/constants/server";
 
 function getHttpBase() {
-  return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
+  return SERVER_URL.replace(/^ws:\/\//, "http://")
+    .replace(/^wss:\/\//, "https://")
+    .replace(/\/$/, "");
 }
 
 export type Interest = "fun" | "life" | "hot" | "connect" | "spicy" | "deep";
+
+export interface ProfileStats {
+  gamesPlayed: number;
+  wins: number;
+  level: number;
+}
 
 export interface Profile {
   name: string;
@@ -21,6 +29,7 @@ export interface Profile {
   bio: string;
   pic: string | null;
   interests: Interest[];
+  stats: ProfileStats;
 }
 
 export interface ProfileContextType {
@@ -34,23 +43,47 @@ export interface ProfileContextType {
   setPic: (v: string | null) => void;
   toggleInterest: (i: Interest) => void;
   clearProfile: () => void;
+  recordGameResult: (won: boolean) => void;
+  winRate: number;
   playerId: string;
 }
 
-const DEFAULT: Profile = { name: "", username: "", bio: "", pic: null, interests: [] };
+const DEFAULT_STATS: ProfileStats = { gamesPlayed: 0, wins: 0, level: 1 };
+
+const DEFAULT: Profile = {
+  name: "",
+  username: "",
+  bio: "",
+  pic: null,
+  interests: [],
+  stats: DEFAULT_STATS,
+};
+
+// A player levels up every 10 games played
+const GAMES_PER_LEVEL = 10;
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile>(DEFAULT);
   const [loaded, setLoaded] = useState(false);
-  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken" | "saved">("idle");
-  const playerIdRef = useRef(`pid-${Math.random().toString(36).slice(2)}-${Date.now()}`);
+  const [usernameStatus, setUsernameStatus] = useState<
+    "idle" | "checking" | "available" | "taken" | "saved"
+  >("idle");
+  const playerIdRef = useRef(
+    `pid-${Math.random().toString(36).slice(2)}-${Date.now()}`,
+  );
 
   // Load from storage on mount
   useEffect(() => {
     AsyncStorage.multiGet([
-      "prof:name", "prof:username", "prof:bio", "prof:pic", "prof:interests", "prof:player_id",
+      "prof:name",
+      "prof:username",
+      "prof:bio",
+      "prof:pic",
+      "prof:interests",
+      "prof:stats",
+      "prof:player_id",
     ]).then((pairs) => {
       const map: Record<string, string | null> = {};
       pairs.forEach(([k, v]) => (map[k] = v));
@@ -61,7 +94,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         username: map["prof:username"] ?? "",
         bio: map["prof:bio"] ?? "",
         pic: map["prof:pic"] ?? null,
-        interests: map["prof:interests"] ? (JSON.parse(map["prof:interests"]) as Interest[]) : [],
+        interests: map["prof:interests"]
+          ? (JSON.parse(map["prof:interests"]) as Interest[])
+          : [],
+        stats: map["prof:stats"]
+          ? (JSON.parse(map["prof:stats"]) as ProfileStats)
+          : DEFAULT_STATS,
       });
       if (map["prof:username"]) setUsernameStatus("saved");
       setLoaded(true);
@@ -73,40 +111,58 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const next = { ...prev, ...patch };
       const pairs: [string, string][] = [];
       if (patch.name !== undefined) pairs.push(["prof:name", patch.name]);
-      if (patch.username !== undefined) pairs.push(["prof:username", patch.username]);
+      if (patch.username !== undefined)
+        pairs.push(["prof:username", patch.username]);
       if (patch.bio !== undefined) pairs.push(["prof:bio", patch.bio]);
       if (patch.pic !== undefined) pairs.push(["prof:pic", patch.pic ?? ""]);
-      if (patch.interests !== undefined) pairs.push(["prof:interests", JSON.stringify(patch.interests)]);
+      if (patch.interests !== undefined)
+        pairs.push(["prof:interests", JSON.stringify(patch.interests)]);
+      if (patch.stats !== undefined)
+        pairs.push(["prof:stats", JSON.stringify(patch.stats)]);
       if (pairs.length) AsyncStorage.multiSet(pairs);
       return next;
     });
   }, []);
 
   const setName = useCallback((v: string) => persist({ name: v }), [persist]);
-  const setBio  = useCallback((v: string) => persist({ bio: v }),  [persist]);
-  const setPic  = useCallback((v: string | null) => persist({ pic: v }), [persist]);
+  const setBio = useCallback((v: string) => persist({ bio: v }), [persist]);
+  const setPic = useCallback(
+    (v: string | null) => persist({ pic: v }),
+    [persist],
+  );
 
-  const setUsername = useCallback((v: string) => {
-    const clean = v.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20);
-    persist({ username: clean });
-    setUsernameStatus("idle");
-  }, [persist]);
+  const setUsername = useCallback(
+    (v: string) => {
+      const clean = v.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20);
+      persist({ username: clean });
+      setUsernameStatus("idle");
+    },
+    [persist],
+  );
 
   const checkUsername = useCallback(async () => {
-    setProfile(prev => {
+    setProfile((prev) => {
       const uname = prev.username.trim().toLowerCase();
-      if (uname.length < 2) { setUsernameStatus("idle"); return prev; }
+      if (uname.length < 2) {
+        setUsernameStatus("idle");
+        return prev;
+      }
       setUsernameStatus("checking");
       (async () => {
         try {
-          const res = await fetch(`${getHttpBase()}/username/check?username=${encodeURIComponent(uname)}`);
+          const res = await fetch(
+            `${getHttpBase()}/username/check?username=${encodeURIComponent(uname)}`,
+          );
           const data = await res.json();
           if (data.available) {
             // Claim it
             const claim = await fetch(`${getHttpBase()}/username/claim`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ username: uname, player_id: playerIdRef.current }),
+              body: JSON.stringify({
+                username: uname,
+                player_id: playerIdRef.current,
+              }),
             });
             const cdata = await claim.json();
             setUsernameStatus(cdata.ok ? "saved" : "taken");
@@ -124,16 +180,37 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const toggleInterest = useCallback((i: Interest) => {
     setProfile((prev) => {
       const has = prev.interests.includes(i);
-      const next = has ? prev.interests.filter((x) => x !== i) : [...prev.interests, i];
+      const next = has
+        ? prev.interests.filter((x) => x !== i)
+        : [...prev.interests, i];
       AsyncStorage.setItem("prof:interests", JSON.stringify(next));
       return { ...prev, interests: next };
+    });
+  }, []);
+
+  // Call this whenever a match finishes to keep stats (and level) up to date
+  const recordGameResult = useCallback((won: boolean) => {
+    setProfile((prev) => {
+      const gamesPlayed = prev.stats.gamesPlayed + 1;
+      const wins = prev.stats.wins + (won ? 1 : 0);
+      const level = Math.max(1, Math.floor(gamesPlayed / GAMES_PER_LEVEL) + 1);
+      const stats = { gamesPlayed, wins, level };
+      AsyncStorage.setItem("prof:stats", JSON.stringify(stats));
+      return { ...prev, stats };
     });
   }, []);
 
   const clearProfile = useCallback(() => {
     setProfile({ ...DEFAULT, username: "" });
     setUsernameStatus("idle");
-    AsyncStorage.multiRemove(["prof:name", "prof:username", "prof:bio", "prof:pic", "prof:interests"]);
+    AsyncStorage.multiRemove([
+      "prof:name",
+      "prof:username",
+      "prof:bio",
+      "prof:pic",
+      "prof:interests",
+      "prof:stats",
+    ]);
   }, []);
 
   // Debounced effect to sync profile name changes to the server
@@ -148,7 +225,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           name: profile.name.trim(),
         }),
       }).catch((err) =>
-        console.warn("Failed to sync profile name to server:", err)
+        console.warn("Failed to sync profile name to server:", err),
       );
     }, 1000);
     return () => clearTimeout(delayDebounce);
@@ -156,14 +233,31 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   if (!loaded) return null;
 
+  const winRate =
+    profile.stats.gamesPlayed > 0
+      ? Math.round((profile.stats.wins / profile.stats.gamesPlayed) * 100)
+      : 0;
+
   return (
-    <ProfileContext.Provider value={{
-      profile,
-      isProfileReady: profile.name.trim().length > 0 && (profile.username.trim().length === 0 || usernameStatus === "saved"),
-      usernameStatus,
-      setName, setUsername, checkUsername, setBio, setPic, toggleInterest, clearProfile,
-      playerId: playerIdRef.current,
-    }}>
+    <ProfileContext.Provider
+      value={{
+        profile,
+        isProfileReady:
+          profile.name.trim().length > 0 &&
+          (profile.username.trim().length === 0 || usernameStatus === "saved"),
+        usernameStatus,
+        setName,
+        setUsername,
+        checkUsername,
+        setBio,
+        setPic,
+        toggleInterest,
+        clearProfile,
+        recordGameResult,
+        winRate,
+        playerId: playerIdRef.current,
+      }}
+    >
       {children}
     </ProfileContext.Provider>
   );

@@ -200,6 +200,16 @@ function sendToPlayer(playerId, message) {
   }
 }
 
+function broadcastOnlineCount() {
+  const count = playerSockets.size;
+  const message = JSON.stringify({ type: "players_online", count });
+  for (const ws of playerSockets.values()) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+    }
+  }
+}
+
 function normalizeMediaData(mediaData) {
   if (Array.isArray(mediaData)) return mediaData.join("");
   if (typeof mediaData === "string") return mediaData;
@@ -234,6 +244,7 @@ wss.on("connection", (ws) => {
         case "create_room": {
           const { player_id, player_name, profile_pic } = message;
           playerSockets.set(player_id, ws);
+          broadcastOnlineCount();
           if (!player_name) {
             sendToPlayer(player_id, {
               type: "error",
@@ -267,6 +278,7 @@ wss.on("connection", (ws) => {
         case "auto_join": {
           const { player_id, player_name, profile_pic, interests } = message;
           playerSockets.set(player_id, ws);
+          broadcastOnlineCount();
           if (!player_name) {
             sendToPlayer(player_id, {
               type: "error",
@@ -354,6 +366,7 @@ wss.on("connection", (ws) => {
             `  → Join Request: Room=${room_id} Player=${player_name}`,
           );
           playerSockets.set(player_id, ws);
+          broadcastOnlineCount();
 
           const room = await getRoom(room_id);
 
@@ -682,6 +695,7 @@ wss.on("connection", (ws) => {
 
           // Re-register the new socket
           playerSockets.set(player_id, ws);
+          broadcastOnlineCount();
           console.log(`  🔄 ${playerInRoom.name} reconnected to ${room_id}`);
 
           // Re-send full game state so the client can restore the correct screen
@@ -709,6 +723,7 @@ wss.on("connection", (ws) => {
       for (const [playerId, socket] of playerSockets.entries()) {
         if (socket === ws) {
           playerSockets.delete(playerId);
+          broadcastOnlineCount();
 
           if (!redisReady) {
             for (const [roomId, data] of memStore.rooms.entries()) {

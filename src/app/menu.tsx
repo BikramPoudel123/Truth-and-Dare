@@ -1,25 +1,24 @@
 import { useGame } from "@/contexts/GameContext";
 import { Interest, useProfile } from "@/contexts/ProfileContext";
+import { GameMood, MOODS, getMoodConfig } from "@/data/moods";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator, Alert, Animated, Easing, Image,
   KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, View,
+  Switch, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import BottomNav from "@/components/BottomNav";
 
-const BG = "#f8faff", CARD = "#ffffff", BLUE = "#3b82f6";
-const BLUE_D = "#1d4ed8", BLUE_L = "#eff6ff", BLUE_M = "#bfdbfe";
-const TEXT = "#0f172a", SUB = "#64748b", HINT = "#94a3b8", BORDER = "#e2e8f0";
-
-const INTEREST_META: { key: Interest; label: string; emoji: string; color: string }[] = [
-  { key: "fun",     label: "Fun & Laughs",  emoji: "😂", color: "#f59e0b" },
-  { key: "life",    label: "Life Talks",    emoji: "💬", color: "#10b981" },
-  { key: "hot",     label: "Hot & Flirty",  emoji: "🔥", color: "#ef4444" },
-  { key: "connect", label: "Get in Touch",  emoji: "🤝", color: "#8b5cf6" },
-  { key: "spicy",   label: "Spicy 🌶",      emoji: "🌶", color: "#f97316" },
-  { key: "deep",    label: "Deep Talks",    emoji: "🌊", color: "#0ea5e9" },
+const INTEREST_META: { key: Interest; label: string; emoji: string; gradient: string[] }[] = [
+  { key: "fun",     label: "Fun & Laughs",  emoji: "😂", gradient: ["#8b5cf6", "#a78bfa"] },
+  { key: "life",    label: "Life Talks",    emoji: "💬", gradient: ["#3b82f6", "#60a5fa"] },
+  { key: "hot",     label: "Hot & Flirty",  emoji: "🔥", gradient: ["#ec4899", "#f472b6"] },
+  { key: "connect", label: "Get in Touch",  emoji: "🤝", gradient: ["#f97316", "#fb923c"] },
+  { key: "spicy",   label: "Spicy",         emoji: "🌶", gradient: ["#ef4444", "#f87171"] },
+  { key: "deep",    label: "Deep Talks",    emoji: "🌊", gradient: ["#06b6d4", "#22d3ee"] },
 ];
 
 function SearchingDots() {
@@ -40,7 +39,7 @@ function SearchingDots() {
     <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
       {dots.map((v, i) => (
         <Animated.View key={i} style={{
-          width: 10, height: 10, borderRadius: 5, backgroundColor: BLUE,
+          width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.pink,
           opacity: v, transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.2] }) }],
         }} />
       ))}
@@ -48,20 +47,91 @@ function SearchingDots() {
   );
 }
 
+function GlowParticles() {
+  const particles = useRef(Array.from({ length: 12 }, () => ({
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: Math.random() * 3 + 1,
+    opacity: new Animated.Value(Math.random() * 0.5 + 0.1),
+    anim: null as Animated.CompositeAnimation | null,
+  }))).current;
+
+  useEffect(() => {
+    particles.forEach(p => {
+      p.anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(p.opacity, { toValue: 0.6, duration: 2000 + Math.random() * 3000, easing: Easing.ease, useNativeDriver: true }),
+          Animated.timing(p.opacity, { toValue: 0.1, duration: 2000 + Math.random() * 3000, easing: Easing.ease, useNativeDriver: true }),
+        ])
+      );
+      p.anim.start();
+    });
+    return () => particles.forEach(p => p.anim?.stop());
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {particles.map((p, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: "absolute",
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: p.size,
+            height: p.size,
+            borderRadius: p.size / 2,
+            backgroundColor: i % 3 === 0 ? COLORS.purple : i % 3 === 1 ? COLORS.pink : COLORS.electricBlue,
+            opacity: p.opacity,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+function BlurredBlob({ color, top, left, size }: { color: string; top: number; left: number; size: number }) {
+  return (
+    <View
+      style={[StyleSheet.absoluteFill, { opacity: 0.15 }]}
+      pointerEvents="none"
+    >
+      <View
+        style={{
+          position: "absolute",
+          top: top,
+          left: left,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color,
+          opacity: 0.3,
+        }}
+      />
+    </View>
+  );
+}
+
 type ScreenMode = "home" | "profile" | "random_waiting" | "private_join" | "private_waiting_creator" | "private_waiting_joiner";
 
 export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "questions" | "community") => void }) {
-  const { createRoom, autoJoin, joinRoom, roomId, players, isConnected, phase, reconnect, error, quitGame, setInterests } = useGame();
-  const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, usernameStatus, setUsername, checkUsername } = useProfile();
+  const { createRoom, autoJoin, joinRoom, roomId, players, isConnected, phase, reconnect, error, quitGame, setInterests, gameMood, setGameMood, playersOnline } = useGame();
+  const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, usernameStatus, setUsername, checkUsername, winRate } = useProfile();
+  
   const [code, setCode] = useState("");
   const [mode, setMode] = useState<ScreenMode>("home");
   const [joining, setJoining] = useState(false);
+  const [spicyMode, setSpicyMode] = useState(false);
+  const displayName = profile.name || "Player";
 
-  // Sync interests to GameContext whenever profile changes
   useEffect(() => { setInterests(profile.interests); }, [profile.interests]);
-
   useEffect(() => { if (phase === "menu") { setMode("home"); setJoining(false); setCode(""); } }, [phase]);
   useEffect(() => { if (error && joining) { Alert.alert("Oops", error); setJoining(false); setMode("home"); } }, [error, joining]);
+
+  useEffect(() => {
+    if (spicyMode && gameMood !== "spicy") setGameMood("spicy");
+    else if (!spicyMode && gameMood === "spicy") setGameMood("casual");
+  }, [spicyMode]);
 
   const pickPic = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -81,143 +151,298 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
 
   return (
     <SafeAreaView style={s.safe}>
+      <GlowParticles />
+      <BlurredBlob color={COLORS.purple} top={-80} left={-60} size={200} />
+      <BlurredBlob color={COLORS.pink} top={200} left={260} size={160} />
+      <BlurredBlob color={COLORS.electricBlue} top={400} left={-40} size={140} />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: 110 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-          {/* Hero */}
-          <View style={s.hero}>
-            <View style={s.heroIconWrap}><Text style={s.heroIcon}>🎭</Text></View>
-            <Text style={s.heroTitle}>Truth or Dare</Text>
-            <Text style={s.heroSub}>Online · 2 Players · Spicy</Text>
-            {/* Connection dot inline — auto reconnects, no ugly banner */}
-            <View style={s.connDot}>
-              <View style={[s.dot, { backgroundColor: isConnected ? "#22c55e" : "#f59e0b" }]} />
-              <Text style={s.connTxt}>{isConnected ? "Online" : "Connecting..."}</Text>
-            </View>
-          </View>
-
-          {/* Profile not set banner — RED */}
-          {!isProfileReady && mode === "home" && (
-            <TouchableOpacity style={s.profileBannerRed} onPress={() => setMode("profile")} activeOpacity={0.85}>
-              <Text style={s.profileBannerIcon}>⚠️</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={s.profileBannerTitleRed}>Please set up your profile first</Text>
-                <Text style={s.profileBannerSubRed}>Tap here to set your name before playing</Text>
-              </View>
-              <Text style={{ color: "#dc2626", fontSize: 18 }}>›</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* HOME */}
           {mode === "home" && (
-            <View style={s.card}>
-              <View style={s.homeCard}>
-                <Text style={s.homeCardTitle}>Ready to play?</Text>
-                <Text style={s.homeCardText}>Jump into a quick match or invite a friend.</Text>
-              </View>
-              <TouchableOpacity style={[s.btnFill, (!isProfileReady) && s.disabled]} onPress={() => guard(() => { setJoining(true); autoJoin(profile.name.trim()); setMode("random_waiting"); })} activeOpacity={0.82}>
-                <View style={s.btnFillLeft}><Text style={s.btnFillEmoji}>⚡</Text><View><Text style={s.btnFillTitle}>Random Matchup</Text><Text style={s.btnFillSub}>Match with a stranger instantly</Text></View></View>
-                <Text style={s.btnArrow}>›</Text>
-              </TouchableOpacity>
-              <View style={s.divider}><View style={s.divLine} /><Text style={s.divText}>or</Text><View style={s.divLine} /></View>
-              <TouchableOpacity style={[s.btnGhost, !isProfileReady && s.disabled]} onPress={() => guard(() => setMode("private_join"))} activeOpacity={0.82}>
-                <View style={s.btnFillLeft}><Text style={s.btnFillEmoji}>🔒</Text><View><Text style={s.btnGhostTitle}>Private Game</Text><Text style={s.btnGhostSub}>Play with a specific friend</Text></View></View>
-                <Text style={[s.btnArrow, { color: BLUE }]}>›</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* PROFILE */}
-          {mode === "profile" && (
-            <View style={s.profileCard}>
-              {/* Avatar */}
-              <TouchableOpacity onPress={pickPic} activeOpacity={0.8} style={s.profilePicWrap}>
-                {profile.pic ? (
-                  <Image source={{ uri: profile.pic }} style={s.profilePic} />
-                ) : (
-                  <View style={s.profilePicEmpty}>
-                    <Text style={{ fontSize: 36 }}>🎮</Text>
+            <>
+              {/* Header with Logo */}
+              <View style={s.header}>
+                <View style={s.logoWrap}>
+                  <View style={s.logoRow}>
+                    <View style={s.maskRow}>
+                      <Text style={s.maskBlue}>🎭</Text>
+                    </View>
+                    <View style={s.logoTextCol}>
+                      <View style={s.logoTextRow}>
+                        <Text style={s.logoTruth}>Truth</Text>
+                        <Text style={s.logoOr}> or</Text>
+                      </View>
+                      <Text style={s.logoDare}>Dare</Text>
+                    </View>
                   </View>
-                )}
-                <View style={s.profilePicBadge}><Text style={{ fontSize: 10 }}>✏️</Text></View>
-              </TouchableOpacity>
-
-              {/* Name */}
-              <TextInput
-                style={s.profileNameInput}
-                placeholder="Your Name"
-                placeholderTextColor="#cbd5e1"
-                value={profile.name}
-                onChangeText={setName}
-                autoCapitalize="words"
-                maxLength={20}
-                textAlign="center"
-              />
-
-              {/* Username */}
-              <View style={s.profileUsernameRow}>
-                <Text style={s.profileUsernameAt}>@</Text>
-                <TextInput
-                  style={s.profileUsernameInput}
-                  placeholder="username"
-                  placeholderTextColor="#cbd5e1"
-                  value={profile.username}
-                  onChangeText={setUsername}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  maxLength={20}
-                  onEndEditing={checkUsername}
-                />
-                {usernameStatus === "checking" && <ActivityIndicator size="small" color={BLUE} />}
-                {usernameStatus === "available" && <Text style={{ color: "#10b981", fontSize: 16 }}>✓</Text>}
-                {usernameStatus === "saved" && <Text style={{ color: "#10b981", fontSize: 16 }}>✓</Text>}
-                {usernameStatus === "taken" && <Text style={{ color: "#dc2626", fontSize: 16 }}>✗</Text>}
+                </View>
+                <TouchableOpacity style={s.notifBtn} activeOpacity={0.8}>
+                  <View style={s.notifDot} />
+                  <Text style={s.notifIcon}>🔔</Text>
+                </TouchableOpacity>
               </View>
 
-              {/* Bio */}
-              <TextInput
-                style={s.profileBioInput}
-                placeholder="Write a short bio..."
-                placeholderTextColor="#cbd5e1"
-                value={profile.bio}
-                onChangeText={setBio}
-                multiline
-                maxLength={80}
-                textAlign="center"
-              />
-
-              <View style={s.profileSpacer} />
-
-              {/* Interests */}
-              <Text style={s.profileSectionLabel}>INTERESTS</Text>
-              <View style={s.profileChips}>
-                {INTEREST_META.map(({ key, label, emoji, color }) => {
-                  const active = profile.interests.includes(key);
-                  return (
-                    <TouchableOpacity
-                      key={key}
-                      style={[s.chip, active && { backgroundColor: color }]}
-                      onPress={() => toggleInterest(key)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={s.chipEmoji}>{emoji}</Text>
-                      <Text style={[s.chipLabel, active && { color: "#fff" }]}>{label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              {/* Online Players */}
+              <View style={s.onlineRow}>
+                <View style={s.onlineDot} />
+                <Text style={s.onlineTxt}>{isConnected ? `${playersOnline.toLocaleString()} Players Online` : "Connecting..."}</Text>
               </View>
 
-              {profile.pic && (
-                <TouchableOpacity onPress={() => setPic(null)} style={{ alignSelf: "center", marginTop: -4 }}>
-                  <Text style={{ color: "#94a3b8", fontSize: 12, fontWeight: "600" }}>Remove photo</Text>
+              {/* Profile missing warning */}
+              {!isProfileReady && (
+                <TouchableOpacity style={s.profileBanner} onPress={() => setMode("profile")} activeOpacity={0.85}>
+                  <Text style={s.profileBannerIcon}>⚠️</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.profileBannerTitle}>Profile needs setup</Text>
+                    <Text style={s.profileBannerSub}>Tap here to set your name before playing</Text>
+                  </View>
+                  <Text style={s.profileBannerArrow}>›</Text>
                 </TouchableOpacity>
               )}
 
-              <View style={s.profileSpacer} />
+              {/* Hero Card */}
+              <View style={s.heroCard}>
+                <Text style={s.heroSparkle1}>✨</Text>
+                <Text style={s.heroSparkle2}>⭐</Text>
+                <View style={s.heroContent}>
+                  <View style={s.heroEmojiWrap}>
+                    <Text style={s.heroEmoji}>😈</Text>
+                  </View>
+                  <View style={s.heroTextWrap}>
+                    <Text style={s.heroTitle}>
+                      Ready for{"\n"}the <Text style={s.heroFun}>fun?</Text>
+                    </Text>
+                    <Text style={s.heroSub}>Truth reveals. Dare dares.{"\n"}Let the game begin!</Text>
+                  </View>
+                </View>
+              </View>
 
-              {isProfileReady && (
-                <TouchableOpacity style={s.profileSaveBtn} onPress={() => setMode("home")} activeOpacity={0.85}>
-                  <Text style={s.profileSaveBtnText}>Save</Text>
+              {/* Quick Match Card */}
+              <TouchableOpacity
+                style={[s.matchCard, (!isProfileReady) && s.disabled]}
+                onPress={() => guard(() => { setJoining(true); autoJoin(profile.name.trim()); setMode("random_waiting"); })}
+                activeOpacity={0.85}
+              >
+                <View style={s.matchContent}>
+                  <View style={s.matchIconWrap}>
+                    <Text style={s.matchIcon}>⚡</Text>
+                  </View>
+                  <View style={s.matchTextCol}>
+                    <Text style={s.matchTitle}>Quick Match</Text>
+                    <Text style={s.matchDesc}>Find a random player{"\n"}and start instantly</Text>
+                  </View>
+                  <View style={s.matchBtnPill}>
+                    <Text style={s.matchBtnText}>Play Now</Text>
+                    <Text style={s.matchBtnArrow}>→</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Private Game Card */}
+              <TouchableOpacity
+                style={[s.matchCard, s.matchCardPrivate, (!isProfileReady) && s.disabled]}
+                onPress={() => guard(() => setMode("private_join"))}
+                activeOpacity={0.85}
+              >
+                <View style={s.matchContent}>
+                  <View style={[s.matchIconWrap, s.matchIconWrapPink]}>
+                    <Text style={s.matchIcon}>👥</Text>
+                  </View>
+                  <View style={s.matchTextCol}>
+                    <Text style={s.matchTitle}>Private Game</Text>
+                    <Text style={s.matchDesc}>Invite a friend and{"\n"}play together</Text>
+                  </View>
+                  <View style={[s.matchBtnPill, s.matchBtnPillPink]}>
+                    <Text style={s.matchBtnText}>Create Room</Text>
+                    <Text style={s.matchBtnArrow}>→</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              {/* Game Modes Section */}
+              <View style={s.modesSection}>
+                <View style={s.modesHeader}>
+                  <Text style={s.modesTitle}>Game Modes</Text>
+                  <View style={s.spicyToggle}>
+                    <Text style={s.spicyLabel}>🌶️ Spicy Mode</Text>
+                    <Switch
+                      value={spicyMode}
+                      onValueChange={setSpicyMode}
+                      trackColor={{ false: COLORS.border, true: COLORS.purpleLight }}
+                      thumbColor={spicyMode ? COLORS.purple : "#666"}
+                      ios_backgroundColor={COLORS.border}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Three Feature Cards */}
+              <View style={s.featureRow}>
+                <View style={[s.featureCard, { borderColor: `${COLORS.purple}40` }]}>
+                  <View style={[s.featureIconWrap, { backgroundColor: `${COLORS.purple}20` }]}>
+                    <Text style={s.featureIcon}>👥</Text>
+                  </View>
+                  <Text style={s.featureNumber}>2</Text>
+                  <Text style={s.featureLabel}>Players</Text>
+                </View>
+                <View style={[s.featureCard, { borderColor: `${COLORS.pink}40` }]}>
+                  <View style={[s.featureIconWrap, { backgroundColor: `${COLORS.pink}20` }]}>
+                    <Text style={s.featureIcon}>∞</Text>
+                  </View>
+                  <Text style={s.featureNumber}>∞</Text>
+                  <Text style={s.featureLabel}>Endless Fun</Text>
+                </View>
+                <View style={[s.featureCard, { borderColor: `${COLORS.electricBlue}40` }]}>
+                  <View style={[s.featureIconWrap, { backgroundColor: `${COLORS.electricBlue}20` }]}>
+                    <Text style={s.featureIcon}>📚</Text>
+                  </View>
+                  <Text style={s.featureNumber}>1000+</Text>
+                  <Text style={s.featureLabel}>Questions</Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          {/* PROFILE SCREEN */}
+          {mode === "profile" && (
+            <View style={s.profileContainer}>
+              {/* Profile Avatar */}
+              <View style={s.profileAvatarSection}>
+                <TouchableOpacity onPress={pickPic} activeOpacity={0.8}>
+                  <View style={s.avatarRing}>
+                    <View style={s.avatarGlow}>
+                      {profile.pic ? (
+                        <Image source={{ uri: profile.pic }} style={s.avatarImage} />
+                      ) : (
+                        <View style={s.avatarPlaceholder}>
+                          <Text style={s.avatarPlaceholderText}>🎮</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  <View style={s.cameraBtn}>
+                    <Text style={s.cameraBtnIcon}>📷</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Editable Name */}
+                <TextInput
+                  style={s.editableName}
+                  placeholder="Your Name"
+                  placeholderTextColor={COLORS.sub}
+                  value={profile.name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                  maxLength={20}
+                  textAlign="center"
+                />
+
+                {/* Editable Username */}
+                <View style={s.usernameRow}>
+                  <Text style={s.usernameAt}>@</Text>
+                  <TextInput
+                    style={s.editableUsername}
+                    placeholder="username"
+                    placeholderTextColor={COLORS.subAlt}
+                    value={profile.username}
+                    onChangeText={setUsername}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={20}
+                    onEndEditing={checkUsername}
+                  />
+                  {usernameStatus === "checking" && <ActivityIndicator size="small" color={COLORS.pink} />}
+                  {usernameStatus === "available" && <Text style={{ color: COLORS.green, fontSize: 14 }}>✓</Text>}
+                  {usernameStatus === "saved" && <Text style={{ color: COLORS.green, fontSize: 14 }}>✓</Text>}
+                  {usernameStatus === "taken" && <Text style={{ color: COLORS.red, fontSize: 14 }}>✗</Text>}
+                </View>
+
+                {/* Achievement Badges */}
+                <View style={s.achievementRow}>
+                  <View style={s.achievementBadge}>
+                    <Text style={s.achievementIcon}>🔥</Text>
+                    <Text style={s.achievementLabel}>Spicy Player</Text>
+                  </View>
+                  <View style={s.achievementBadge}>
+                    <Text style={s.achievementIcon}>👑</Text>
+                    <Text style={s.achievementLabel}>Level {profile.stats.level}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Stats Card */}
+              <View style={s.statsCard}>
+                <View style={s.statColumn}>
+                  <Text style={s.statIcon}>🎮</Text>
+                  <Text style={s.statNumber}>{profile.stats.gamesPlayed}</Text>
+                  <Text style={s.statLabel}>Games Played</Text>
+                </View>
+                <View style={s.statDivider} />
+                <View style={s.statColumn}>
+                  <Text style={s.statIcon}>🏆</Text>
+                  <Text style={s.statNumber}>{profile.stats.wins}</Text>
+                  <Text style={s.statLabel}>Wins</Text>
+                </View>
+                <View style={s.statDivider} />
+                <View style={s.statColumn}>
+                  <Text style={s.statIcon}>🎯</Text>
+                  <Text style={s.statNumber}>{winRate}%</Text>
+                  <Text style={s.statLabel}>Win Rate</Text>
+                </View>
+              </View>
+
+              {/* Bio Card */}
+              <View style={s.bioCard}>
+                <View style={s.bioHeader}>
+                  <Text style={s.bioTitle}>Your Bio</Text>
+                  <TouchableOpacity activeOpacity={0.7}>
+                    <Text style={s.bioEdit}>✏️</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={s.bioInput}
+                  placeholder="Here for fun, laughs and deep talks. Let's play!"
+                  placeholderTextColor={COLORS.sub}
+                  value={profile.bio}
+                  onChangeText={setBio}
+                  multiline
+                  maxLength={80}
+                />
+              </View>
+
+              {/* Interests Card */}
+              <View style={s.interestsCard}>
+                <View style={s.interestsHeader}>
+                  <Text style={s.interestsTitle}>Your Interests</Text>
+                  <TouchableOpacity activeOpacity={0.7}>
+                    <Text style={s.interestsEdit}>✏️</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={s.interestsChips}>
+                  {INTEREST_META.map(({ key, label, emoji, gradient }) => {
+                    const active = profile.interests.includes(key);
+                    return (
+                      <TouchableOpacity
+                        key={key}
+                        style={[
+                          s.interestChip,
+                          active && { backgroundColor: gradient[0] },
+                          active && { borderColor: gradient[0] },
+                        ]}
+                        onPress={() => toggleInterest(key)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={s.interestChipEmoji}>{emoji}</Text>
+                        <Text style={[s.interestChipLabel, active && { color: "#fff" }]}>{label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {profile.pic && (
+                <TouchableOpacity onPress={() => setPic(null)} style={{ alignSelf: "center", marginTop: 12, marginBottom: 12 }}>
+                  <Text style={{ color: COLORS.sub, fontSize: 12, fontWeight: "600" }}>Remove photo</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -225,11 +450,11 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
 
           {/* RANDOM SEARCHING */}
           {mode === "random_waiting" && (
-            <View style={s.card}>
+            <View style={[s.stateCard, { marginTop: 40 }]}>
               <View style={s.stateBlock}>
                 <View style={s.pulseRing}><Text style={{ fontSize: 36 }}>🔍</Text></View>
                 <Text style={s.stateTitle}>Finding opponent...</Text>
-                <Text style={s.stateSub}>Playing as <Text style={s.nameTag}>{profile.name}</Text></Text>
+                <Text style={s.stateSub}>Playing as <Text style={{ color: COLORS.pink, fontWeight: 'bold' }}>{profile.name}</Text></Text>
                 {profile.interests.length > 0 && (
                   <Text style={s.stateHint}>Matching on: {profile.interests.map(i => INTEREST_META.find(m => m.key === i)?.emoji).join(" ")}</Text>
                 )}
@@ -244,28 +469,31 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
 
           {/* PRIVATE JOIN/CREATE */}
           {mode === "private_join" && (
-            <View style={s.card}>
+            <View style={[s.stateCard, { marginTop: 20 }]}>
               <TouchableOpacity onPress={() => setMode("home")} style={s.backBtn}><Text style={s.backBtnText}>← Back</Text></TouchableOpacity>
               <View style={s.fieldWrap}>
                 <Text style={s.fieldLabel}>ENTER ROOM CODE</Text>
-                <View style={[s.inputBox, s.codeBox]}>
-                  <TextInput style={s.codeInput} placeholder="A B C" placeholderTextColor={HINT} value={code} onChangeText={t => setCode(t.toUpperCase().replace(/[^A-Z]/g, ""))} autoCapitalize="characters" maxLength={3} autoFocus />
+                <View style={s.inputBox}>
+                  <TextInput style={s.codeInput} placeholder="A B C" placeholderTextColor={COLORS.sub} value={code} onChangeText={t => setCode(t.toUpperCase().replace(/[^A-Z]/g, ""))} autoCapitalize="characters" maxLength={3} autoFocus />
                 </View>
               </View>
+              
               <TouchableOpacity style={[s.btnFill, code.length < 3 && s.disabled]} onPress={() => { if (!isConnected) { reconnect(); return; } setJoining(true); joinRoom(code, profile.name.trim()); setMode("private_waiting_joiner"); }} disabled={code.length < 3 || joining} activeOpacity={0.82}>
                 {joining ? <ActivityIndicator color="#fff" /> : <Text style={[s.btnFillTitle, { textAlign: "center", flex: 1 }]}>Join Room</Text>}
               </TouchableOpacity>
+              
               <View style={s.divider}><View style={s.divLine} /><Text style={s.divText}>or</Text><View style={s.divLine} /></View>
+              
               <TouchableOpacity style={s.btnGhost} onPress={() => { if (!isConnected) { reconnect(); return; } createRoom(profile.name.trim()); setMode("private_waiting_creator"); }} activeOpacity={0.82}>
-                <View style={s.btnFillLeft}><Text style={s.btnFillEmoji}>✨</Text><View><Text style={s.btnGhostTitle}>Create New Room</Text><Text style={s.btnGhostSub}>Get a code to share</Text></View></View>
-                <Text style={[s.btnArrow, { color: BLUE }]}>›</Text>
+                <View style={s.btnGhostLeft}><Text style={s.btnGhostEmoji}>✨</Text><View><Text style={s.btnGhostTitle}>Create New Room</Text><Text style={s.btnGhostSub}>Get a code to share</Text></View></View>
+                <Text style={[s.btnArrow, { color: COLORS.purple }]}>›</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* CREATOR WAITING */}
           {mode === "private_waiting_creator" && (
-            <View style={s.card}>
+            <View style={[s.stateCard, { marginTop: 40 }]}>
               <View style={s.stateBlock}>
                 <Text style={{ fontSize: 44, marginBottom: 4 }}>🎉</Text>
                 <Text style={s.stateTitle}>Room Ready!</Text>
@@ -275,7 +503,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                   <Text style={s.codeCardValue}>{roomId ?? "···"}</Text>
                 </View>
                 <View style={s.waitRow}>
-                  <ActivityIndicator size="small" color={BLUE} />
+                  <ActivityIndicator size="small" color={COLORS.pink} />
                   <Text style={s.waitRowText}>{players.length === 2 ? "Friend joined! Starting..." : "Waiting for friend..."}</Text>
                 </View>
               </View>
@@ -287,12 +515,12 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
 
           {/* JOINER WAITING */}
           {mode === "private_waiting_joiner" && (
-            <View style={s.card}>
+            <View style={[s.stateCard, { marginTop: 40 }]}>
               <View style={s.stateBlock}>
                 <Text style={{ fontSize: 44, marginBottom: 4 }}>⏳</Text>
                 <Text style={s.stateTitle}>Joining room...</Text>
-                <Text style={s.stateSub}>Code: <Text style={s.nameTag}>{code}</Text></Text>
-                <ActivityIndicator size="large" color={BLUE} style={{ marginTop: 16 }} />
+                <Text style={s.stateSub}>Code: <Text style={{ color: COLORS.pink, fontWeight: "800" }}>{code}</Text></Text>
+                <ActivityIndicator size="large" color={COLORS.purple} style={{ marginTop: 16 }} />
                 <Text style={s.stateHint}>{players.length === 2 ? "✓ Connected! Starting..." : "Connecting..."}</Text>
               </View>
               <TouchableOpacity style={s.btnDanger} onPress={() => { quitGame(); setMode("home"); setJoining(false); setCode(""); }} activeOpacity={0.82}>
@@ -301,159 +529,296 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
             </View>
           )}
 
-          <Text style={s.footer}>SWOYEF LABS</Text>
         </ScrollView>
 
-        {/* Bottom Nav */}
-        <View style={s.bottomNav}>
-          {[
-            { key: "home",      label: "Home",      emoji: "🏠" },
-            { key: "profile",   label: "Profile",   emoji: "👤" },
-            { key: "questions", label: "Questions", emoji: "🃏" },
-            { key: "community", label: "Community", emoji: "📣" },
-          ].map(tab => {
-            const isActive = tab.key === mode || (tab.key === "questions" && mode === "home" && false);
-            const isExternal = tab.key === "questions" || tab.key === "community";
-            return (
-              <TouchableOpacity key={tab.key} style={[s.navItem, (mode === tab.key) && s.navItemActive]}
-                onPress={() => {
-                  if (isExternal) { onNavigate?.(tab.key as "questions" | "community"); }
-                  else { setMode(tab.key as ScreenMode); }
-                }} activeOpacity={0.85}>
-                <Text style={s.navIcon}>{tab.emoji}</Text>
-                <Text style={[s.navLabel, (mode === tab.key) && s.navLabelActive]}>{tab.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <BottomNav
+          activeTab={mode}
+          onNavigate={(tab) => {
+            if (tab === "questions" || tab === "community") {
+              onNavigate?.(tab as "questions" | "community");
+            } else {
+              setMode(tab as ScreenMode);
+            }
+          }}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: BG },
+  safe: { flex: 1, backgroundColor: COLORS.bg },
   scroll: { paddingHorizontal: 20, paddingBottom: 48 },
-  hero: { alignItems: "center", paddingTop: 48, paddingBottom: 28 },
-  heroIconWrap: { width: 88, height: 88, borderRadius: 28, backgroundColor: BLUE_L, borderWidth: 2, borderColor: BLUE_M, alignItems: "center", justifyContent: "center", marginBottom: 14, shadowColor: BLUE, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 4 },
-  heroIcon: { fontSize: 44 },
-  heroTitle: { fontSize: 30, fontWeight: "900", color: TEXT, letterSpacing: 0.5 },
-  heroSub: { fontSize: 13, color: SUB, marginTop: 4 },
-  connDot: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 10 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  connTxt: { fontSize: 11, color: HINT },
-  profileBannerRed: { backgroundColor: "#fef2f2", borderRadius: 14, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14, borderWidth: 1.5, borderColor: "#fca5a5" },
-  profileBannerIcon: { fontSize: 32 },
-  profileBannerTitleRed: { color: "#dc2626", fontSize: 14, fontWeight: "800" },
-  profileBannerSubRed: { color: "#ef4444", fontSize: 12, marginTop: 2 },
-  card: { backgroundColor: CARD, borderRadius: 20, padding: 20, gap: 14, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 3, marginBottom: 16 },
-  homeCard: { backgroundColor: BLUE_L, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BLUE_M, gap: 4 },
-  homeCardTitle: { color: BLUE_D, fontSize: 16, fontWeight: "800" },
-  homeCardText: { color: SUB, fontSize: 12, lineHeight: 18 },
-  btnFill: { backgroundColor: BLUE, borderRadius: 14, paddingVertical: 15, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  btnFillLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  btnFillEmoji: { fontSize: 24 },
-  btnFillTitle: { color: "#fff", fontSize: 15, fontWeight: "800" },
-  btnFillSub: { color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 1 },
-  btnArrow: { color: "rgba(255,255,255,0.8)", fontSize: 22, fontWeight: "300" },
-  btnGhost: { backgroundColor: BLUE_L, borderRadius: 14, paddingVertical: 15, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1.5, borderColor: BLUE_M },
-  btnGhostTitle: { color: BLUE_D, fontSize: 15, fontWeight: "800" },
-  btnGhostSub: { color: SUB, fontSize: 12, marginTop: 1 },
-  disabled: { opacity: 0.38 },
-  divider: { flexDirection: "row", alignItems: "center", gap: 10 },
-  divLine: { flex: 1, height: 1, backgroundColor: BORDER },
-  divText: { color: HINT, fontSize: 12, fontWeight: "600" },
-  stateBlock: { alignItems: "center", paddingVertical: 16, gap: 8 },
-  pulseRing: { width: 80, height: 80, borderRadius: 40, backgroundColor: BLUE_L, borderWidth: 2, borderColor: BLUE_M, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  stateTitle: { color: TEXT, fontSize: 20, fontWeight: "800" },
-  stateSub: { color: SUB, fontSize: 13 },
-  stateHint: { color: HINT, fontSize: 12, textAlign: "center", marginTop: 2 },
-  nameTag: { color: BLUE, fontWeight: "800" },
-  codeCard: { backgroundColor: BLUE_L, borderRadius: 16, paddingHorizontal: 36, paddingVertical: 18, alignItems: "center", marginTop: 8, borderWidth: 2, borderColor: BLUE_M },
-  codeCardLabel: { color: SUB, fontSize: 10, fontWeight: "800", letterSpacing: 3, marginBottom: 4 },
-  codeCardValue: { color: BLUE_D, fontSize: 48, fontWeight: "900", letterSpacing: 12 },
-  waitRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
-  waitRowText: { color: SUB, fontSize: 13 },
-  backBtn: { alignSelf: "flex-start" },
-  backBtnText: { color: BLUE, fontSize: 13, fontWeight: "700" },
-  btnDanger: { borderRadius: 12, paddingVertical: 13, alignItems: "center", backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca" },
-  btnDangerText: { color: "#dc2626", fontSize: 14, fontWeight: "700" },
-  fieldWrap: { gap: 8 },
-  fieldLabel: { fontSize: 10, fontWeight: "800", color: HINT, letterSpacing: 2 },
-  inputBox: { backgroundColor: BG, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, borderWidth: 1.5, borderColor: BLUE_M },
-  codeBox: { justifyContent: "center" },
-  codeInput: { flex: 1, color: BLUE_D, fontSize: 28, fontWeight: "900", letterSpacing: 12, textAlign: "center" },
-  profileCard: {
-    backgroundColor: CARD, borderRadius: 24,
-    paddingHorizontal: 32, paddingVertical: 40,
-    alignItems: "center", gap: 0,
-    shadowColor: "#94a3b8", shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1, shadowRadius: 12, elevation: 3,
-    marginBottom: 16,
+  disabled: { opacity: 0.4 },
+
+  // ── Background Particles ──
+
+  // ── Header ──
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingTop: 16, paddingBottom: 12 },
+  logoWrap: {},
+  logoRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  maskRow: { flexDirection: "row", gap: 2 },
+  maskBlue: { fontSize: 28 },
+  logoTextCol: {},
+  logoTextRow: { flexDirection: "row", alignItems: "baseline" },
+  logoTruth: { fontSize: 22, fontWeight: "900", color: COLORS.electricBlue, letterSpacing: -0.5 },
+  logoOr: { fontSize: 18, fontWeight: "800", color: COLORS.text, opacity: 0.8 },
+  logoDare: { fontSize: 28, fontWeight: "900", color: COLORS.pink, letterSpacing: 1, marginTop: -4 },
+
+  notifBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
+  notifDot: { position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.pink, zIndex: 1, borderWidth: 1.5, borderColor: COLORS.bg },
+  notifIcon: { fontSize: 18 },
+
+  // ── Online Players ──
+  onlineRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 20 },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.green },
+  onlineTxt: { fontSize: 12, color: COLORS.sub, fontWeight: "600", letterSpacing: 0.5 },
+
+  // ── Profile Banner ──
+  profileBanner: { backgroundColor: "rgba(255, 0, 110, 0.1)", borderRadius: RADIUS.small, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16, borderWidth: 1, borderColor: "rgba(255, 0, 110, 0.3)" },
+  profileBannerIcon: { fontSize: 24 },
+  profileBannerTitle: { color: COLORS.pink, fontSize: 14, fontWeight: "800" },
+  profileBannerSub: { color: COLORS.sub, fontSize: 11, marginTop: 2 },
+  profileBannerArrow: { color: COLORS.pink, fontSize: 20, fontWeight: "300" },
+
+  // ── Hero Card ──
+  heroCard: {
+    backgroundColor: "rgba(23, 19, 50, 0.75)",
+    borderRadius: RADIUS.card,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.pinkGlow,
+    ...SHADOWS.pinkGlow,
+    overflow: "hidden",
+    position: "relative",
   },
-  profilePicWrap: { position: "relative", marginBottom: 20 },
-  profilePic: { width: 96, height: 96, borderRadius: 48 },
-  profilePicEmpty: {
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: "#f1f5f9",
-    alignItems: "center", justifyContent: "center",
-  },
-  profilePicBadge: {
-    position: "absolute", bottom: 0, right: -2,
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: "#e2e8f0", borderWidth: 3, borderColor: CARD,
-    alignItems: "center", justifyContent: "center",
-  },
-  profileNameInput: {
-    color: TEXT, fontSize: 24, fontWeight: "800",
-    textAlign: "center", paddingVertical: 6, minWidth: 200,
-  },
-  profileUsernameRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    marginBottom: 12,
-  },
-  profileUsernameAt: { color: "#94a3b8", fontSize: 16, fontWeight: "500" },
-  profileUsernameInput: {
-    color: "#64748b", fontSize: 15, fontWeight: "500",
-    paddingVertical: 4, minWidth: 120,
-  },
-  profileBioInput: {
-    color: TEXT, fontSize: 14, fontWeight: "400",
-    minHeight: 40, maxHeight: 60, lineHeight: 20,
-    paddingVertical: 4, alignSelf: "stretch",
-  },
-  profileSpacer: { height: 1, backgroundColor: "#f1f5f9", alignSelf: "stretch", marginVertical: 20 },
-  profileSectionLabel: {
-    fontSize: 11, fontWeight: "700", color: "#94a3b8",
-    letterSpacing: 1.5, marginBottom: 14, textAlign: "center",
-  },
-  profileChips: {
-    flexDirection: "row", flexWrap: "wrap", gap: 8,
-    justifyContent: "center", marginBottom: 4,
-  },
-  chip: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#f8fafc",
-    borderWidth: 1, borderColor: "#e2e8f0",
-  },
-  chipEmoji: { fontSize: 14 },
-  chipLabel: { fontSize: 13, fontWeight: "600", color: "#475569" },
-  profileSaveBtn: {
-    backgroundColor: "#0f172a",
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 48,
+  heroSparkle1: { position: "absolute", top: 16, left: 20, fontSize: 16 },
+  heroSparkle2: { position: "absolute", bottom: 16, right: 20, fontSize: 14 },
+  heroContent: { flexDirection: "row", alignItems: "center", gap: 16 },
+  heroEmojiWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "rgba(255,255,255,0.05)",
     alignItems: "center",
-    alignSelf: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
   },
-  profileSaveBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  bottomNav: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", backgroundColor: CARD, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 8, paddingBottom: 16, paddingHorizontal: 8 },
-  navItem: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 6, borderRadius: 12 },
-  navItemActive: { backgroundColor: BLUE_L },
-  navIcon: { fontSize: 18, marginBottom: 2 },
-  navLabel: { color: SUB, fontSize: 10, fontWeight: "700" },
-  navLabelActive: { color: BLUE_D },
-  footer: { color: HINT, fontSize: 9, fontWeight: "800", letterSpacing: 3, textAlign: "center", marginTop: 16 },
+  heroEmoji: { fontSize: 40 },
+  heroTextWrap: { flex: 1 },
+  heroTitle: { fontSize: 26, fontWeight: "900", color: COLORS.text, lineHeight: 32 },
+  heroFun: { color: COLORS.pink },
+  heroSub: { fontSize: 12, color: COLORS.sub, marginTop: 8, lineHeight: 18 },
+
+  // ── Match Cards ──
+  matchCard: {
+    backgroundColor: "rgba(26, 16, 64, 0.85)",
+    borderRadius: RADIUS.cardSm,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.3)",
+    overflow: "hidden",
+    ...SHADOWS.subtle,
+  },
+  matchCardPrivate: { backgroundColor: "rgba(26, 10, 18, 0.85)", borderColor: "rgba(255, 0, 110, 0.3)" },
+  matchContent: { flexDirection: "row", alignItems: "center", padding: 18 },
+  matchIconWrap: { width: 48, height: 48, borderRadius: RADIUS.icon, backgroundColor: "rgba(139, 92, 246, 0.15)", alignItems: "center", justifyContent: "center", marginRight: 14 },
+  matchIconWrapPink: { backgroundColor: "rgba(255, 0, 110, 0.15)" },
+  matchIcon: { fontSize: 24 },
+  matchTextCol: { flex: 1, paddingRight: 8 },
+  matchTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800", marginBottom: 3 },
+  matchDesc: { color: COLORS.sub, fontSize: 11, lineHeight: 15 },
+  matchBtnPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.purple,
+    borderRadius: RADIUS.pill,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  matchBtnText: { color: COLORS.text, fontSize: 12, fontWeight: "700" },
+  matchBtnArrow: { color: COLORS.text, fontSize: 14, fontWeight: "700" },
+  matchBtnPillPink: { backgroundColor: COLORS.pink },
+
+  // ── Game Modes ──
+  modesSection: { marginTop: 4, marginBottom: 16 },
+  modesHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  modesTitle: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
+  spicyToggle: { flexDirection: "row", alignItems: "center", gap: 8 },
+  spicyLabel: { color: COLORS.sub, fontSize: 12, fontWeight: "600" },
+
+  // ── Feature Cards ──
+  featureRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  featureCard: {
+    flex: 1,
+    backgroundColor: "rgba(23, 19, 50, 0.6)",
+    borderRadius: RADIUS.cardSm,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    gap: 6,
+  },
+  featureIconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  featureIcon: { fontSize: 16 },
+  featureNumber: { color: COLORS.text, fontSize: 20, fontWeight: "900" },
+  featureLabel: { color: COLORS.sub, fontSize: 10, fontWeight: "600" },
+
+  // ── Profile Screen ──
+  profileContainer: { gap: 16, paddingTop: 24 },
+
+  // Avatar Section
+  profileAvatarSection: { alignItems: "center", marginBottom: 8 },
+  avatarRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: COLORS.text,
+    alignItems: "center",
+    justifyContent: "center",
+    ...SHADOWS.pinkGlow,
+  },
+  avatarGlow: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    overflow: "hidden",
+    backgroundColor: COLORS.cardDark,
+  },
+  avatarImage: { width: 88, height: 88, borderRadius: 44 },
+  avatarPlaceholder: { width: 88, height: 88, borderRadius: 44, backgroundColor: "#2a2440", alignItems: "center", justifyContent: "center" },
+  avatarPlaceholderText: { fontSize: 32 },
+  cameraBtn: {
+    position: "absolute",
+    bottom: 2,
+    right: -2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.cardDark,
+    borderWidth: 2,
+    borderColor: COLORS.borderLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraBtnIcon: { fontSize: 12 },
+
+  editableName: { color: COLORS.text, fontSize: 24, fontWeight: "900", textAlign: "center", paddingVertical: 6, marginTop: 8, minWidth: 200 },
+  usernameRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 4 },
+  usernameAt: { color: COLORS.sub, fontSize: 16, fontWeight: "500" },
+  editableUsername: { color: COLORS.sub, fontSize: 15, fontWeight: "500", paddingVertical: 4, minWidth: 120, textAlign: "center" },
+
+  // Achievements
+  achievementRow: { flexDirection: "row", gap: 10, marginTop: 12 },
+  achievementBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: RADIUS.pill,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  achievementIcon: { fontSize: 14 },
+  achievementLabel: { color: COLORS.text, fontSize: 12, fontWeight: "700" },
+
+  // Stats Card
+  statsCard: {
+    flexDirection: "row",
+    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    borderRadius: RADIUS.cardSm,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.subtle,
+  },
+  statColumn: { flex: 1, alignItems: "center", gap: 4 },
+  statIcon: { fontSize: 20 },
+  statNumber: { color: COLORS.text, fontSize: 22, fontWeight: "900" },
+  statLabel: { color: COLORS.sub, fontSize: 11, fontWeight: "600" },
+  statDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
+
+  // Bio Card
+  bioCard: {
+    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    borderRadius: RADIUS.cardSm,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.subtle,
+  },
+  bioHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  bioTitle: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
+  bioEdit: { fontSize: 16, opacity: 0.7 },
+  bioInput: { color: COLORS.text, fontSize: 13, fontWeight: "400", lineHeight: 20, minHeight: 36, paddingVertical: 2 },
+
+  // Interests Card
+  interestsCard: {
+    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    borderRadius: RADIUS.cardSm,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.subtle,
+  },
+  interestsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  interestsTitle: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
+  interestsEdit: { fontSize: 16, opacity: 0.7 },
+  interestsChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  interestChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: RADIUS.pill,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  interestChipEmoji: { fontSize: 13 },
+  interestChipLabel: { fontSize: 12, fontWeight: "600", color: COLORS.sub },
+
+  // ── State/Waiting Cards ──
+  stateCard: { backgroundColor: "rgba(23, 19, 50, 0.85)", borderRadius: RADIUS.cardSm, padding: 24, borderWidth: 1, borderColor: COLORS.border, gap: 14, ...SHADOWS.subtle },
+  stateBlock: { alignItems: "center", paddingVertical: 16, gap: 10 },
+  pulseRing: { width: 88, height: 88, borderRadius: 44, backgroundColor: COLORS.pinkLight, borderWidth: 2, borderColor: COLORS.pink, alignItems: "center", justifyContent: "center" },
+  stateTitle: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
+  stateSub: { color: COLORS.sub, fontSize: 14 },
+  stateHint: { color: COLORS.sub, fontSize: 12, textAlign: "center", marginTop: 4 },
+  
+  btnDanger: { borderRadius: RADIUS.button, paddingVertical: 16, alignItems: "center", backgroundColor: COLORS.pinkLight, borderWidth: 1, borderColor: `${COLORS.pink}66` },
+  btnDangerText: { color: COLORS.pink, fontSize: 15, fontWeight: "800" },
+  
+  backBtn: { alignSelf: "flex-start", paddingBottom: 10 },
+  backBtnText: { color: COLORS.sub, fontSize: 14, fontWeight: "700" },
+  fieldWrap: { gap: 10 },
+  fieldLabel: { fontSize: 11, fontWeight: "800", color: COLORS.sub, letterSpacing: 2 },
+  inputBox: { backgroundColor: COLORS.bg, borderRadius: RADIUS.small, paddingHorizontal: 16, paddingVertical: 16, borderWidth: 1, borderColor: COLORS.border, justifyContent: "center" },
+  codeInput: { color: COLORS.pink, fontSize: 32, fontWeight: "900", letterSpacing: 14, textAlign: "center" },
+  
+  btnFill: { backgroundColor: COLORS.pink, borderRadius: RADIUS.button, paddingVertical: 16, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  btnFillTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  btnGhost: { backgroundColor: "rgba(23, 19, 50, 0.85)", borderRadius: RADIUS.button, paddingVertical: 16, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: COLORS.border },
+  btnGhostLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  btnGhostEmoji: { fontSize: 24 },
+  btnGhostTitle: { color: COLORS.text, fontSize: 15, fontWeight: "800" },
+  btnGhostSub: { color: COLORS.sub, fontSize: 12, marginTop: 2 },
+  btnArrow: { color: "rgba(255,255,255,0.8)", fontSize: 22, fontWeight: "300" },
+  
+  divider: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+  divLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
+  divText: { color: COLORS.sub, fontSize: 13, fontWeight: "600" },
+  
+  codeCard: { backgroundColor: COLORS.bg, borderRadius: RADIUS.small, paddingHorizontal: 40, paddingVertical: 20, alignItems: "center", marginTop: 12, borderWidth: 1, borderColor: COLORS.border },
+  codeCardLabel: { color: COLORS.sub, fontSize: 11, fontWeight: "800", letterSpacing: 3, marginBottom: 8 },
+  codeCardValue: { color: COLORS.pink, fontSize: 48, fontWeight: "900", letterSpacing: 12 },
+  waitRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
+  waitRowText: { color: COLORS.sub, fontSize: 14 },
+
 });
