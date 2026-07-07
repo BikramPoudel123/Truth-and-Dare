@@ -5,8 +5,11 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -26,6 +29,8 @@ function getHttpBase() {
 export interface CommunityPost {
   id: string;
   author: string;
+  author_id?: string;
+  profilePic?: string | null;
   type: "truth" | "dare";
   text: string;
   likes: number;
@@ -50,6 +55,7 @@ export default function CommunityScreen() {
   const [postText, setPostText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [filter, setFilter] = useState<"all" | "truth" | "dare">("all");
+  const [profileModal, setProfileModal] = useState<{ visible: boolean; name: string; bio: string; pic: string | null; interests: string[]; loading: boolean }>({ visible: false, name: "", bio: "", pic: null, interests: [], loading: false });
 
   const base = getHttpBase();
 
@@ -124,16 +130,38 @@ export default function CommunityScreen() {
     } catch {}
   };
 
+  const openProfile = async (authorId: string | undefined, authorName: string) => {
+    if (!authorId) return;
+    setProfileModal({ visible: true, name: authorName, bio: "", pic: null, interests: [], loading: true });
+    try {
+      const res = await fetch(`${base}/profile/${encodeURIComponent(authorId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProfileModal({ visible: true, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, loading: false });
+      } else {
+        setProfileModal(prev => ({ ...prev, loading: false }));
+      }
+    } catch {
+      setProfileModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
   const filtered = posts.filter((p) => filter === "all" || p.type === filter);
 
   const renderPost = ({ item }: { item: CommunityPost }) => (
     <View style={s.postCard}>
       <View style={s.postTop}>
-        <View style={s.postAvatar}>
-          <Text style={s.postAvatarTxt}>
-            {item.author.slice(0, 2).toUpperCase()}
-          </Text>
-        </View>
+        <TouchableOpacity onPress={() => openProfile(item.author_id, item.author)} activeOpacity={0.7}>
+          {item.profilePic ? (
+            <Image source={{ uri: item.profilePic }} style={s.postAvatarImg} />
+          ) : (
+            <View style={s.postAvatar}>
+              <Text style={s.postAvatarTxt}>
+                {item.author.slice(0, 2).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={s.postAuthor}>{item.author}</Text>
           <Text style={s.postTime}>{timeAgo(item.createdAt)}</Text>
@@ -291,6 +319,37 @@ export default function CommunityScreen() {
           />
         )}
       </KeyboardAvoidingView>
+
+      <Modal visible={profileModal.visible} transparent animationType="fade" onRequestClose={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
+          <TouchableOpacity style={s.modalCard} activeOpacity={1} onPress={() => {}}>
+            {profileModal.loading ? (
+              <ActivityIndicator size="large" color={COLORS.purple} />
+            ) : (
+              <ScrollView contentContainerStyle={{ alignItems: "center", gap: 16 }} showsVerticalScrollIndicator={false}>
+                {profileModal.pic ? (
+                  <Image source={{ uri: profileModal.pic }} style={s.modalAvatar} />
+                ) : (
+                  <View style={[s.modalAvatar, s.modalAvatarPlaceholder]}>
+                    <Text style={s.modalAvatarTxt}>{profileModal.name.slice(0, 2).toUpperCase()}</Text>
+                  </View>
+                )}
+                <Text style={s.modalName}>{profileModal.name}</Text>
+                {profileModal.bio ? <Text style={s.modalBio}>{profileModal.bio}</Text> : null}
+                {profileModal.interests.length > 0 && (
+                  <View style={s.modalInterestsWrap}>
+                    {profileModal.interests.map((i) => (
+                      <View key={i} style={s.modalInterestTag}>
+                        <Text style={s.modalInterestTxt}>{i}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -381,6 +440,13 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  postAvatarImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
   postAvatarTxt: { color: COLORS.purple, fontSize: 13, fontWeight: "800" },
   postAuthor: { color: COLORS.text, fontSize: 13, fontWeight: "700" },
   postTime: { color: COLORS.subAlt, fontSize: 11 },
@@ -413,4 +479,47 @@ const s = StyleSheet.create({
   likeBtnText: { fontSize: 13, fontWeight: "700", color: COLORS.text },
   empty: { alignItems: "center", paddingTop: 60, gap: 10 },
   emptyText: { color: COLORS.sub, fontSize: 14, textAlign: "center" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 300,
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.cardSm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 28,
+    alignItems: "center",
+    ...SHADOWS.glow,
+  },
+  modalAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: COLORS.purple,
+  },
+  modalAvatarPlaceholder: {
+    backgroundColor: `${COLORS.purple}20`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalAvatarTxt: { color: COLORS.purple, fontSize: 24, fontWeight: "800" },
+  modalName: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
+  modalBio: { color: COLORS.sub, fontSize: 13, textAlign: "center", lineHeight: 18 },
+  modalInterestsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" },
+  modalInterestTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: `${COLORS.purple}15`,
+    borderWidth: 1,
+    borderColor: `${COLORS.purple}30`,
+  },
+  modalInterestTxt: { color: COLORS.purple, fontSize: 11, fontWeight: "700" },
 });

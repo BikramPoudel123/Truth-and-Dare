@@ -174,6 +174,7 @@ async function createRoom(creator = null) {
     current_question: null,
     player1_answer: null,
     player2_answer: null,
+    reaction: null,
   };
 
   await saveRoom(gameState);
@@ -635,6 +636,36 @@ wss.on("connection", (ws) => {
           break;
         }
 
+        // ── SEND REACTION ─────────────────────────────────────────────────────
+        case "send_reaction": {
+          const { room_id, player_id, reaction } = message;
+          const room = await getRoom(room_id);
+          if (!room || room.phase !== "reveal") break;
+
+          const reactor = room.players.find((p) => p.id === player_id);
+          if (!reactor) break;
+
+          room.reaction = reaction;
+          await saveRoom(room);
+
+          // Track reaction on the responder's profile (the one who answered)
+          const responder = room.players[room.current_turn];
+          if (responder) {
+            const respProfile = profileStore.get(responder.id) ?? {};
+            const reactions = respProfile.reactions ?? {};
+            reactions[reaction] = (reactions[reaction] ?? 0) + 1;
+            respProfile.reactions = reactions;
+            profileStore.set(responder.id, respProfile);
+          }
+
+          broadcastToRoom(room, {
+            type: "reaction",
+            reaction,
+            reactor_name: reactor.name,
+          });
+          break;
+        }
+
         // ── NEXT ROUND ───────────────────────────────────────────────────────
         case "next_round": {
           const { room_id } = message;
@@ -655,6 +686,7 @@ wss.on("connection", (ws) => {
           room.current_question = null;
           room.player1_answer = null;
           room.player2_answer = null;
+          room.reaction = null;
           await saveRoom(room);
 
           broadcastToRoom(room, {
@@ -841,6 +873,42 @@ app.post("/profile/sync", (req, res) => {
   }
 });
 
+function getPlayStyle(reactions = {}) {
+  const entries = Object.entries(reactions).filter(([, c]) => c > 0);
+  if (entries.length === 0) return "Rising Star";
+  const top = entries.sort(([, a], [, b]) => b - a)[0][0];
+  const map = {
+    "🔥": "Hot Player",
+    "😂": "Funny Player",
+    "😍": "Heartthrob",
+    "😮": "Shocking Player",
+    "💀": "Savage Player",
+    "😢": "Emotional Player",
+    "🎉": "Life of the Party",
+    "👏": "Respected Player",
+  };
+  return map[top] ?? "Rising Star";
+}
+
+// GET /profile/:player_id
+app.get("/profile/:player_id", (req, res) => {
+  try {
+    const { player_id } = req.params;
+    const data = profileStore.get(player_id);
+    if (!data) return res.status(404).json({ error: "Profile not found" });
+    res.json({
+      name: data.name ?? "Unknown",
+      bio: data.bio ?? "",
+      pic: data.pic ?? null,
+      interests: data.interests ?? [],
+      reactions: data.reactions ?? {},
+      playStyle: getPlayStyle(data.reactions),
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // ─── Community REST API ───────────────────────────────────────────────────────
 
 const POSTS_KEY = "community:posts";
@@ -869,9 +937,11 @@ app.get("/community/posts", async (req, res) => {
     const posts = await getCommunityPosts();
     const mappedPosts = posts.map((p) => {
       const likedBy = p.liked_by || [];
+      const authorProfile = profileStore.get(p.author_id);
       return {
         ...p,
         likedByMe: player_id ? likedBy.includes(player_id) : false,
+        profilePic: authorProfile?.pic ?? null,
       };
     });
     res.json({ posts: mappedPosts });

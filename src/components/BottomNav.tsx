@@ -1,4 +1,5 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/design-system";
 import { Home, User, HelpCircle, Users } from "lucide-react-native";
 
@@ -17,8 +18,9 @@ interface BottomNavProps {
 const icons: Record<string, React.ComponentType<{ size: number; color: string }>> = { Home, User, HelpCircle, Users };
 
 export default function BottomNav({ activeTab, onNavigate }: BottomNavProps) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={s.bottomNav}>
+    <View style={[s.bottomNav, { paddingBottom: insets.bottom || 8 }]}>
       {NAV_TABS.map(tab => {
         const isActive = tab.key === activeTab;
         const IconComp = icons[tab.icon];
@@ -47,7 +49,6 @@ const s = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: "#060411",
     paddingTop: 2,
-    paddingBottom: 8,
     paddingHorizontal: 4,
     borderTopWidth: 1,
     borderTopColor: "rgba(255, 255, 255, 0.06)",

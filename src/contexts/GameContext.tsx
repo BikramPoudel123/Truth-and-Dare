@@ -9,12 +9,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-
-const generateUUID = () =>
-  "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
+import { useProfile } from "./ProfileContext";
 
 const MAX_MEDIA_CHUNK_CHARS = 700_000;
 
@@ -68,6 +63,7 @@ export interface GameContextType {
   currentMode: "truth" | "dare" | null;
   currentQuestion: string | null;
   answer: string | null;
+  reaction: string | null;
   media: Media[];
   answerMediaList: Media[];
   roomId: string | null;
@@ -78,6 +74,7 @@ export interface GameContextType {
   askerName: string | null;
   responderName: string | null;
   createRoom: (playerName: string) => void;
+  sendReaction: (reaction: string) => void;
   autoJoin: (playerName: string) => void;
   joinRoom: (roomId: string, playerName: string) => void;
   chooseMode: (mode: "truth" | "dare") => void;
@@ -97,7 +94,10 @@ export interface GameContextType {
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const playerId = useRef(generateUUID());
+  const { playerId: profilePlayerId } = useProfile();
+  const playerId = useRef(profilePlayerId);
+  // keep the ref in sync if the profile playerId changes (it shouldn't, but just in case)
+  playerId.current = profilePlayerId;
   const wsRef = useRef<WebSocket | null>(null);
 
   const [ws, setWs] = useState<WebSocket | null>(null);
@@ -117,6 +117,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [chooserName, setChooserName] = useState<string | null>(null);
   const [askerName, setAskerName] = useState<string | null>(null);
   const [responderName, setResponderName] = useState<string | null>(null);
+  const [reaction, setReaction] = useState<string | null>(null);
   const [profilePic, setProfilePicState] = useState<string | null>(null);
   const [interests, setInterestsState] = useState<string[]>([]);
   const [gameMood, setGameMood] = useState<GameMood>("casual");
@@ -129,7 +130,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // Load persisted profile pic on mount
   useEffect(() => {
-    AsyncStorage.getItem("profilePic").then((v) => {
+    AsyncStorage.getItem("prof:pic").then((v) => {
       if (v) {
         setProfilePicState(v);
         profilePicRef.current = v;
@@ -147,8 +148,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const setProfilePic = useCallback((uri: string | null) => {
     setProfilePicState(uri);
     profilePicRef.current = uri;
-    if (uri) AsyncStorage.setItem("profilePic", uri);
-    else AsyncStorage.removeItem("profilePic");
+    if (uri) AsyncStorage.setItem("prof:pic", uri);
+    else AsyncStorage.removeItem("prof:pic");
   }, []);
 
   const setInterests = useCallback((v: string[]) => {
@@ -247,11 +248,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setPhase("reveal");
         break;
 
+      case "reaction":
+        setReaction(message.reaction);
+        break;
+
       case "round_started":
         setCurrentTurn(message.current_turn);
         setCurrentMode(null);
         setCurrentQuestion(null);
         setAnswer(null);
+        setReaction(null);
         setAnswerMediaList([]);
         setMedia([]);
         setChooserName(null);
@@ -541,6 +547,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, [sendMessage]);
 
+  const sendReaction = useCallback((emoji: string) => {
+    if (roomIdRef.current) {
+      sendMessage({
+        type: "send_reaction",
+        room_id: roomIdRef.current,
+        player_id: playerId.current,
+        reaction: emoji,
+      });
+    }
+  }, [sendMessage]);
+
   const nextRound = useCallback(() => {
     if (roomIdRef.current) {
       sendMessage({
@@ -599,6 +616,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     currentMode,
     currentQuestion,
     answer,
+    reaction,
     media,
     answerMediaList,
     roomId,
@@ -615,6 +633,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     submitQuestion,
     submitAnswer,
     submitMedia,
+    sendReaction,
     nextRound,
     quitGame,
     forfeit,

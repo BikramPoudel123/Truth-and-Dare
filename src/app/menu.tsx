@@ -1,6 +1,7 @@
 import { useGame } from "@/contexts/GameContext";
 import { Interest, useProfile } from "@/contexts/ProfileContext";
 import { GameMood, MOODS, getMoodConfig } from "@/data/moods";
+import { SERVER_URL } from "@/constants/server";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -11,7 +12,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
 import BottomNav from "@/components/BottomNav";
-import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Trophy, Target, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves } from "lucide-react-native";
+import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Trophy, Target, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves, Star, Skull, Heart } from "lucide-react-native";
+
+function getHttpBase() {
+  return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
+}
 
 const ICON_MAP: Record<string, any> = { SmilePlus, MessageCircle, Flame, Handshake, Waves };
 
@@ -119,7 +124,7 @@ type ScreenMode = "home" | "profile" | "random_waiting" | "private_join" | "priv
 
 export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (screen: "questions" | "community") => void; initialMode?: string }) {
   const { createRoom, autoJoin, joinRoom, roomId, players, isConnected, phase, reconnect, error, quitGame, setInterests, gameMood, setGameMood, playersOnline } = useGame();
-  const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, winRate } = useProfile();
+  const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, winRate, playerId } = useProfile();
   
   const [code, setCode] = useState("");
   const [mode, setMode] = useState<ScreenMode>((initialMode as ScreenMode) || "home");
@@ -127,6 +132,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
   const [spicyMode, setSpicyMode] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
+  const [playStyle, setPlayStyle] = useState<string | null>(null);
   const displayName = profile.name || "Player";
 
   useEffect(() => { setInterests(profile.interests); }, [profile.interests]);
@@ -137,6 +143,16 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
     if (spicyMode && gameMood !== "spicy") setGameMood("spicy");
     else if (!spicyMode && gameMood === "spicy") setGameMood("casual");
   }, [spicyMode]);
+
+  const base = getHttpBase();
+  useEffect(() => {
+    if (mode === "profile") {
+      fetch(`${base}/profile/${encodeURIComponent(playerId)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => setPlayStyle(d?.playStyle ?? null))
+        .catch(() => setPlayStyle(null));
+    }
+  }, [mode]);
 
   const pickPic = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -313,11 +329,26 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                   </TouchableOpacity>
                 )}
 
-                {/* Achievement Badges */}
+                {/* Play Style & Level Badges */}
                 <View style={s.achievementRow}>
                   <View style={s.achievementBadge}>
-                    <Flame size={14} color={COLORS.orange} />
-                    <Text style={s.achievementLabel}>Spicy Player</Text>
+                    {(() => {
+                      const iconMap: Record<string, [React.ComponentType<{size: number; color: string}>, string]> = {
+                        "Rising Star":      [Star, COLORS.gold],
+                        "Hot Player":       [Flame, COLORS.orange],
+                        "Funny Player":     [SmilePlus, "#facc15"],
+                        "Heartthrob":       [Heart, COLORS.pink],
+                        "Shocking Player":  [Zap, COLORS.electricBlue],
+                        "Savage Player":    [Skull, "#a855f7"],
+                        "Emotional Player": [Heart, "#60a5fa"],
+                        "Life of the Party":[PartyPopper, "#f97316"],
+                        "Respected Player": [Crown, COLORS.gold],
+                      };
+                      const pair = iconMap[playStyle ?? ""] ?? [Star, COLORS.sub];
+                      const Icon = pair[0];
+                      return <Icon size={14} color={pair[1]} />;
+                    })()}
+                    <Text style={s.achievementLabel}>{playStyle ?? "Rising Star"}</Text>
                   </View>
                   <View style={s.achievementBadge}>
                     <Crown size={14} color={COLORS.gold} />

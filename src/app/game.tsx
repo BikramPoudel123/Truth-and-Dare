@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import { Eye, Flame, Timer as TimerIcon, Sparkles, Paperclip, Send, Target, Camera, Check, X, Flag } from "lucide-react-native";
+import { ArrowLeft, Eye, Flame, Timer as TimerIcon, Sparkles, Paperclip, Send, Target, Camera, Check, X, Flag, SmilePlus } from "lucide-react-native";
 
 function PlayerBar({ players, currentTurn, playerName, profilePic }: {
   players: { id: string; name: string }[];
@@ -27,8 +27,9 @@ function PlayerBar({ players, currentTurn, playerName, profilePic }: {
   playerName: string | null;
   profilePic: string | null;
 }) {
-  const { gameMood } = useGame();
-  const moodCfg = getMoodConfig(gameMood);
+  const { gameMood, currentMode } = useGame();
+  let moodCfg = getMoodConfig(gameMood);
+  if (currentMode === "dare") moodCfg = { ...moodCfg, color: COLORS.red, accentColor: COLORS.red };
   if (players.length < 2) return null;
   const p0 = players[0];
   const p1 = players[1];
@@ -116,8 +117,9 @@ const pb = StyleSheet.create({
 });
 
 function ModeBadge({ mode }: { mode: "truth" | "dare" | null }) {
-  const { gameMood } = useGame();
-  const moodCfg = getMoodConfig(gameMood);
+  const { gameMood, currentMode } = useGame();
+  let moodCfg = getMoodConfig(gameMood);
+  if (currentMode === "dare") moodCfg = { ...moodCfg, color: COLORS.red, accentColor: COLORS.red };
   if (!mode) return null;
   const isTruth = mode === "truth";
   return (
@@ -165,8 +167,10 @@ export default function GameScreen() {
     answer, media, answerMediaList, playerName, chooserName,
     askerName, responderName, profilePic, chooseMode, submitQuestion,
     submitAnswer, submitMedia, nextRound, quitGame, forfeit, gameMood,
+    reaction, sendReaction,
   } = useGame();
-  const moodCfg = getMoodConfig(gameMood);
+  let moodCfg = getMoodConfig(gameMood);
+  if (currentMode === "dare") moodCfg = { ...moodCfg, color: COLORS.red, accentColor: COLORS.red };
   const answerInputRef = useRef<TextInput>(null);
 
   const [inputQ, setInputQ]       = useState("");
@@ -176,6 +180,7 @@ export default function GameScreen() {
   const [inputA, setInputA]       = useState("");
   const [aMedia, setAMedia]       = useState<SelectedMedia[]>([]);
   const [showAMedia, setShowAMedia] = useState(false);
+  const [showReactions, setShowReactions] = useState(false);
   const [timer, setTimer]         = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevTimerRef = useRef(0);
@@ -184,13 +189,18 @@ export default function GameScreen() {
   const isMyTurn     = !!playerName && playerName === chooserName_;
   const askerName_   = askerName ?? (players.length === 2 ? players[1 - currentTurn]?.name : null);
   const isMyQ        = !!playerName && playerName === askerName_;
+  const responderPlayer = players.find(p => p.name === responderName);
+  const responderPic = responderName === playerName ? profilePic : (responderPlayer?.profilePic ?? null);
   const canSendQ     = inputQ.trim().length > 0 || qMedia.length > 0;
   const canSendA     = inputA.trim().length > 0 || aMedia.length > 0;
 
   function getTimerDuration() {
+    if (phase === "reveal" && currentMode === "dare") return 60;
+    if (phase === "reveal") return 30;
     if (phase === "answering" && currentMode === "dare") return 180;
     if (phase === "answering") return 60;
     if (phase === "choosing") return 7;
+    if (phase === "question_set") return 30;
     return 0;
   }
 
@@ -207,14 +217,24 @@ export default function GameScreen() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [phase, currentMode]);
 
+  const sendQ = (q: string) => {
+    submitQuestion(q);
+    qMedia.forEach(m => submitMedia(m.type, m.base64));
+    setInputQ(""); setQMedia([]); setShowQMedia(false);
+  };
+  const handleSendQ = () => { if (canSendQ) sendQ(inputQ); };
+  const autoSendQ = () => sendQ(inputQ);
+
   useEffect(() => {
     const prev = prevTimerRef.current;
     prevTimerRef.current = timer;
     if (prev === 1 && timer === 0) {
       if (phase === "answering" && isMyTurn) forfeit();
       if (phase === "choosing" && isMyTurn) chooseMode("truth");
+      if (phase === "question_set" && isMyQ) autoSendQ();
+      if (phase === "reveal") nextRound();
     }
-  }, [timer, phase, isMyTurn]);
+  }, [timer, phase, isMyTurn, isMyQ]);
 
   useEffect(() => {
     if (phase === "answering" && isMyTurn) {
@@ -230,12 +250,6 @@ export default function GameScreen() {
   }, [phase]);
 
   const handleQuit  = () => Alert.alert("Quit Game", "Are you sure?", [{ text: "Cancel" }, { text: "Quit", onPress: quitGame, style: "destructive" }]);
-  const handleSendQ = () => {
-    if (!canSendQ) return;
-    submitQuestion(inputQ);
-    qMedia.forEach(m => submitMedia(m.type, m.base64));
-    setInputQ(""); setQMedia([]); setShowQMedia(false);
-  };
   const handleSendA = () => {
     if (!canSendA) return;
     submitAnswer(inputA, aMedia.length > 0 ? aMedia.map(m => ({ type: m.type, base64: m.base64 })) : undefined);
@@ -248,7 +262,7 @@ export default function GameScreen() {
 
         <View style={[s.topBar, { borderBottomColor: `${moodCfg.color}20` }]}>
           <TouchableOpacity onPress={handleQuit} style={s.topBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={[s.topBtnTxt, { color: moodCfg.color }]}>←</Text>
+            <ArrowLeft size={18} color={moodCfg.color} />
           </TouchableOpacity>
           <Text style={s.topTitle}>Truth or Dare</Text>
           <View style={{ width: 36 }} />
@@ -307,6 +321,7 @@ export default function GameScreen() {
           {phase === "question_set" && isMyQ && (
             <View style={s.section}>
               <ModeBadge mode={currentMode} />
+              <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
               <Text style={s.phaseLabel}>
                 {currentMode === "truth" ? `Ask ${chooserName_} a question` : `Give ${chooserName_} a dare`}
               </Text>
@@ -416,20 +431,46 @@ export default function GameScreen() {
               </View>
 
               <View style={s.responderSection}>
-                <View style={[s.responderAvatar, { backgroundColor: moodCfg.color }]}>
-                  <Text style={s.responderAvatarTxt}>{responderName?.slice(0, 2).toUpperCase()}</Text>
-                </View>
+                {responderPic ? (
+                  <Image source={{ uri: responderPic }} style={[s.responderAvatar, { borderWidth: 2, borderColor: moodCfg.color }]} />
+                ) : (
+                  <View style={[s.responderAvatar, { backgroundColor: moodCfg.color }]}>
+                    <Text style={s.responderAvatarTxt}>{responderName?.slice(0, 2).toUpperCase()}</Text>
+                  </View>
+                )}
                 <Text style={s.responderName}>{responderName}</Text>
               </View>
 
               {answer || answerMediaList.length > 0 ? (
                 <View style={[s.answerCard, { backgroundColor: `${moodCfg.color}18`, borderColor: `${moodCfg.color}35` }]}>
+                  {isMyQ && (
+                    <View style={s.reactRow}>
+                      {showReactions ? (
+                        <View style={s.emojiPicker}>
+                          {["😂", "🔥", "😍", "😮", "💀", "😢", "🎉", "👏"].map(e => (
+                            <TouchableOpacity key={e} onPress={() => { sendReaction(e); setShowReactions(false); }} activeOpacity={0.7} style={s.emojiBtn}>
+                              <Text style={s.emojiTxt}>{e}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      ) : (
+                        <TouchableOpacity onPress={() => setShowReactions(true)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <SmilePlus size={20} color={COLORS.sub} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                   {answer ? <Text style={s.answerText}>{answer}</Text> : null}
                   {answerMediaList.length > 0 && (
                     <View style={{ gap: 8, marginTop: 8 }}>
                       {answerMediaList.map((m, i) => (
                         <MediaDisplay key={i} media={{ type: m.type, data: m.data, playerName: m.playerName }} size="medium" />
                       ))}
+                    </View>
+                  )}
+                  {reaction && (
+                    <View style={s.reactDisplay}>
+                      <Text style={s.reactEmoji}>{reaction}</Text>
                     </View>
                   )}
                 </View>
@@ -440,8 +481,16 @@ export default function GameScreen() {
                 </View>
               )}
 
-              <TouchableOpacity style={[s.nextBtn, { backgroundColor: moodCfg.color }]} onPress={nextRound} activeOpacity={0.85}>
-                <Text style={s.nextBtnTxt}>Next Round  →</Text>
+              {timer > 0 && <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />}
+              <TouchableOpacity
+                style={[s.nextBtn, { backgroundColor: moodCfg.color }, !isMyQ && s.nextBtnDisabled]}
+                onPress={nextRound}
+                activeOpacity={0.85}
+                disabled={!isMyQ}
+              >
+                <Text style={s.nextBtnTxt}>
+                  {isMyQ ? `Next Round  →  ${timer}s` : `Waiting for ${askerName_}…`}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -670,6 +719,42 @@ const s = StyleSheet.create({
     textAlign: "center",
     lineHeight: 28,
   },
+  reactRow: {
+    alignSelf: "flex-end",
+    marginBottom: 4,
+    zIndex: 10,
+  },
+  emojiPicker: {
+    flexDirection: "row",
+    gap: 2,
+    backgroundColor: "rgba(23, 19, 50, 0.95)",
+    borderRadius: RADIUS.small,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  emojiBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emojiTxt: { fontSize: 18 },
+  reactDisplay: {
+    position: "absolute",
+    bottom: -12,
+    right: -8,
+    backgroundColor: "rgba(23, 19, 50, 0.9)",
+    borderRadius: 16,
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  reactEmoji: { fontSize: 18 },
   forfeitBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -683,6 +768,7 @@ const s = StyleSheet.create({
   },
   forfeitTxt: { color: COLORS.red, fontSize: 14, fontWeight: "700" },
   nextBtn: { borderRadius: RADIUS.button, paddingVertical: 16, alignItems: "center" },
+  nextBtnDisabled: { opacity: 0.4 },
   nextBtnTxt: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: 1 },
 
   // ── Sticky bottom ──
