@@ -134,9 +134,9 @@ const mb = StyleSheet.create({
   text:  { fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
 });
 
-function TimerBar({ seconds, moodColor }: { seconds: number; moodColor: string }) {
+function TimerBar({ seconds, moodColor, maxSeconds = 60 }: { seconds: number; moodColor: string; maxSeconds?: number }) {
   const urgent = seconds <= 10;
-  const pct = seconds / 60;
+  const pct = Math.max(0, seconds / maxSeconds);
   return (
     <View style={tib.wrap}>
       <View style={tib.row}>
@@ -176,8 +176,9 @@ export default function GameScreen() {
   const [inputA, setInputA]       = useState("");
   const [aMedia, setAMedia]       = useState<SelectedMedia[]>([]);
   const [showAMedia, setShowAMedia] = useState(false);
-  const [timer, setTimer]         = useState(60);
+  const [timer, setTimer]         = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevTimerRef = useRef(0);
 
   const chooserName_ = chooserName ?? players[currentTurn]?.name ?? null;
   const isMyTurn     = !!playerName && playerName === chooserName_;
@@ -186,16 +187,34 @@ export default function GameScreen() {
   const canSendQ     = inputQ.trim().length > 0 || qMedia.length > 0;
   const canSendA     = inputA.trim().length > 0 || aMedia.length > 0;
 
+  function getTimerDuration() {
+    if (phase === "answering" && currentMode === "dare") return 180;
+    if (phase === "answering") return 60;
+    if (phase === "choosing") return 7;
+    return 0;
+  }
+
   useEffect(() => {
-    if (phase === "answering") {
-      setTimer(60);
+    const dur = getTimerDuration();
+    if (dur > 0) {
+      setTimer(dur);
       timerRef.current = setInterval(() =>
         setTimer(p => { if (p <= 1) { clearInterval(timerRef.current!); return 0; } return p - 1; }), 1000);
-    } else if (timerRef.current) clearInterval(timerRef.current);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setTimer(0);
+    }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [phase]);
+  }, [phase, currentMode]);
 
-  useEffect(() => { if (phase === "answering" && isMyTurn && timer === 0) forfeit(); }, [timer, phase, isMyTurn]);
+  useEffect(() => {
+    const prev = prevTimerRef.current;
+    prevTimerRef.current = timer;
+    if (prev === 1 && timer === 0) {
+      if (phase === "answering" && isMyTurn) forfeit();
+      if (phase === "choosing" && isMyTurn) chooseMode("truth");
+    }
+  }, [timer, phase, isMyTurn]);
 
   useEffect(() => {
     if (phase === "answering" && isMyTurn) {
@@ -247,6 +266,15 @@ export default function GameScreen() {
           {phase === "choosing" && isMyTurn && (
             <View style={s.centerFill}>
               <Text style={s.chooseLabel}>Your turn — pick one</Text>
+              <View style={[s.choiceTimer, timer <= 3 && s.choiceTimerUrgent]}>
+                <TimerIcon size={12} color={timer <= 3 ? COLORS.red : COLORS.sub} />
+                <Text style={[s.choiceTimerTxt, timer <= 3 && { color: COLORS.red }]}>
+                  Choose in {timer}s
+                </Text>
+                <View style={[s.choiceTrack, { backgroundColor: `${moodCfg.color}15` }]}>
+                  <View style={[s.choiceFill, { width: `${(timer / 7) * 100}%` as any, backgroundColor: timer <= 3 ? COLORS.red : moodCfg.color }]} />
+                </View>
+              </View>
               <View style={s.modeRow}>
                 <TouchableOpacity style={[s.modeCard, { backgroundColor: `${moodCfg.color}15`, borderColor: moodCfg.color }]} onPress={() => chooseMode("truth")} activeOpacity={0.82}>
                   <View style={[s.modeIconWrap, { backgroundColor: `${moodCfg.color}20` }]}>
@@ -330,7 +358,7 @@ export default function GameScreen() {
 
           {phase === "answering" && isMyTurn && (
             <View style={s.answerContainer}>
-              <TimerBar seconds={timer} moodColor={moodCfg.color} />
+              <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
               <View style={[s.questionPill, { backgroundColor: `${moodCfg.color}15`, borderColor: `${moodCfg.color}30` }]}>
                 <ModeBadge mode={currentMode} />
                 <Text style={s.questionText}>{currentQuestion}</Text>
@@ -355,7 +383,7 @@ export default function GameScreen() {
 
           {phase === "answering" && !isMyTurn && (
             <View style={s.answerContainer}>
-              <TimerBar seconds={timer} moodColor={moodCfg.color} />
+              <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
               <View style={[s.questionPill, { backgroundColor: `${moodCfg.color}15`, borderColor: `${moodCfg.color}30` }]}>
                 <ModeBadge mode={currentMode} />
                 <Text style={s.questionText}>{currentQuestion}</Text>
@@ -499,7 +527,17 @@ const s = StyleSheet.create({
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 32 },
   section:    { gap: 14, paddingTop: 8 },
 
-  chooseLabel: { color: COLORS.sub, fontSize: 14, textAlign: "center", fontWeight: "600", marginBottom: 8 },
+  chooseLabel: { color: COLORS.sub, fontSize: 14, textAlign: "center", fontWeight: "600", marginBottom: 4 },
+
+  choiceTimer: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    marginBottom: 20, paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: RADIUS.small,
+  },
+  choiceTimerUrgent: { backgroundColor: `${COLORS.red}10` },
+  choiceTimerTxt: { color: COLORS.sub, fontSize: 12, fontWeight: "700" },
+  choiceTrack: { height: 3, borderRadius: 2, flex: 1, overflow: "hidden", minWidth: 60 },
+  choiceFill: { height: "100%", borderRadius: 2 },
 
   waitingCard: {
     borderRadius: RADIUS.cardSm, padding: 28, alignItems: "center", gap: 12,
