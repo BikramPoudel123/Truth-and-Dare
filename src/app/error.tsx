@@ -2,6 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useGame } from "@/contexts/GameContext";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { AlertTriangle } from "lucide-react-native";
 
 export default function ErrorScreen() {
   const { error, reset, reconnect, isConnected } = useGame();
@@ -9,7 +10,7 @@ export default function ErrorScreen() {
     <SafeAreaView style={s.safe}>
       <View style={s.center}>
         <View style={s.iconWrap}>
-          <Text style={s.icon}>⚠️</Text>
+          <AlertTriangle size={38} color={COLORS.red} />
         </View>
 
         <Text style={s.title}>Something went wrong</Text>
@@ -47,7 +48,6 @@ const s = StyleSheet.create({
     backgroundColor: `${COLORS.red}15`, borderWidth: 1.5, borderColor: `${COLORS.red}30`,
     alignItems: "center", justifyContent: "center",
   },
-  icon: { fontSize: 38 },
   title: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
   card: {
     backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: RADIUS.cardSm,

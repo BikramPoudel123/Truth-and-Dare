@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { Clapperboard, X, Camera, Image as LucideImage, Video } from "lucide-react-native";
 
 export interface SelectedMedia {
   type: "photo" | "video";
@@ -198,14 +199,14 @@ export function MediaPicker({ selected, onChange }: MediaPickerProps) {
                 <Image source={{ uri: m.uri }} style={styles.thumbImg} />
               ) : (
                 <View style={styles.thumbVideo}>
-                  <Text style={styles.thumbVideoIcon}>🎬</Text>
+                  <Clapperboard size={28} color="white" />
                 </View>
               )}
               <TouchableOpacity
                 style={styles.removeBtn}
                 onPress={() => remove(idx)}
               >
-                <Text style={styles.removeTxt}>✕</Text>
+                <X size={10} color="white" />
               </TouchableOpacity>
             </View>
           ))}
@@ -218,7 +219,7 @@ export function MediaPicker({ selected, onChange }: MediaPickerProps) {
           onPress={takePhoto}
           activeOpacity={0.8}
         >
-          <Text style={styles.btnEmoji}>📸</Text>
+          <Camera size={20} color="white" />
           <Text style={styles.btnTxt}>Camera</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -226,7 +227,7 @@ export function MediaPicker({ selected, onChange }: MediaPickerProps) {
           onPress={pickImages}
           activeOpacity={0.8}
         >
-          <Text style={styles.btnEmoji}>🖼️</Text>
+          <LucideImage size={20} color="white" />
           <Text style={styles.btnTxt}>Photos</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -234,7 +235,7 @@ export function MediaPicker({ selected, onChange }: MediaPickerProps) {
           onPress={takeVideo}
           activeOpacity={0.8}
         >
-          <Text style={styles.btnEmoji}>🎥</Text>
+          <Video size={20} color="white" />
           <Text style={styles.btnTxt}>Record</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -242,7 +243,7 @@ export function MediaPicker({ selected, onChange }: MediaPickerProps) {
           onPress={pickVideos}
           activeOpacity={0.8}
         >
-          <Text style={styles.btnEmoji}>📹</Text>
+          <Video size={20} color="white" />
           <Text style={styles.btnTxt}>Videos</Text>
         </TouchableOpacity>
       </View>
@@ -267,7 +268,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  thumbVideoIcon: { fontSize: 28 },
   removeBtn: {
     position: "absolute",
     top: 2,
@@ -279,7 +279,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  removeTxt: { color: "white", fontSize: 10, fontWeight: "bold" },
   row: { flexDirection: "row", gap: 8 },
   btn: {
     flex: 1,
@@ -292,6 +291,5 @@ const styles = StyleSheet.create({
   cyan: { backgroundColor: "#0891b2" },
   red: { backgroundColor: "#dc2626" },
   purple: { backgroundColor: "#9333ea" },
-  btnEmoji: { fontSize: 20, marginBottom: 4 },
   btnTxt: { color: "white", fontSize: 12, fontWeight: "700" },
 });

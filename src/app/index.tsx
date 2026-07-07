@@ -15,6 +15,7 @@ type AppScreen = "menu" | "questions" | "community";
 function AppContent() {
   const { phase, isConnected } = useGame();
   const [screen, setScreen] = useState<AppScreen>("menu");
+  const [menuTab, setMenuTab] = useState("home");
 
   if (!isConnected && phase === "connecting") {
     return (
@@ -38,7 +39,7 @@ function AppContent() {
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         <QuestionsScreen />
-        <BottomNav activeTab="questions" onNavigate={(tab) => setScreen(tab === "home" || tab === "profile" ? "menu" : tab as AppScreen)} />
+        <BottomNav activeTab="questions" onNavigate={(tab) => { setMenuTab(tab); setScreen(tab === "home" || tab === "profile" ? "menu" : tab as AppScreen); }} />
       </View>
     );
   }
@@ -46,12 +47,12 @@ function AppContent() {
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         <CommunityScreen />
-        <BottomNav activeTab="community" onNavigate={(tab) => setScreen(tab === "home" || tab === "profile" ? "menu" : tab as AppScreen)} />
+        <BottomNav activeTab="community" onNavigate={(tab) => { setMenuTab(tab); setScreen(tab === "home" || tab === "profile" ? "menu" : tab as AppScreen); }} />
       </View>
     );
   }
 
-  return <MenuScreen onNavigate={(s) => setScreen(s)} />;
+  return <MenuScreen onNavigate={(s) => { setMenuTab("home"); setScreen(s); }} initialMode={menuTab} />;
 }
 
 const s = StyleSheet.create({});

@@ -11,14 +11,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
 import BottomNav from "@/components/BottomNav";
+import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Trophy, Target, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves } from "lucide-react-native";
 
-const INTEREST_META: { key: Interest; label: string; emoji: string; gradient: string[] }[] = [
-  { key: "fun",     label: "Fun & Laughs",  emoji: "😂", gradient: ["#8b5cf6", "#a78bfa"] },
-  { key: "life",    label: "Life Talks",    emoji: "💬", gradient: ["#3b82f6", "#60a5fa"] },
-  { key: "hot",     label: "Hot & Flirty",  emoji: "🔥", gradient: ["#ec4899", "#f472b6"] },
-  { key: "connect", label: "Get in Touch",  emoji: "🤝", gradient: ["#f97316", "#fb923c"] },
-  { key: "spicy",   label: "Spicy",         emoji: "🌶", gradient: ["#ef4444", "#f87171"] },
-  { key: "deep",    label: "Deep Talks",    emoji: "🌊", gradient: ["#06b6d4", "#22d3ee"] },
+const ICON_MAP: Record<string, any> = { SmilePlus, MessageCircle, Flame, Handshake, Waves };
+
+const INTEREST_META: { key: Interest; label: string; emoji: string; icon: string; gradient: string[] }[] = [
+  { key: "fun",     label: "Fun & Laughs",  emoji: "😂", icon: "SmilePlus",   gradient: ["#8b5cf6", "#a78bfa"] },
+  { key: "life",    label: "Life Talks",    emoji: "💬", icon: "MessageCircle", gradient: ["#3b82f6", "#60a5fa"] },
+  { key: "hot",     label: "Hot & Flirty",  emoji: "🔥", icon: "Flame",        gradient: ["#ec4899", "#f472b6"] },
+  { key: "connect", label: "Get in Touch",  emoji: "🤝", icon: "Handshake",    gradient: ["#f97316", "#fb923c"] },
+  { key: "spicy",   label: "Spicy",         emoji: "🌶", icon: "Flame",        gradient: ["#ef4444", "#f87171"] },
+  { key: "deep",    label: "Deep Talks",    emoji: "🌊", icon: "Waves",        gradient: ["#06b6d4", "#22d3ee"] },
 ];
 
 function SearchingDots() {
@@ -114,16 +117,15 @@ function BlurredBlob({ color, top, left, size }: { color: string; top: number; l
 
 type ScreenMode = "home" | "profile" | "random_waiting" | "private_join" | "private_waiting_creator" | "private_waiting_joiner";
 
-export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "questions" | "community") => void }) {
+export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (screen: "questions" | "community") => void; initialMode?: string }) {
   const { createRoom, autoJoin, joinRoom, roomId, players, isConnected, phase, reconnect, error, quitGame, setInterests, gameMood, setGameMood, playersOnline } = useGame();
-  const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, usernameStatus, setUsername, checkUsername, winRate } = useProfile();
+  const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, winRate } = useProfile();
   
   const [code, setCode] = useState("");
-  const [mode, setMode] = useState<ScreenMode>("home");
+  const [mode, setMode] = useState<ScreenMode>((initialMode as ScreenMode) || "home");
   const [joining, setJoining] = useState(false);
   const [spicyMode, setSpicyMode] = useState(false);
   const [editingName, setEditingName] = useState(false);
-  const [editingUsername, setEditingUsername] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
   const displayName = profile.name || "Player";
 
@@ -177,10 +179,18 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                 </View>
                   </View>
                 </View>
-                <TouchableOpacity style={s.notifBtn} activeOpacity={0.8}>
-                  <View style={s.notifDot} />
-                  <Text style={s.notifIcon}>🔔</Text>
-                </TouchableOpacity>
+                <View style={s.headerRight}>
+                  <TouchableOpacity style={s.iconBtn} activeOpacity={0.8}>
+                    <Users size={18} color={COLORS.sub} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.notifBtn} activeOpacity={0.8}>
+                    <View style={s.notifDot} />
+                    <Bell size={18} color={COLORS.sub} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.iconBtn} activeOpacity={0.8}>
+                    <Settings size={18} color={COLORS.sub} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Online Players */}
@@ -192,7 +202,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
               {/* Profile missing warning */}
               {!isProfileReady && (
                 <TouchableOpacity style={s.profileBanner} onPress={() => setMode("profile")} activeOpacity={0.85}>
-                  <Text style={s.profileBannerIcon}>⚠️</Text>
+                  <AlertTriangle size={24} color={COLORS.pink} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.profileBannerTitle}>Profile needs setup</Text>
                     <Text style={s.profileBannerSub}>Tap here to set your name before playing</Text>
@@ -222,7 +232,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
               >
                 <View style={s.matchContent}>
                   <View style={s.matchIconWrap}>
-                    <Text style={s.matchIcon}>⚡</Text>
+                    <Zap size={24} color={COLORS.purple} />
                   </View>
                   <View style={s.matchTextCol}>
                     <Text style={s.matchTitle}>Quick Match</Text>
@@ -243,7 +253,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
               >
                 <View style={s.matchContent}>
                   <View style={[s.matchIconWrap, s.matchIconWrapPink]}>
-                    <Text style={s.matchIcon}>👥</Text>
+                    <Users size={24} color={COLORS.pink} />
                   </View>
                   <View style={s.matchTextCol}>
                     <Text style={s.matchTitle}>Private Game</Text>
@@ -272,13 +282,13 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                         <Image source={{ uri: profile.pic }} style={s.avatarImage} />
                       ) : (
                         <View style={s.avatarPlaceholder}>
-                          <Text style={s.avatarPlaceholderText}>🎮</Text>
+                          <Gamepad2 size={32} color={COLORS.sub} />
                         </View>
                       )}
                     </View>
                   </View>
                   <View style={s.cameraBtn}>
-                    <Text style={s.cameraBtnIcon}>📷</Text>
+                    <Camera size={12} color={COLORS.sub} />
                   </View>
                 </TouchableOpacity>
 
@@ -299,47 +309,18 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                 ) : (
                   <TouchableOpacity style={s.displayNameRow} onPress={() => setEditingName(true)} activeOpacity={0.7}>
                     <Text style={s.displayName}>{profile.name || "Your Name"}</Text>
-                    <Text style={s.penIcon}>✏️</Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* Editable Username */}
-                {editingUsername ? (
-                  <View style={s.usernameRow}>
-                    <Text style={s.usernameAt}>@</Text>
-                    <TextInput
-                      style={s.editableUsername}
-                      placeholder="username"
-                      placeholderTextColor={COLORS.subAlt}
-                      value={profile.username}
-                      onChangeText={setUsername}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      maxLength={20}
-                      onEndEditing={() => { checkUsername(); setEditingUsername(false); }}
-                      autoFocus
-                    />
-                    {usernameStatus === "checking" && <ActivityIndicator size="small" color={COLORS.pink} />}
-                    {usernameStatus === "available" && <Text style={{ color: COLORS.green, fontSize: 14 }}>✓</Text>}
-                    {usernameStatus === "saved" && <Text style={{ color: COLORS.green, fontSize: 14 }}>✓</Text>}
-                    {usernameStatus === "taken" && <Text style={{ color: COLORS.red, fontSize: 14 }}>✗</Text>}
-                  </View>
-                ) : (
-                  <TouchableOpacity style={s.usernameRow} onPress={() => setEditingUsername(true)} activeOpacity={0.7}>
-                    <Text style={s.usernameAt}>@</Text>
-                    <Text style={s.displayUsername}>{profile.username || "username"}</Text>
-                    <Text style={s.penIcon}>✏️</Text>
+                    <Pencil size={14} color={COLORS.sub} />
                   </TouchableOpacity>
                 )}
 
                 {/* Achievement Badges */}
                 <View style={s.achievementRow}>
                   <View style={s.achievementBadge}>
-                    <Text style={s.achievementIcon}>🔥</Text>
+                    <Flame size={14} color={COLORS.orange} />
                     <Text style={s.achievementLabel}>Spicy Player</Text>
                   </View>
                   <View style={s.achievementBadge}>
-                    <Text style={s.achievementIcon}>👑</Text>
+                    <Crown size={14} color={COLORS.gold} />
                     <Text style={s.achievementLabel}>Level {profile.stats.level}</Text>
                   </View>
                 </View>
@@ -348,19 +329,19 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
               {/* Stats Card */}
               <View style={s.statsCard}>
                 <View style={s.statColumn}>
-                  <Text style={s.statIcon}>🎮</Text>
+                  <Gamepad2 size={20} color={COLORS.sub} />
                   <Text style={s.statNumber}>{profile.stats.gamesPlayed}</Text>
                   <Text style={s.statLabel}>Games Played</Text>
                 </View>
                 <View style={s.statDivider} />
                 <View style={s.statColumn}>
-                  <Text style={s.statIcon}>🏆</Text>
+                  <Trophy size={20} color={COLORS.sub} />
                   <Text style={s.statNumber}>{profile.stats.wins}</Text>
                   <Text style={s.statLabel}>Wins</Text>
                 </View>
                 <View style={s.statDivider} />
                 <View style={s.statColumn}>
-                  <Text style={s.statIcon}>🎯</Text>
+                  <Target size={20} color={COLORS.sub} />
                   <Text style={s.statNumber}>{winRate}%</Text>
                   <Text style={s.statLabel}>Win Rate</Text>
                 </View>
@@ -371,7 +352,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                 <View style={s.bioHeader}>
                   <Text style={s.bioTitle}>Your Bio</Text>
                   <TouchableOpacity onPress={() => setEditingBio(!editingBio)} activeOpacity={0.7}>
-                    <Text style={s.bioEdit}>✏️</Text>
+                    <Pencil size={16} color={COLORS.sub} />
                   </TouchableOpacity>
                 </View>
                 {editingBio ? (
@@ -397,8 +378,9 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                   <Text style={s.interestsTitle}>Your Interests</Text>
                 </View>
                 <View style={s.interestsChips}>
-                  {INTEREST_META.map(({ key, label, emoji, gradient }) => {
+                  {INTEREST_META.map(({ key, label, icon, gradient }) => {
                     const active = profile.interests.includes(key);
+                    const IconComp = ICON_MAP[icon];
                     return (
                       <TouchableOpacity
                         key={key}
@@ -410,7 +392,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                         onPress={() => toggleInterest(key)}
                         activeOpacity={0.7}
                       >
-                        <Text style={s.interestChipEmoji}>{emoji}</Text>
+                        {IconComp && <IconComp size={13} color={active ? "#fff" : COLORS.sub} />}
                         <Text style={[s.interestChipLabel, active && { color: "#fff" }]}>{label}</Text>
                       </TouchableOpacity>
                     );
@@ -430,11 +412,11 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
           {mode === "random_waiting" && (
             <View style={[s.stateCard, { marginTop: 40 }]}>
               <View style={s.stateBlock}>
-                <View style={s.pulseRing}><Text style={{ fontSize: 36 }}>🔍</Text></View>
+                <View style={s.pulseRing}><Search size={36} color={COLORS.pink} /></View>
                 <Text style={s.stateTitle}>Finding opponent...</Text>
                 <Text style={s.stateSub}>Playing as <Text style={{ color: COLORS.pink, fontWeight: 'bold' }}>{profile.name}</Text></Text>
                 {profile.interests.length > 0 && (
-                  <Text style={s.stateHint}>Matching on: {profile.interests.map(i => INTEREST_META.find(m => m.key === i)?.emoji).join(" ")}</Text>
+                  <Text style={s.stateHint}>Matching on: {profile.interests.map(i => { const m = INTEREST_META.find(x => x.key === i); return m?.emoji || ""; }).join(" ")}</Text>
                 )}
                 <SearchingDots />
                 <Text style={s.stateHint}>{players.length === 2 ? "✓ Found! Starting game..." : "Scanning for available players"}</Text>
@@ -463,7 +445,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
               <View style={s.divider}><View style={s.divLine} /><Text style={s.divText}>or</Text><View style={s.divLine} /></View>
               
               <TouchableOpacity style={s.btnGhost} onPress={() => { if (!isConnected) { reconnect(); return; } createRoom(profile.name.trim()); setMode("private_waiting_creator"); }} activeOpacity={0.82}>
-                <View style={s.btnGhostLeft}><Text style={s.btnGhostEmoji}>✨</Text><View><Text style={s.btnGhostTitle}>Create New Room</Text><Text style={s.btnGhostSub}>Get a code to share</Text></View></View>
+                <View style={s.btnGhostLeft}><Sparkles size={24} color={COLORS.sub} /><View><Text style={s.btnGhostTitle}>Create New Room</Text><Text style={s.btnGhostSub}>Get a code to share</Text></View></View>
                 <Text style={[s.btnArrow, { color: COLORS.purple }]}>›</Text>
               </TouchableOpacity>
             </View>
@@ -473,7 +455,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
           {mode === "private_waiting_creator" && (
             <View style={[s.stateCard, { marginTop: 40 }]}>
               <View style={s.stateBlock}>
-                <Text style={{ fontSize: 44, marginBottom: 4 }}>🎉</Text>
+                <PartyPopper size={44} color={COLORS.pink} />
                 <Text style={s.stateTitle}>Room Ready!</Text>
                 <Text style={s.stateSub}>Share this code with your friend</Text>
                 <View style={s.codeCard}>
@@ -495,7 +477,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
           {mode === "private_waiting_joiner" && (
             <View style={[s.stateCard, { marginTop: 40 }]}>
               <View style={s.stateBlock}>
-                <Text style={{ fontSize: 44, marginBottom: 4 }}>⏳</Text>
+                <Hourglass size={44} color={COLORS.purple} />
                 <Text style={s.stateTitle}>Joining room...</Text>
                 <Text style={s.stateSub}>Code: <Text style={{ color: COLORS.pink, fontWeight: "800" }}>{code}</Text></Text>
                 <ActivityIndicator size="large" color={COLORS.purple} style={{ marginTop: 16 }} />
@@ -546,9 +528,10 @@ const s = StyleSheet.create({
   logoOr: { position: "absolute", fontSize: 13, fontWeight: "900", color: COLORS.text, opacity: 0.8, letterSpacing: 2, zIndex: 2, alignSelf: "center", top: 14 },
   logoDare: { fontSize: 28, fontWeight: "900", color: COLORS.pink, letterSpacing: 1, lineHeight: 28, zIndex: 0 },
 
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
   notifBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
   notifDot: { position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.pink, zIndex: 1, borderWidth: 1.5, borderColor: COLORS.bg },
-  notifIcon: { fontSize: 18 },
 
   // ── Online Players ──
   onlineRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 20 },
@@ -557,7 +540,6 @@ const s = StyleSheet.create({
 
   // ── Profile Banner ──
   profileBanner: { backgroundColor: "rgba(255, 0, 110, 0.1)", borderRadius: RADIUS.small, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16, borderWidth: 1, borderColor: "rgba(255, 0, 110, 0.3)" },
-  profileBannerIcon: { fontSize: 24 },
   profileBannerTitle: { color: COLORS.pink, fontSize: 14, fontWeight: "800" },
   profileBannerSub: { color: COLORS.sub, fontSize: 11, marginTop: 2 },
   profileBannerArrow: { color: COLORS.pink, fontSize: 20, fontWeight: "300" },
@@ -576,7 +558,6 @@ const s = StyleSheet.create({
   matchContent: { flexDirection: "row", alignItems: "center", padding: 18 },
   matchIconWrap: { width: 48, height: 48, borderRadius: RADIUS.icon, backgroundColor: "rgba(139, 92, 246, 0.15)", alignItems: "center", justifyContent: "center", marginRight: 14 },
   matchIconWrapPink: { backgroundColor: "rgba(255, 0, 110, 0.15)" },
-  matchIcon: { fontSize: 24 },
   matchTextCol: { flex: 1, paddingRight: 8 },
   matchTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800", marginBottom: 3 },
   matchDesc: { color: COLORS.sub, fontSize: 11, lineHeight: 15 },
@@ -640,7 +621,6 @@ const s = StyleSheet.create({
   },
   avatarImage: { width: 88, height: 88, borderRadius: 44 },
   avatarPlaceholder: { width: 88, height: 88, borderRadius: 44, backgroundColor: "#2a2440", alignItems: "center", justifyContent: "center" },
-  avatarPlaceholderText: { fontSize: 32 },
   cameraBtn: {
     position: "absolute",
     bottom: 2,
@@ -654,17 +634,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cameraBtnIcon: { fontSize: 12 },
-
   editableName: { color: COLORS.text, fontSize: 24, fontWeight: "900", textAlign: "center", paddingVertical: 6, marginTop: 8, minWidth: 200 },
   displayNameRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, paddingVertical: 6 },
   displayName: { color: COLORS.text, fontSize: 24, fontWeight: "900", textAlign: "center" },
-  penIcon: { fontSize: 14, opacity: 0.5 },
-  usernameRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 4 },
-  usernameAt: { color: COLORS.sub, fontSize: 16, fontWeight: "500" },
-  editableUsername: { color: COLORS.sub, fontSize: 15, fontWeight: "500", paddingVertical: 4, minWidth: 120, textAlign: "center" },
-  displayUsername: { color: COLORS.sub, fontSize: 15, fontWeight: "500" },
-
   // Achievements
   achievementRow: { flexDirection: "row", gap: 10, marginTop: 12 },
   achievementBadge: {
@@ -678,7 +650,6 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  achievementIcon: { fontSize: 14 },
   achievementLabel: { color: COLORS.text, fontSize: 12, fontWeight: "700" },
 
   // Stats Card
@@ -692,7 +663,6 @@ const s = StyleSheet.create({
     ...SHADOWS.subtle,
   },
   statColumn: { flex: 1, alignItems: "center", gap: 4 },
-  statIcon: { fontSize: 20 },
   statNumber: { color: COLORS.text, fontSize: 22, fontWeight: "900" },
   statLabel: { color: COLORS.sub, fontSize: 11, fontWeight: "600" },
   statDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
@@ -708,7 +678,6 @@ const s = StyleSheet.create({
   },
   bioHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   bioTitle: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
-  bioEdit: { fontSize: 16, opacity: 0.7 },
   bioInput: { color: COLORS.text, fontSize: 13, fontWeight: "400", lineHeight: 20, minHeight: 36, paddingVertical: 2 },
   bioText: { color: COLORS.text, fontSize: 13, fontWeight: "400", lineHeight: 20 },
 
@@ -735,7 +704,6 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  interestChipEmoji: { fontSize: 13 },
   interestChipLabel: { fontSize: 12, fontWeight: "600", color: COLORS.sub },
 
   // ── State/Waiting Cards ──
@@ -760,7 +728,6 @@ const s = StyleSheet.create({
   btnFillTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
   btnGhost: { backgroundColor: "rgba(23, 19, 50, 0.85)", borderRadius: RADIUS.button, paddingVertical: 16, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: COLORS.border },
   btnGhostLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  btnGhostEmoji: { fontSize: 24 },
   btnGhostTitle: { color: COLORS.text, fontSize: 15, fontWeight: "800" },
   btnGhostSub: { color: COLORS.sub, fontSize: 12, marginTop: 2 },
   btnArrow: { color: "rgba(255,255,255,0.8)", fontSize: 22, fontWeight: "300" },

@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { Eye, Flame, Heart, Inbox } from "lucide-react-native";
 
 function getHttpBase() {
   return SERVER_URL.replace(/^ws:\/\//, "http://")
@@ -143,14 +144,17 @@ export default function CommunityScreen() {
             item.type === "truth" ? s.postTypeTruth : s.postTypeDare,
           ]}
         >
-          <Text
-            style={[
-              s.postTypeText,
-              { color: item.type === "truth" ? COLORS.purple : COLORS.orange },
-            ]}
-          >
-            {item.type === "truth" ? "👁 TRUTH" : "🔥 DARE"}
-          </Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+            {item.type === "truth" ? <Eye size={12} color={COLORS.purple} /> : <Flame size={12} color={COLORS.orange} />}
+            <Text
+              style={[
+                s.postTypeText,
+                { color: item.type === "truth" ? COLORS.purple : COLORS.orange },
+              ]}
+            >
+              {item.type === "truth" ? "TRUTH" : "DARE"}
+            </Text>
+          </View>
         </View>
       </View>
       <Text style={s.postText}>{item.text}</Text>
@@ -160,9 +164,10 @@ export default function CommunityScreen() {
           onPress={() => likePost(item.id)}
           activeOpacity={0.8}
         >
-          <Text style={s.likeBtnText}>
-            {item.likedByMe ? "❤️" : "🤍"} {item.likes}
-          </Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+            <Heart size={14} color={item.likedByMe ? COLORS.pink : COLORS.sub} fill={item.likedByMe ? COLORS.pink : "transparent"} />
+            <Text style={s.likeBtnText}>{item.likes}</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -194,14 +199,17 @@ export default function CommunityScreen() {
                 onPress={() => setPostType(t)}
                 activeOpacity={0.8}
               >
-                <Text
-                  style={[
-                    s.composeTypeTxt,
-                    postType === t && { color: "#fff" },
-                  ]}
-                >
-                  {t === "truth" ? "👁 Truth" : "🔥 Dare"}
-                </Text>
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+                  {t === "truth" ? <Eye size={14} color={postType === t ? "#fff" : COLORS.sub} /> : <Flame size={14} color={postType === t ? "#fff" : COLORS.sub} />}
+                  <Text
+                    style={[
+                      s.composeTypeTxt,
+                      postType === t && { color: "#fff" },
+                    ]}
+                  >
+                    {t === "truth" ? "Truth" : "Dare"}
+                  </Text>
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -242,11 +250,14 @@ export default function CommunityScreen() {
               onPress={() => setFilter(f)}
               activeOpacity={0.8}
             >
-              <Text
-                style={[s.filterBtnTxt, filter === f && { color: COLORS.text }]}
-              >
-                {f === "all" ? "All" : f === "truth" ? "👁 Truth" : "🔥 Dare"}
-              </Text>
+              {f === "all" ? (
+                <Text style={[s.filterBtnTxt, filter === f && { color: COLORS.text }]}>All</Text>
+              ) : (
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+                  {f === "truth" ? <Eye size={12} color={filter === f ? COLORS.text : COLORS.sub} /> : <Flame size={12} color={filter === f ? COLORS.text : COLORS.sub} />}
+                  <Text style={[s.filterBtnTxt, filter === f && { color: COLORS.text }]}>{f === "truth" ? "Truth" : "Dare"}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
           <View style={{ flex: 1 }} />
@@ -271,7 +282,7 @@ export default function CommunityScreen() {
             onRefresh={() => fetchPosts(true)}
             ListEmptyComponent={
               <View style={s.empty}>
-                <Text style={s.emptyIcon}>📭</Text>
+                <Inbox size={48} color={COLORS.sub} />
                 <Text style={s.emptyText}>
                   No posts yet. Be the first to share!
                 </Text>
@@ -401,6 +412,5 @@ const s = StyleSheet.create({
   likeBtnActive: { backgroundColor: `${COLORS.pink}20`, borderColor: `${COLORS.pink}40` },
   likeBtnText: { fontSize: 13, fontWeight: "700", color: COLORS.text },
   empty: { alignItems: "center", paddingTop: 60, gap: 10 },
-  emptyIcon: { fontSize: 48 },
   emptyText: { color: COLORS.sub, fontSize: 14, textAlign: "center" },
 });

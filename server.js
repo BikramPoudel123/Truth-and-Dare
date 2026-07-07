@@ -55,11 +55,10 @@ console.log("Server config:", {
 
 // ─── In-memory: only WebSocket connections (cannot be stored in Redis) ───────
 const playerSockets = new Map(); // playerId → WebSocket
-const profileStore = new Map(); // playerId → { name, username, bio, pic, interests }
+const profileStore = new Map(); // playerId → { name, bio, pic, interests }
 const memStore = {
   rooms: new Map(), // roomId → JSON string
   openRooms: new Set(), // roomId
-  usernames: new Map(), // username (lowercase) → playerId string
   communityPosts: [], // array of post objects
 };
 
@@ -795,43 +794,7 @@ wss.on("connection", (ws) => {
   ws.on("error", (error) => console.error("WebSocket error:", error));
 });
 
-// ─── Username API ─────────────────────────────────────────────────────────────
-// username:<lower> → player_id  (unique index)
 
-// GET /username/check?username=foo
-app.get("/username/check", async (req, res) => {
-  try {
-    const raw = String(req.query.username ?? "").trim().toLowerCase();
-    if (!raw || raw.length < 2) return res.json({ available: false, reason: "Too short" });
-    const existing = !redisReady ? memStore.usernames.get(raw) : await redisClient.get(`username:${raw}`);
-    res.json({ available: !existing });
-  } catch { res.status(500).json({ error: "Server error" }); }
-});
-
-// POST /username/claim  { username, player_id }
-app.post("/username/claim", async (req, res) => {
-  try {
-    const { username, player_id } = req.body;
-    const raw = String(username ?? "").trim().toLowerCase();
-    if (!raw || raw.length < 2 || raw.length > 20) return res.status(400).json({ ok: false, reason: "Invalid username" });
-    
-    let set = false;
-    if (!redisReady) {
-      if (!memStore.usernames.has(raw)) {
-        memStore.usernames.set(raw, String(player_id));
-        set = true;
-      }
-    } else {
-      set = await redisClient.set(`username:${raw}`, String(player_id), { NX: true });
-    }
-
-    if (set) {
-      res.json({ ok: true });
-    } else {
-      res.json({ ok: false, reason: "Username already taken" });
-    }
-  } catch { res.status(500).json({ ok: false, reason: "Server error" }); }
-});
 
 // POST /profile/update
 app.post("/profile/update", async (req, res) => {
@@ -863,12 +826,11 @@ app.post("/profile/update", async (req, res) => {
 // POST /profile/sync
 app.post("/profile/sync", (req, res) => {
   try {
-    const { player_id, name, username, bio, pic, interests } = req.body;
+    const { player_id, name, bio, pic, interests } = req.body;
     if (!player_id) return res.status(400).json({ error: "Missing player_id" });
 
     const existing = profileStore.get(player_id) ?? {};
     if (name !== undefined) existing.name = String(name).slice(0, 30);
-    if (username !== undefined) existing.username = String(username).slice(0, 20);
     if (bio !== undefined) existing.bio = String(bio).slice(0, 80);
     if (pic !== undefined) existing.pic = pic;
     if (interests !== undefined) existing.interests = interests;

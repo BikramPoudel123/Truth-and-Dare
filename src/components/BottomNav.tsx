@@ -1,11 +1,12 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { COLORS } from "@/constants/design-system";
+import { Home, User, HelpCircle, Users } from "lucide-react-native";
 
 const NAV_TABS = [
-  { key: "home",      label: "Home",      icon: "🏠" },
-  { key: "profile",   label: "Profile",   icon: "👤" },
-  { key: "questions", label: "Questions", icon: "❓" },
-  { key: "community", label: "Community", icon: "👥" },
+  { key: "home",      label: "Home",      icon: "Home" },
+  { key: "profile",   label: "Profile",   icon: "User" },
+  { key: "questions", label: "Questions", icon: "HelpCircle" },
+  { key: "community", label: "Community", icon: "Users" },
 ];
 
 interface BottomNavProps {
@@ -13,11 +14,14 @@ interface BottomNavProps {
   onNavigate: (tab: string) => void;
 }
 
+const icons: Record<string, React.ComponentType<{ size: number; color: string }>> = { Home, User, HelpCircle, Users };
+
 export default function BottomNav({ activeTab, onNavigate }: BottomNavProps) {
   return (
     <View style={s.bottomNav}>
       {NAV_TABS.map(tab => {
         const isActive = tab.key === activeTab;
+        const IconComp = icons[tab.icon];
         return (
           <TouchableOpacity
             key={tab.key}
@@ -26,10 +30,11 @@ export default function BottomNav({ activeTab, onNavigate }: BottomNavProps) {
             activeOpacity={0.85}
           >
             <View style={s.navIconWrap}>
-              <Text style={[s.navIcon, isActive && s.navIconActive]}>{tab.icon}</Text>
+              {IconComp && <IconComp size={18} color={isActive ? "#fff" : "rgba(255,255,255,0.5)"} />}
             </View>
-            <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
-            {isActive && <View style={s.navUnderline} />}
+            <View style={[s.navLabelWrap, isActive && s.navLabelActiveWrap]}>
+              <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
+            </View>
           </TouchableOpacity>
         );
       })}
@@ -63,16 +68,15 @@ const s = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 0,
   },
-  navIcon: { fontSize: 18, opacity: 0.5 },
-  navIconActive: { opacity: 1 },
   navLabel: { color: COLORS.sub, fontSize: 9, fontWeight: "700" },
   navLabelActive: { color: COLORS.text },
-  navUnderline: {
-    position: "absolute",
-    bottom: 2,
-    width: 20,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: COLORS.purple,
+  navLabelWrap: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  navLabelActiveWrap: {
+    backgroundColor: "rgb(131, 56, 236)",
   },
 });

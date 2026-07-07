@@ -1,8 +1,11 @@
+import { Balloon, SmilePlus, MessageCircle, Heart, Flame, Skull } from "lucide-react-native";
+
 export type GameMood = "casual" | "funny" | "deep" | "flirty" | "spicy" | "extreme";
 
 export interface MoodConfig {
   key: GameMood;
   emoji: string;
+  icon: string;
   label: string;
   description: string;
   color: string;
@@ -19,6 +22,7 @@ export const MOODS: MoodConfig[] = [
   {
     key: "casual",
     emoji: "🎈",
+    icon: "Balloon",
     label: "Casual",
     description: "Light & easy",
     color: "#0ea5e9",
@@ -33,6 +37,7 @@ export const MOODS: MoodConfig[] = [
   {
     key: "funny",
     emoji: "😂",
+    icon: "SmilePlus",
     label: "Funny",
     description: "Silly & laughs",
     color: "#eab308",
@@ -47,6 +52,7 @@ export const MOODS: MoodConfig[] = [
   {
     key: "deep",
     emoji: "💬",
+    icon: "MessageCircle",
     label: "Deep",
     description: "Meaningful talks",
     color: "#06b6d4",
@@ -61,6 +67,7 @@ export const MOODS: MoodConfig[] = [
   {
     key: "flirty",
     emoji: "❤️",
+    icon: "Heart",
     label: "Flirty",
     description: "Playful romance",
     color: "#ec4899",
@@ -75,6 +82,7 @@ export const MOODS: MoodConfig[] = [
   {
     key: "spicy",
     emoji: "🌶️",
+    icon: "Flame",
     label: "Spicy",
     description: "Bold & daring",
     color: "#f97316",
@@ -89,6 +97,7 @@ export const MOODS: MoodConfig[] = [
   {
     key: "extreme",
     emoji: "💀",
+    icon: "Skull",
     label: "Extreme",
     description: "Maximum chaos",
     color: "#7c3aed",

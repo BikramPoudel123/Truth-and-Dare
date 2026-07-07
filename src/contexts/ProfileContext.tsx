@@ -25,7 +25,6 @@ export interface ProfileStats {
 
 export interface Profile {
   name: string;
-  username: string;
   bio: string;
   pic: string | null;
   interests: Interest[];
@@ -35,10 +34,7 @@ export interface Profile {
 export interface ProfileContextType {
   profile: Profile;
   isProfileReady: boolean;
-  usernameStatus: "idle" | "checking" | "available" | "taken" | "saved";
   setName: (v: string) => void;
-  setUsername: (v: string) => void;
-  checkUsername: () => Promise<void>;
   setBio: (v: string) => void;
   setPic: (v: string | null) => void;
   toggleInterest: (i: Interest) => void;
@@ -52,7 +48,6 @@ const DEFAULT_STATS: ProfileStats = { gamesPlayed: 0, wins: 0, level: 1 };
 
 const DEFAULT: Profile = {
   name: "",
-  username: "",
   bio: "",
   pic: null,
   interests: [],
@@ -67,31 +62,27 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile>(DEFAULT);
   const [loaded, setLoaded] = useState(false);
-  const [usernameStatus, setUsernameStatus] = useState<
-    "idle" | "checking" | "available" | "taken" | "saved"
-  >("idle");
   const playerIdRef = useRef(
     `pid-${Math.random().toString(36).slice(2)}-${Date.now()}`,
   );
 
   // Load from storage on mount
   useEffect(() => {
+    let cancelled = false;
     AsyncStorage.multiGet([
       "prof:name",
-      "prof:username",
       "prof:bio",
       "prof:pic",
       "prof:interests",
       "prof:stats",
       "prof:player_id",
-    ]).then((pairs) => {
+    ]).then(async (pairs) => {
       const map: Record<string, string | null> = {};
       pairs.forEach(([k, v]) => (map[k] = v));
       if (map["prof:player_id"]) playerIdRef.current = map["prof:player_id"];
       else AsyncStorage.setItem("prof:player_id", playerIdRef.current);
       setProfile({
         name: map["prof:name"] ?? "",
-        username: map["prof:username"] ?? "",
         bio: map["prof:bio"] ?? "",
         pic: map["prof:pic"] ?? null,
         interests: map["prof:interests"]
@@ -101,9 +92,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           ? (JSON.parse(map["prof:stats"]) as ProfileStats)
           : DEFAULT_STATS,
       });
-      if (map["prof:username"]) setUsernameStatus("saved");
-      setLoaded(true);
+      if (!cancelled) setLoaded(true);
     });
+    return () => { cancelled = true; };
   }, []);
 
   const persist = useCallback((patch: Partial<Profile>) => {
@@ -111,8 +102,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const next = { ...prev, ...patch };
       const pairs: [string, string][] = [];
       if (patch.name !== undefined) pairs.push(["prof:name", patch.name]);
-      if (patch.username !== undefined)
-        pairs.push(["prof:username", patch.username]);
       if (patch.bio !== undefined) pairs.push(["prof:bio", patch.bio]);
       if (patch.pic !== undefined) pairs.push(["prof:pic", patch.pic ?? ""]);
       if (patch.interests !== undefined)
@@ -130,52 +119,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     (v: string | null) => persist({ pic: v }),
     [persist],
   );
-
-  const setUsername = useCallback(
-    (v: string) => {
-      const clean = v.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20);
-      persist({ username: clean });
-      setUsernameStatus("idle");
-    },
-    [persist],
-  );
-
-  const checkUsername = useCallback(async () => {
-    setProfile((prev) => {
-      const uname = prev.username.trim().toLowerCase();
-      if (uname.length < 2) {
-        setUsernameStatus("idle");
-        return prev;
-      }
-      setUsernameStatus("checking");
-      (async () => {
-        try {
-          const res = await fetch(
-            `${getHttpBase()}/username/check?username=${encodeURIComponent(uname)}`,
-          );
-          const data = await res.json();
-          if (data.available) {
-            // Claim it
-            const claim = await fetch(`${getHttpBase()}/username/claim`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                username: uname,
-                player_id: playerIdRef.current,
-              }),
-            });
-            const cdata = await claim.json();
-            setUsernameStatus(cdata.ok ? "saved" : "taken");
-          } else {
-            setUsernameStatus("taken");
-          }
-        } catch {
-          setUsernameStatus("idle");
-        }
-      })();
-      return prev;
-    });
-  }, []);
 
   const toggleInterest = useCallback((i: Interest) => {
     setProfile((prev) => {
@@ -201,11 +144,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearProfile = useCallback(() => {
-    setProfile({ ...DEFAULT, username: "" });
-    setUsernameStatus("idle");
+    setProfile({ ...DEFAULT });
     AsyncStorage.multiRemove([
       "prof:name",
-      "prof:username",
       "prof:bio",
       "prof:pic",
       "prof:interests",
@@ -235,12 +176,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loaded) return;
     const delayDebounce = setTimeout(() => {
-      const body: { player_id: string; name?: string; username?: string; bio?: string; pic?: string | null; interests?: string[] } = {
+      const body: { player_id: string; name?: string; bio?: string; pic?: string | null; interests?: string[] } = {
         player_id: playerIdRef.current,
       };
       let hasData = false;
       if (profile.name.trim()) { body.name = profile.name.trim(); hasData = true; }
-      if (profile.username.trim()) { body.username = profile.username.trim(); hasData = true; }
       if (profile.bio.trim()) { body.bio = profile.bio.trim(); hasData = true; }
       if (profile.pic) { body.pic = profile.pic; hasData = true; }
       if (profile.interests.length > 0) { body.interests = profile.interests; hasData = true; }
@@ -254,7 +194,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       );
     }, 1500);
     return () => clearTimeout(delayDebounce);
-  }, [profile.name, profile.username, profile.bio, profile.pic, profile.interests, loaded]);
+  }, [profile.name, profile.bio, profile.pic, profile.interests, loaded]);
 
   if (!loaded) return null;
 
@@ -267,13 +207,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     <ProfileContext.Provider
       value={{
         profile,
-        isProfileReady:
-          profile.name.trim().length > 0 &&
-          (profile.username.trim().length === 0 || usernameStatus === "saved"),
-        usernameStatus,
+        isProfileReady: profile.name.trim().length > 0,
         setName,
-        setUsername,
-        checkUsername,
         setBio,
         setPic,
         toggleInterest,

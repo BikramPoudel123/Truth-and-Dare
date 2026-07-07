@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import { Search, X } from "lucide-react-native";
 import {
     Gesture,
     GestureDetector,
@@ -209,7 +210,7 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
             </View>
           )}
           <View style={styles.tapHint}>
-            <Text style={styles.tapHintText}>🔍</Text>
+            <Search size={12} color="white" />
           </View>
         </TouchableOpacity>
 
@@ -225,13 +226,13 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
               <Text style={styles.fullscreenName}>{media.playerName}</Text>
             )}
             <Text style={styles.closeHint}>
-              Pinch or double-tap to zoom · Tap ✕ to close
+              Pinch or double-tap to zoom · Tap X to close
             </Text>
             <TouchableOpacity
               style={styles.closeBtn}
               onPress={() => setFullscreen(false)}
             >
-              <Text style={styles.closeBtnText}>✕</Text>
+              <X size={16} color="white" />
             </TouchableOpacity>
           </View>
         </Modal>
@@ -280,7 +281,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
-  tapHintText: { fontSize: 12 },
   videoLoading: {
     alignItems: "center",
     justifyContent: "center",
@@ -316,5 +316,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  closeBtnText: { color: "white", fontSize: 16, fontWeight: "bold" },
 });

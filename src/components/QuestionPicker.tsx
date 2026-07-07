@@ -9,6 +9,7 @@ import {
   ActivityIndicator, FlatList, Modal, StyleSheet,
   Text, TouchableOpacity, View,
 } from "react-native";
+import { Eye, Flame, Sparkles, Megaphone, X, Heart } from "lucide-react-native";
 
 const BLUE = "#3b82f6", BLUE_D = "#1d4ed8", BLUE_L = "#eff6ff", BLUE_M = "#bfdbfe";
 const TEXT = "#0f172a", SUB = "#64748b", HINT = "#94a3b8", BORDER = "#e2e8f0";
@@ -67,20 +68,20 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
         <View style={s.header}>
           <View style={{ flex: 1 }}>
             <Text style={s.title}>Pick a Question</Text>
-            <Text style={s.subtitle}>{mode ? (mode === "truth" ? "👁 Truth questions" : "🔥 Dare challenges") : "All"}</Text>
+            <Text style={s.subtitle}>{mode ? (mode === "truth" ? <><Eye size={14} color={BLUE} /> Truth questions</> : <><Flame size={14} color="#f97316" /> Dare challenges</>) : "All"}</Text>
           </View>
           <TouchableOpacity onPress={onClose} style={s.closeBtn}>
-            <Text style={s.closeBtnText}>✕</Text>
+            <X size={16} color={SUB} />
           </TouchableOpacity>
         </View>
 
         {/* Tabs */}
         <View style={s.tabs}>
           <TouchableOpacity style={[s.tab, tab === "bank" && s.tabActive]} onPress={() => setTab("bank")} activeOpacity={0.8}>
-            <Text style={[s.tabText, tab === "bank" && s.tabTextActive]}>🃏 Question Bank</Text>
+            <Text style={[s.tabText, tab === "bank" && s.tabTextActive]}><Sparkles size={16} color={tab === "bank" ? BLUE_D : HINT} /> Question Bank</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.tab, tab === "community" && s.tabActive]} onPress={() => setTab("community")} activeOpacity={0.8}>
-            <Text style={[s.tabText, tab === "community" && s.tabTextActive]}>📣 Community</Text>
+            <Text style={[s.tabText, tab === "community" && s.tabTextActive]}><Megaphone size={16} color={tab === "community" ? BLUE_D : HINT} /> Community</Text>
           </TouchableOpacity>
         </View>
 
@@ -118,7 +119,7 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
                   <View style={s.communityTop}>
                     <View style={[s.typeDot, { backgroundColor: item.type === "truth" ? BLUE : "#f97316" }]} />
                     <Text style={s.communityAuthor}>@{item.author}</Text>
-                    <Text style={s.communityLikes}>❤️ {item.likes}</Text>
+                    <Text style={s.communityLikes}><Heart size={14} color={HINT} /> {item.likes}</Text>
                   </View>
                   <Text style={s.qText}>{item.text}</Text>
                 </TouchableOpacity>
@@ -137,7 +138,6 @@ const s = StyleSheet.create({
   title: { color: TEXT, fontSize: 18, fontWeight: "900" },
   subtitle: { color: SUB, fontSize: 12, marginTop: 2 },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: BG, alignItems: "center", justifyContent: "center" },
-  closeBtnText: { color: SUB, fontSize: 16, fontWeight: "700" },
   tabs: { flexDirection: "row", backgroundColor: CARD, borderBottomWidth: 1, borderBottomColor: BORDER },
   tab: { flex: 1, paddingVertical: 12, alignItems: "center" },
   tabActive: { borderBottomWidth: 2.5, borderBottomColor: BLUE },
