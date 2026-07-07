@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import BottomNav from "@/components/BottomNav";
+
 import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Trophy, Target, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves, Star, Skull, Heart } from "lucide-react-native";
 
 function getHttpBase() {
@@ -134,9 +134,13 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
   const [editingBio, setEditingBio] = useState(false);
   const [playStyle, setPlayStyle] = useState<string | null>(null);
   const displayName = profile.name || "Player";
+  const initialRun = useRef(true);
 
   useEffect(() => { setInterests(profile.interests); }, [profile.interests]);
-  useEffect(() => { if (phase === "menu") { setMode("home"); setJoining(false); setCode(""); } }, [phase]);
+  useEffect(() => {
+    if (initialRun.current) { initialRun.current = false; return; }
+    if (phase === "menu") { setMode("home"); setJoining(false); setCode(""); }
+  }, [phase]);
   useEffect(() => { if (error && joining) { Alert.alert("Oops", error); setJoining(false); setMode("home"); } }, [error, joining]);
 
   useEffect(() => {
@@ -179,11 +183,11 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: 110 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-          {mode === "home" && (
-            <View style={s.homeCenter}>
-              {/* Header with Logo */}
-              <View style={s.header}>
-                <View style={s.logoWrap}>
+            {mode === "home" && (
+              <View style={s.homeCenter}>
+                {/* Header with Logo */}
+                <View style={s.header}>
+                  <View style={s.logoWrap}>
                   <View style={s.logoRow}>
                     <View style={s.maskRow}>
                       <Text style={s.maskBlue}>🎭</Text>
@@ -521,17 +525,6 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
           )}
 
         </ScrollView>
-
-        <BottomNav
-          activeTab={mode}
-          onNavigate={(tab) => {
-            if (tab === "questions" || tab === "community") {
-              onNavigate?.(tab as "questions" | "community");
-            } else {
-              setMode(tab as ScreenMode);
-            }
-          }}
-        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

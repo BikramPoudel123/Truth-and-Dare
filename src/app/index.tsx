@@ -52,7 +52,20 @@ function AppContent() {
     );
   }
 
-  return <MenuScreen onNavigate={(s) => { setMenuTab("home"); setScreen(s); }} initialMode={menuTab} />;
+  return (
+    <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+      <MenuScreen key={menuTab} onNavigate={(s) => { setMenuTab("home"); setScreen(s); }} initialMode={menuTab} />
+      <BottomNav
+        activeTab={menuTab}
+        onNavigate={(tab) => {
+          setMenuTab(tab);
+          if (tab === "questions" || tab === "community") {
+            setScreen(tab as AppScreen);
+          }
+        }}
+      />
+    </View>
+  );
 }
 
 const s = StyleSheet.create({});

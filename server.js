@@ -129,7 +129,8 @@ async function findAvailableRoom(interests = []) {
 
   for (const id of openIds) {
     const room = await getRoom(id);
-    if (!room || room.players.length >= 2 || room.phase !== "waiting") {
+    if (!room || room.players.length >= 2 || room.phase !== "waiting" || room.is_private) {
+      if (room && room.is_private) continue;
       await markRoomClosed(id); // stale
       continue;
     }
@@ -158,7 +159,7 @@ function generateRoomId() {
   return id;
 }
 
-async function createRoom(creator = null) {
+async function createRoom(creator = null, isPrivate = false) {
   let roomId = generateRoomId();
   // Ensure unique (check Redis)
   while (await redisClient.exists(`room:${roomId}`)) {
@@ -175,13 +176,16 @@ async function createRoom(creator = null) {
     player1_answer: null,
     player2_answer: null,
     reaction: null,
+    is_private: isPrivate,
   };
 
   await saveRoom(gameState);
-  await markRoomOpen(roomId);
+  if (!isPrivate) {
+    await markRoomOpen(roomId);
+  }
 
   const total = await redisClient.dbSize();
-  console.log(`✓ Room Created: ${roomId} | Redis keys: ${total}`);
+  console.log(`✓ Room Created: ${roomId} | Redis keys: ${total}${isPrivate ? " [private]" : ""}`);
   return roomId;
 }
 
@@ -272,8 +276,8 @@ wss.on("connection", (ws) => {
             id: player_id,
             name: player_name,
             profile_pic: profile_pic ?? null,
-          });
-          console.log(`  → Room ${roomId} created for ${player_name}`);
+          }, true);
+          console.log(`  → Private Room ${roomId} created for ${player_name}`);
 
           sendToPlayer(player_id, { type: "room_created", room_id: roomId });
           sendToPlayer(player_id, {
