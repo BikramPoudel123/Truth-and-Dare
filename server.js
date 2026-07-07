@@ -55,6 +55,7 @@ console.log("Server config:", {
 
 // ─── In-memory: only WebSocket connections (cannot be stored in Redis) ───────
 const playerSockets = new Map(); // playerId → WebSocket
+const profileStore = new Map(); // playerId → { name, username, bio, pic, interests }
 const memStore = {
   rooms: new Map(), // roomId → JSON string
   openRooms: new Set(), // roomId
@@ -228,6 +229,10 @@ function normalizeMediaList(mediaList = []) {
 wss.on("connection", (ws) => {
   console.log("✓ Client Connected");
 
+  // Send current online count immediately
+  const count = playerSockets.size;
+  ws.send(JSON.stringify({ type: "players_online", count }));
+
   ws.on("message", async (data) => {
     try {
       const message = JSON.parse(data);
@@ -240,6 +245,16 @@ wss.on("connection", (ws) => {
       }
 
       switch (message.type) {
+        // ── REGISTER (just mark as online) ────────────────────────────────────
+        case "register": {
+          const { player_id } = message;
+          if (player_id) {
+            playerSockets.set(player_id, ws);
+            broadcastOnlineCount();
+          }
+          break;
+        }
+
         // ── CREATE ROOM ──────────────────────────────────────────────────────
         case "create_room": {
           const { player_id, player_name, profile_pic } = message;
@@ -839,6 +854,25 @@ app.post("/profile/update", async (req, res) => {
       await saveCommunityPosts(newPosts);
       console.log(`✏️ Updated author name to "${cleanName}" for player ${player_id}`);
     }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /profile/sync
+app.post("/profile/sync", (req, res) => {
+  try {
+    const { player_id, name, username, bio, pic, interests } = req.body;
+    if (!player_id) return res.status(400).json({ error: "Missing player_id" });
+
+    const existing = profileStore.get(player_id) ?? {};
+    if (name !== undefined) existing.name = String(name).slice(0, 30);
+    if (username !== undefined) existing.username = String(username).slice(0, 20);
+    if (bio !== undefined) existing.bio = String(bio).slice(0, 80);
+    if (pic !== undefined) existing.pic = pic;
+    if (interests !== undefined) existing.interests = interests;
+    profileStore.set(player_id, existing);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: "Server error" });

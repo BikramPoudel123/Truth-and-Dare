@@ -21,11 +21,11 @@ export default function BottomNav({ activeTab, onNavigate }: BottomNavProps) {
         return (
           <TouchableOpacity
             key={tab.key}
-            style={[s.navItem, isActive && s.navItemActive]}
+            style={s.navItem}
             onPress={() => onNavigate(tab.key)}
             activeOpacity={0.85}
           >
-            <View style={[s.navIconWrap, isActive && s.navIconWrapActive]}>
+            <View style={s.navIconWrap}>
               <Text style={[s.navIcon, isActive && s.navIconActive]}>{tab.icon}</Text>
             </View>
             <Text style={[s.navLabel, isActive && s.navLabelActive]}>{tab.label}</Text>
@@ -41,9 +41,9 @@ const s = StyleSheet.create({
   bottomNav: {
     flexDirection: "row",
     backgroundColor: "#060411",
-    paddingTop: 4,
-    paddingBottom: 16,
-    paddingHorizontal: 8,
+    paddingTop: 2,
+    paddingBottom: 8,
+    paddingHorizontal: 4,
     borderTopWidth: 1,
     borderTopColor: "rgba(255, 255, 255, 0.06)",
   },
@@ -51,24 +51,17 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 20,
     position: "relative",
   },
-  navItemActive: {
-    backgroundColor: "rgba(131, 56, 236, 0.15)",
-  },
   navIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 2,
-  },
-  navIconWrapActive: {
-    backgroundColor: "rgba(131, 56, 236, 0.2)",
-    marginTop: -8,
+    marginBottom: 0,
   },
   navIcon: { fontSize: 18, opacity: 0.5 },
   navIconActive: { opacity: 1 },
@@ -76,7 +69,7 @@ const s = StyleSheet.create({
   navLabelActive: { color: COLORS.text },
   navUnderline: {
     position: "absolute",
-    bottom: 4,
+    bottom: 2,
     width: 20,
     height: 2,
     borderRadius: 1,

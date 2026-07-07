@@ -344,6 +344,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         );
       } else {
         setPhase("menu");
+        socket.send(
+          JSON.stringify({
+            type: "register",
+            player_id: playerId.current,
+          }),
+        );
       }
     };
 

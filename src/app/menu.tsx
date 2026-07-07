@@ -122,6 +122,9 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
   const [mode, setMode] = useState<ScreenMode>("home");
   const [joining, setJoining] = useState(false);
   const [spicyMode, setSpicyMode] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [editingBio, setEditingBio] = useState(false);
   const displayName = profile.name || "Player";
 
   useEffect(() => { setInterests(profile.interests); }, [profile.interests]);
@@ -136,7 +139,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
   const pickPic = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") { Alert.alert("Permission needed", "Allow photo access for profile picture."); return; }
-    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.4, base64: true });
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", allowsEditing: true, aspect: [1, 1], quality: 0.4, base64: true });
     if (!r.canceled && r.assets[0]) {
       const a = r.assets[0];
       setPic(a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri);
@@ -159,7 +162,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
         <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: 110 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
           {mode === "home" && (
-            <>
+            <View style={s.homeCenter}>
               {/* Header with Logo */}
               <View style={s.header}>
                 <View style={s.logoWrap}>
@@ -167,13 +170,11 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                     <View style={s.maskRow}>
                       <Text style={s.maskBlue}>🎭</Text>
                     </View>
-                    <View style={s.logoTextCol}>
-                      <View style={s.logoTextRow}>
-                        <Text style={s.logoTruth}>Truth</Text>
-                        <Text style={s.logoOr}> or</Text>
-                      </View>
-                      <Text style={s.logoDare}>Dare</Text>
-                    </View>
+                <View style={s.logoTextCol}>
+                  <Text style={s.logoTruth}>Truth</Text>
+                  <Text style={s.logoDare}>Dare</Text>
+                  <Text style={s.logoOr}>or</Text>
+                </View>
                   </View>
                 </View>
                 <TouchableOpacity style={s.notifBtn} activeOpacity={0.8}>
@@ -201,18 +202,14 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
               )}
 
               {/* Hero Card */}
-              <View style={s.heroCard}>
-                <Text style={s.heroSparkle1}>✨</Text>
-                <Text style={s.heroSparkle2}>⭐</Text>
-                <View style={s.heroContent}>
-                  <View style={s.heroEmojiWrap}>
-                    <Text style={s.heroEmoji}>😈</Text>
+              <View style={[s.matchCard, { backgroundColor: "#29002b", borderColor: "rgba(255, 0, 110, 0.25)" }]}>
+                <View style={s.matchContent}>
+                  <View style={[s.matchIconWrap, s.matchIconWrapPink]}>
+                    <Image source={require("../../assets/images/fun.png")} style={{ width: 36, height: 36 }} />
                   </View>
-                  <View style={s.heroTextWrap}>
-                    <Text style={s.heroTitle}>
-                      Ready for{"\n"}the <Text style={s.heroFun}>fun?</Text>
-                    </Text>
-                    <Text style={s.heroSub}>Truth reveals. Dare dares.{"\n"}Let the game begin!</Text>
+                  <View style={s.matchTextCol}>
+                    <Text style={s.matchTitle}>Ready for the <Text style={{ color: COLORS.pink }}>fun?</Text></Text>
+                    <Text style={s.matchDesc}>Truth reveals. Dare dares. Let the game begin!</Text>
                   </View>
                 </View>
               </View>
@@ -250,7 +247,7 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                   </View>
                   <View style={s.matchTextCol}>
                     <Text style={s.matchTitle}>Private Game</Text>
-                    <Text style={s.matchDesc}>Invite a friend and{"\n"}play together</Text>
+                    <Text style={s.matchDesc}>Invite a friend and play together</Text>
                   </View>
                   <View style={[s.matchBtnPill, s.matchBtnPillPink]}>
                     <Text style={s.matchBtnText}>Create Room</Text>
@@ -259,48 +256,8 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                 </View>
               </TouchableOpacity>
 
-              {/* Game Modes Section */}
-              <View style={s.modesSection}>
-                <View style={s.modesHeader}>
-                  <Text style={s.modesTitle}>Game Modes</Text>
-                  <View style={s.spicyToggle}>
-                    <Text style={s.spicyLabel}>🌶️ Spicy Mode</Text>
-                    <Switch
-                      value={spicyMode}
-                      onValueChange={setSpicyMode}
-                      trackColor={{ false: COLORS.border, true: COLORS.purpleLight }}
-                      thumbColor={spicyMode ? COLORS.purple : "#666"}
-                      ios_backgroundColor={COLORS.border}
-                    />
-                  </View>
-                </View>
-              </View>
 
-              {/* Three Feature Cards */}
-              <View style={s.featureRow}>
-                <View style={[s.featureCard, { borderColor: `${COLORS.purple}40` }]}>
-                  <View style={[s.featureIconWrap, { backgroundColor: `${COLORS.purple}20` }]}>
-                    <Text style={s.featureIcon}>👥</Text>
-                  </View>
-                  <Text style={s.featureNumber}>2</Text>
-                  <Text style={s.featureLabel}>Players</Text>
-                </View>
-                <View style={[s.featureCard, { borderColor: `${COLORS.pink}40` }]}>
-                  <View style={[s.featureIconWrap, { backgroundColor: `${COLORS.pink}20` }]}>
-                    <Text style={s.featureIcon}>∞</Text>
-                  </View>
-                  <Text style={s.featureNumber}>∞</Text>
-                  <Text style={s.featureLabel}>Endless Fun</Text>
-                </View>
-                <View style={[s.featureCard, { borderColor: `${COLORS.electricBlue}40` }]}>
-                  <View style={[s.featureIconWrap, { backgroundColor: `${COLORS.electricBlue}20` }]}>
-                    <Text style={s.featureIcon}>📚</Text>
-                  </View>
-                  <Text style={s.featureNumber}>1000+</Text>
-                  <Text style={s.featureLabel}>Questions</Text>
-                </View>
-              </View>
-            </>
+            </View>
           )}
 
           {/* PROFILE SCREEN */}
@@ -326,36 +283,54 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                 </TouchableOpacity>
 
                 {/* Editable Name */}
-                <TextInput
-                  style={s.editableName}
-                  placeholder="Your Name"
-                  placeholderTextColor={COLORS.sub}
-                  value={profile.name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                  maxLength={20}
-                  textAlign="center"
-                />
+                {editingName ? (
+                  <TextInput
+                    style={s.editableName}
+                    placeholder="Your Name"
+                    placeholderTextColor={COLORS.sub}
+                    value={profile.name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                    maxLength={20}
+                    textAlign="center"
+                    onBlur={() => setEditingName(false)}
+                    autoFocus
+                  />
+                ) : (
+                  <TouchableOpacity style={s.displayNameRow} onPress={() => setEditingName(true)} activeOpacity={0.7}>
+                    <Text style={s.displayName}>{profile.name || "Your Name"}</Text>
+                    <Text style={s.penIcon}>✏️</Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Editable Username */}
-                <View style={s.usernameRow}>
-                  <Text style={s.usernameAt}>@</Text>
-                  <TextInput
-                    style={s.editableUsername}
-                    placeholder="username"
-                    placeholderTextColor={COLORS.subAlt}
-                    value={profile.username}
-                    onChangeText={setUsername}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    maxLength={20}
-                    onEndEditing={checkUsername}
-                  />
-                  {usernameStatus === "checking" && <ActivityIndicator size="small" color={COLORS.pink} />}
-                  {usernameStatus === "available" && <Text style={{ color: COLORS.green, fontSize: 14 }}>✓</Text>}
-                  {usernameStatus === "saved" && <Text style={{ color: COLORS.green, fontSize: 14 }}>✓</Text>}
-                  {usernameStatus === "taken" && <Text style={{ color: COLORS.red, fontSize: 14 }}>✗</Text>}
-                </View>
+                {editingUsername ? (
+                  <View style={s.usernameRow}>
+                    <Text style={s.usernameAt}>@</Text>
+                    <TextInput
+                      style={s.editableUsername}
+                      placeholder="username"
+                      placeholderTextColor={COLORS.subAlt}
+                      value={profile.username}
+                      onChangeText={setUsername}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={20}
+                      onEndEditing={() => { checkUsername(); setEditingUsername(false); }}
+                      autoFocus
+                    />
+                    {usernameStatus === "checking" && <ActivityIndicator size="small" color={COLORS.pink} />}
+                    {usernameStatus === "available" && <Text style={{ color: COLORS.green, fontSize: 14 }}>✓</Text>}
+                    {usernameStatus === "saved" && <Text style={{ color: COLORS.green, fontSize: 14 }}>✓</Text>}
+                    {usernameStatus === "taken" && <Text style={{ color: COLORS.red, fontSize: 14 }}>✗</Text>}
+                  </View>
+                ) : (
+                  <TouchableOpacity style={s.usernameRow} onPress={() => setEditingUsername(true)} activeOpacity={0.7}>
+                    <Text style={s.usernameAt}>@</Text>
+                    <Text style={s.displayUsername}>{profile.username || "username"}</Text>
+                    <Text style={s.penIcon}>✏️</Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Achievement Badges */}
                 <View style={s.achievementRow}>
@@ -395,28 +370,31 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
               <View style={s.bioCard}>
                 <View style={s.bioHeader}>
                   <Text style={s.bioTitle}>Your Bio</Text>
-                  <TouchableOpacity activeOpacity={0.7}>
+                  <TouchableOpacity onPress={() => setEditingBio(!editingBio)} activeOpacity={0.7}>
                     <Text style={s.bioEdit}>✏️</Text>
                   </TouchableOpacity>
                 </View>
-                <TextInput
-                  style={s.bioInput}
-                  placeholder="Here for fun, laughs and deep talks. Let's play!"
-                  placeholderTextColor={COLORS.sub}
-                  value={profile.bio}
-                  onChangeText={setBio}
-                  multiline
-                  maxLength={80}
-                />
+                {editingBio ? (
+                  <TextInput
+                    style={s.bioInput}
+                    placeholder="Here for fun, laughs and deep talks. Let's play!"
+                    placeholderTextColor={COLORS.sub}
+                    value={profile.bio}
+                    onChangeText={setBio}
+                    multiline
+                    maxLength={80}
+                    onBlur={() => setEditingBio(false)}
+                    autoFocus
+                  />
+                ) : (
+                  <Text style={s.bioText}>{profile.bio || "Here for fun, laughs and deep talks. Let's play!"}</Text>
+                )}
               </View>
 
               {/* Interests Card */}
               <View style={s.interestsCard}>
                 <View style={s.interestsHeader}>
                   <Text style={s.interestsTitle}>Your Interests</Text>
-                  <TouchableOpacity activeOpacity={0.7}>
-                    <Text style={s.interestsEdit}>✏️</Text>
-                  </TouchableOpacity>
                 </View>
                 <View style={s.interestsChips}>
                   {INTEREST_META.map(({ key, label, emoji, gradient }) => {
@@ -426,8 +404,8 @@ export default function MenuScreen({ onNavigate }: { onNavigate?: (screen: "ques
                         key={key}
                         style={[
                           s.interestChip,
-                          active && { backgroundColor: gradient[0] },
-                          active && { borderColor: gradient[0] },
+                          active && { backgroundColor: "#22c55e" },
+                          active && { borderColor: "#22c55e" },
                         ]}
                         onPress={() => toggleInterest(key)}
                         activeOpacity={0.7}
@@ -551,6 +529,9 @@ const s = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingBottom: 48 },
   disabled: { opacity: 0.4 },
 
+  // ── Home Center ──
+  homeCenter: { flex: 1, justifyContent: "center" },
+
   // ── Background Particles ──
 
   // ── Header ──
@@ -559,11 +540,11 @@ const s = StyleSheet.create({
   logoRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   maskRow: { flexDirection: "row", gap: 2 },
   maskBlue: { fontSize: 28 },
-  logoTextCol: {},
-  logoTextRow: { flexDirection: "row", alignItems: "baseline" },
-  logoTruth: { fontSize: 22, fontWeight: "900", color: COLORS.electricBlue, letterSpacing: -0.5 },
-  logoOr: { fontSize: 18, fontWeight: "800", color: COLORS.text, opacity: 0.8 },
-  logoDare: { fontSize: 28, fontWeight: "900", color: COLORS.pink, letterSpacing: 1, marginTop: -4 },
+  logoTextCol: { position: "relative", alignItems: "center", justifyContent: "center", paddingVertical: 0 },
+  logoTextRow: {},
+  logoTruth: { fontSize: 22, fontWeight: "900", color: COLORS.electricBlue, letterSpacing: -0.5, lineHeight: 22, zIndex: 0 },
+  logoOr: { position: "absolute", fontSize: 13, fontWeight: "900", color: COLORS.text, opacity: 0.8, letterSpacing: 2, zIndex: 2, alignSelf: "center", top: 14 },
+  logoDare: { fontSize: 28, fontWeight: "900", color: COLORS.pink, letterSpacing: 1, lineHeight: 28, zIndex: 0 },
 
   notifBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
   notifDot: { position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.pink, zIndex: 1, borderWidth: 1.5, borderColor: COLORS.bg },
@@ -580,37 +561,6 @@ const s = StyleSheet.create({
   profileBannerTitle: { color: COLORS.pink, fontSize: 14, fontWeight: "800" },
   profileBannerSub: { color: COLORS.sub, fontSize: 11, marginTop: 2 },
   profileBannerArrow: { color: COLORS.pink, fontSize: 20, fontWeight: "300" },
-
-  // ── Hero Card ──
-  heroCard: {
-    backgroundColor: "rgba(23, 19, 50, 0.75)",
-    borderRadius: RADIUS.card,
-    padding: 24,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: COLORS.pinkGlow,
-    ...SHADOWS.pinkGlow,
-    overflow: "hidden",
-    position: "relative",
-  },
-  heroSparkle1: { position: "absolute", top: 16, left: 20, fontSize: 16 },
-  heroSparkle2: { position: "absolute", bottom: 16, right: 20, fontSize: 14 },
-  heroContent: { flexDirection: "row", alignItems: "center", gap: 16 },
-  heroEmojiWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-  heroEmoji: { fontSize: 40 },
-  heroTextWrap: { flex: 1 },
-  heroTitle: { fontSize: 26, fontWeight: "900", color: COLORS.text, lineHeight: 32 },
-  heroFun: { color: COLORS.pink },
-  heroSub: { fontSize: 12, color: COLORS.sub, marginTop: 8, lineHeight: 18 },
 
   // ── Match Cards ──
   matchCard: {
@@ -707,9 +657,13 @@ const s = StyleSheet.create({
   cameraBtnIcon: { fontSize: 12 },
 
   editableName: { color: COLORS.text, fontSize: 24, fontWeight: "900", textAlign: "center", paddingVertical: 6, marginTop: 8, minWidth: 200 },
+  displayNameRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, paddingVertical: 6 },
+  displayName: { color: COLORS.text, fontSize: 24, fontWeight: "900", textAlign: "center" },
+  penIcon: { fontSize: 14, opacity: 0.5 },
   usernameRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 4 },
   usernameAt: { color: COLORS.sub, fontSize: 16, fontWeight: "500" },
   editableUsername: { color: COLORS.sub, fontSize: 15, fontWeight: "500", paddingVertical: 4, minWidth: 120, textAlign: "center" },
+  displayUsername: { color: COLORS.sub, fontSize: 15, fontWeight: "500" },
 
   // Achievements
   achievementRow: { flexDirection: "row", gap: 10, marginTop: 12 },
@@ -756,6 +710,7 @@ const s = StyleSheet.create({
   bioTitle: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
   bioEdit: { fontSize: 16, opacity: 0.7 },
   bioInput: { color: COLORS.text, fontSize: 13, fontWeight: "400", lineHeight: 20, minHeight: 36, paddingVertical: 2 },
+  bioText: { color: COLORS.text, fontSize: 13, fontWeight: "400", lineHeight: 20 },
 
   // Interests Card
   interestsCard: {
@@ -768,7 +723,6 @@ const s = StyleSheet.create({
   },
   interestsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   interestsTitle: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
-  interestsEdit: { fontSize: 16, opacity: 0.7 },
   interestsChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   interestChip: {
     flexDirection: "row",

@@ -231,6 +231,31 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(delayDebounce);
   }, [profile.name, loaded]);
 
+  // Debounced effect to sync full profile to server
+  useEffect(() => {
+    if (!loaded) return;
+    const delayDebounce = setTimeout(() => {
+      const body: { player_id: string; name?: string; username?: string; bio?: string; pic?: string | null; interests?: string[] } = {
+        player_id: playerIdRef.current,
+      };
+      let hasData = false;
+      if (profile.name.trim()) { body.name = profile.name.trim(); hasData = true; }
+      if (profile.username.trim()) { body.username = profile.username.trim(); hasData = true; }
+      if (profile.bio.trim()) { body.bio = profile.bio.trim(); hasData = true; }
+      if (profile.pic) { body.pic = profile.pic; hasData = true; }
+      if (profile.interests.length > 0) { body.interests = profile.interests; hasData = true; }
+      if (!hasData) return;
+      fetch(`${getHttpBase()}/profile/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).catch((err) =>
+        console.warn("Failed to sync profile to server:", err),
+      );
+    }, 1500);
+    return () => clearTimeout(delayDebounce);
+  }, [profile.name, profile.username, profile.bio, profile.pic, profile.interests, loaded]);
+
   if (!loaded) return null;
 
   const winRate =
