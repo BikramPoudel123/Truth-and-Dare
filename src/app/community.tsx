@@ -18,13 +18,22 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import { Eye, Flame, Heart, Inbox } from "lucide-react-native";
+import { Crown, Eye, Flame, Heart, Inbox, PartyPopper, Skull, SmilePlus, Star, UserPlus, Zap } from "lucide-react-native";
 
 function getHttpBase() {
   return SERVER_URL.replace(/^ws:\/\//, "http://")
     .replace(/^wss:\/\//, "https://")
     .replace(/\/$/, "");
 }
+
+const INTEREST_LABEL: Record<string, string> = {
+  fun: "fun",
+  life: "life",
+  hot: "hot",
+  connect: "connect",
+  spicy: "spicy",
+  deep: "deep",
+};
 
 export interface CommunityPost {
   id: string;
@@ -55,9 +64,24 @@ export default function CommunityScreen() {
   const [postText, setPostText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [filter, setFilter] = useState<"all" | "truth" | "dare">("all");
-  const [profileModal, setProfileModal] = useState<{ visible: boolean; name: string; bio: string; pic: string | null; interests: string[]; loading: boolean }>({ visible: false, name: "", bio: "", pic: null, interests: [], loading: false });
+  const [profileModal, setProfileModal] = useState<{ visible: boolean; authorId: string | null; name: string; bio: string; pic: string | null; interests: string[]; playStyle: string | null; reactions: Record<string, number>; loading: boolean }>({ visible: false, authorId: null, name: "", bio: "", pic: null, interests: [], playStyle: null, reactions: {}, loading: false });
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
 
   const base = getHttpBase();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${base}/friends/${playerId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setFriendIds(new Set(data.friends.map((f: { id: string }) => f.id)));
+          setSentIds(new Set(data.sent ?? []));
+        }
+      } catch {}
+    })();
+  }, []);
 
   const fetchPosts = async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -132,17 +156,17 @@ export default function CommunityScreen() {
 
   const openProfile = async (authorId: string | undefined, authorName: string) => {
     if (!authorId) return;
-    setProfileModal({ visible: true, name: authorName, bio: "", pic: null, interests: [], loading: true });
+    setProfileModal({ visible: true, authorId, name: authorName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, loading: true });
     try {
       const res = await fetch(`${base}/profile/${encodeURIComponent(authorId)}`);
       if (res.ok) {
         const data = await res.json();
-        setProfileModal({ visible: true, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, loading: false });
+        setProfileModal({ visible: true, authorId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, loading: false });
       } else {
-        setProfileModal(prev => ({ ...prev, loading: false }));
+        setProfileModal(prev => ({ ...prev, authorId, loading: false }));
       }
     } catch {
-      setProfileModal(prev => ({ ...prev, loading: false }));
+      setProfileModal(prev => ({ ...prev, authorId, loading: false }));
     }
   };
 
@@ -151,8 +175,20 @@ export default function CommunityScreen() {
   const renderPost = ({ item }: { item: CommunityPost }) => (
     <View style={s.postCard}>
       <View style={s.postTop}>
-        <TouchableOpacity onPress={() => openProfile(item.author_id, item.author)} activeOpacity={0.7}>
-          {item.profilePic ? (
+        {item.author_id && item.author_id !== playerId ? (
+          <TouchableOpacity onPress={() => openProfile(item.author_id, item.author)} activeOpacity={0.7}>
+            {item.profilePic ? (
+              <Image source={{ uri: item.profilePic }} style={s.postAvatarImg} />
+            ) : (
+              <View style={s.postAvatar}>
+                <Text style={s.postAvatarTxt}>
+                  {item.author.slice(0, 2).toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ) : (
+          item.profilePic ? (
             <Image source={{ uri: item.profilePic }} style={s.postAvatarImg} />
           ) : (
             <View style={s.postAvatar}>
@@ -160,8 +196,8 @@ export default function CommunityScreen() {
                 {item.author.slice(0, 2).toUpperCase()}
               </Text>
             </View>
-          )}
-        </TouchableOpacity>
+          )
+        )}
         <View style={{ flex: 1 }}>
           <Text style={s.postAuthor}>{item.author}</Text>
           <Text style={s.postTime}>{timeAgo(item.createdAt)}</Text>
@@ -335,15 +371,84 @@ export default function CommunityScreen() {
                   </View>
                 )}
                 <Text style={s.modalName}>{profileModal.name}</Text>
-                {profileModal.bio ? <Text style={s.modalBio}>{profileModal.bio}</Text> : null}
-                {profileModal.interests.length > 0 && (
-                  <View style={s.modalInterestsWrap}>
-                    {profileModal.interests.map((i) => (
-                      <View key={i} style={s.modalInterestTag}>
-                        <Text style={s.modalInterestTxt}>{i}</Text>
+
+                {profileModal.playStyle && (() => {
+                  const iconMap: Record<string, [React.ComponentType<{size: number; color: string}>, string]> = {
+                    "Rising Star":      [Star, COLORS.gold],
+                    "Hot Player":       [Flame, COLORS.orange],
+                    "Funny Player":     [SmilePlus, "#facc15"],
+                    "Heartthrob":       [Heart, COLORS.pink],
+                    "Shocking Player":  [Zap, COLORS.electricBlue],
+                    "Savage Player":    [Skull, "#a855f7"],
+                    "Emotional Player": [Heart, "#60a5fa"],
+                    "Life of the Party":[PartyPopper, "#f97316"],
+                    "Respected Player": [Crown, COLORS.gold],
+                  };
+                  const pair = iconMap[profileModal.playStyle ?? ""] ?? [Star, COLORS.sub];
+                  const Icon = pair[0];
+                  return (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: RADIUS.pill, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1, borderColor: COLORS.border }}>
+                      <Icon size={13} color={pair[1]} />
+                      <Text style={{ color: COLORS.text, fontSize: 11, fontWeight: "700" }}>{profileModal.playStyle}</Text>
+                    </View>
+                  );
+                })()}
+
+                {Object.keys(profileModal.reactions).length > 0 && (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+                    {Object.entries(profileModal.reactions).map(([emoji, count]) => (
+                      <View key={emoji} style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: COLORS.border }}>
+                        <Text style={{ fontSize: 14 }}>{emoji}</Text>
+                        <Text style={{ color: COLORS.sub, fontSize: 11, fontWeight: "700" }}>{count}</Text>
                       </View>
                     ))}
                   </View>
+                )}
+
+                {profileModal.bio ? <Text style={s.modalBio}>{profileModal.bio}</Text> : null}
+                {profileModal.interests.length > 0 && (
+                  <>
+                    <Text style={{ color: COLORS.sub, fontSize: 10, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" }}>Interests</Text>
+                    <View style={s.modalInterestsWrap}>
+                      {profileModal.interests.map((i) => (
+                        <View key={i} style={s.modalInterestTag}>
+                          <Text style={s.modalInterestTxt}>{INTEREST_LABEL[i] ?? i}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
+                {profileModal.authorId && profileModal.authorId !== playerId && !friendIds.has(profileModal.authorId) && (
+                  sentIds.has(profileModal.authorId)
+                    ? (
+                      <View style={[s.addFriendBtn, { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" }]}>
+                        <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: "700" }}>Request Sent</Text>
+                      </View>
+                    )
+                    : (
+                      <TouchableOpacity
+                        style={s.addFriendBtn}
+                        onPress={async () => {
+                          try {
+                            const res = await fetch(`${base}/friends/request`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ from_id: playerId, from_name: profile.name, from_pic: profile.pic, to_id: profileModal.authorId }),
+                            });
+                            if (res.ok) {
+                              const data = await res.json();
+                              if (data.status === "already_friends") { Alert.alert("Already Friends", "You are already friends with this player."); }
+                              else if (data.status === "already_requested") { Alert.alert("Request Pending", "A friend request is already pending."); }
+                              else { Alert.alert("Sent", "Friend request sent!"); }
+                            }
+                          } catch {}
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <UserPlus size={14} color="#fff" />
+                        <Text style={s.addFriendTxt}>Add Friend</Text>
+                      </TouchableOpacity>
+                    )
                 )}
               </ScrollView>
             )}
@@ -522,4 +627,6 @@ const s = StyleSheet.create({
     borderColor: `${COLORS.purple}30`,
   },
   modalInterestTxt: { color: COLORS.purple, fontSize: 11, fontWeight: "700" },
+  addFriendBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.purple, borderRadius: RADIUS.button, paddingVertical: 10, paddingHorizontal: 20, width: "100%", justifyContent: "center" },
+  addFriendTxt: { color: "#fff", fontSize: 13, fontWeight: "800" },
 });

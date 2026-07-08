@@ -21,12 +21,12 @@ function getHttpBase() {
 const ICON_MAP: Record<string, any> = { SmilePlus, MessageCircle, Flame, Handshake, Waves };
 
 const INTEREST_META: { key: Interest; label: string; emoji: string; icon: string; gradient: string[] }[] = [
-  { key: "fun",     label: "Fun & Laughs",  emoji: "😂", icon: "SmilePlus",   gradient: ["#8b5cf6", "#a78bfa"] },
-  { key: "life",    label: "Life Talks",    emoji: "💬", icon: "MessageCircle", gradient: ["#3b82f6", "#60a5fa"] },
-  { key: "hot",     label: "Hot & Flirty",  emoji: "🔥", icon: "Flame",        gradient: ["#ec4899", "#f472b6"] },
-  { key: "connect", label: "Get in Touch",  emoji: "🤝", icon: "Handshake",    gradient: ["#f97316", "#fb923c"] },
-  { key: "spicy",   label: "Spicy",         emoji: "🌶", icon: "Flame",        gradient: ["#ef4444", "#f87171"] },
-  { key: "deep",    label: "Deep Talks",    emoji: "🌊", icon: "Waves",        gradient: ["#06b6d4", "#22d3ee"] },
+  { key: "fun",     label: "fun",     emoji: "😂", icon: "SmilePlus",     gradient: ["#8b5cf6", "#a78bfa"] },
+  { key: "life",    label: "life",    emoji: "💬", icon: "MessageCircle", gradient: ["#3b82f6", "#60a5fa"] },
+  { key: "hot",     label: "hot",     emoji: "🔥", icon: "Flame",         gradient: ["#ec4899", "#f472b6"] },
+  { key: "connect", label: "connect", emoji: "🤝", icon: "Handshake",     gradient: ["#f97316", "#fb923c"] },
+  { key: "spicy",   label: "spicy",   emoji: "🌶", icon: "Flame",         gradient: ["#ef4444", "#f87171"] },
+  { key: "deep",    label: "deep",    emoji: "🌊", icon: "Waves",         gradient: ["#06b6d4", "#22d3ee"] },
 ];
 
 function SearchingDots() {
@@ -122,7 +122,7 @@ function BlurredBlob({ color, top, left, size }: { color: string; top: number; l
 
 type ScreenMode = "home" | "profile" | "random_waiting" | "private_join" | "private_waiting_creator" | "private_waiting_joiner";
 
-export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (screen: "questions" | "community") => void; initialMode?: string }) {
+export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (screen: "questions" | "community" | "friends" | "notifications" | "settings") => void; initialMode?: string }) {
   const { createRoom, autoJoin, joinRoom, roomId, players, isConnected, phase, reconnect, error, quitGame, setInterests, gameMood, setGameMood, playersOnline } = useGame();
   const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, winRate, playerId } = useProfile();
   
@@ -133,8 +133,22 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
   const [editingName, setEditingName] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
   const [playStyle, setPlayStyle] = useState<string | null>(null);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
   const displayName = profile.name || "Player";
   const initialRun = useRef(true);
+
+  const base = getHttpBase();
+  const fetchNotifCount = async () => {
+    try {
+      const res = await fetch(`${base}/notifications/${encodeURIComponent(playerId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadNotifs((data.notifications ?? []).filter((n: any) => !n.read).length);
+      }
+    } catch {}
+  };
+
+  useEffect(() => { fetchNotifCount(); const iv = setInterval(fetchNotifCount, 15000); return () => clearInterval(iv); }, []);
 
   useEffect(() => { setInterests(profile.interests); }, [profile.interests]);
   useEffect(() => {
@@ -148,7 +162,6 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
     else if (!spicyMode && gameMood === "spicy") setGameMood("casual");
   }, [spicyMode]);
 
-  const base = getHttpBase();
   useEffect(() => {
     if (mode === "profile") {
       fetch(`${base}/profile/${encodeURIComponent(playerId)}`)
@@ -200,14 +213,14 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                   </View>
                 </View>
                 <View style={s.headerRight}>
-                  <TouchableOpacity style={s.iconBtn} activeOpacity={0.8}>
+                  <TouchableOpacity style={s.iconBtn} activeOpacity={0.8} onPress={() => onNavigate?.("friends")}>
                     <Users size={18} color={COLORS.sub} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.notifBtn} activeOpacity={0.8}>
-                    <View style={s.notifDot} />
-                    <Bell size={18} color={COLORS.sub} />
+                  <TouchableOpacity style={s.notifBtn} activeOpacity={0.8} onPress={() => onNavigate?.("notifications")}>
+                    {unreadNotifs > 0 && <View style={s.notifDot} />}
+                    <Bell size={18} color={unreadNotifs > 0 ? COLORS.purple : COLORS.sub} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.iconBtn} activeOpacity={0.8}>
+                  <TouchableOpacity style={s.iconBtn} activeOpacity={0.8} onPress={() => onNavigate?.("settings")}>
                     <Settings size={18} color={COLORS.sub} />
                   </TouchableOpacity>
                 </View>
@@ -450,9 +463,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                 <View style={s.pulseRing}><Search size={36} color={COLORS.pink} /></View>
                 <Text style={s.stateTitle}>Finding opponent...</Text>
                 <Text style={s.stateSub}>Playing as <Text style={{ color: COLORS.pink, fontWeight: 'bold' }}>{profile.name}</Text></Text>
-                {profile.interests.length > 0 && (
-                  <Text style={s.stateHint}>Matching on: {profile.interests.map(i => { const m = INTEREST_META.find(x => x.key === i); return m?.emoji || ""; }).join(" ")}</Text>
-                )}
+
                 <SearchingDots />
                 <Text style={s.stateHint}>{players.length === 2 ? "✓ Found! Starting game..." : "Scanning for available players"}</Text>
               </View>

@@ -9,6 +9,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -19,13 +20,28 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import { ArrowLeft, Eye, Flame, Timer as TimerIcon, Sparkles, Paperclip, Send, Target, Camera, Check, X, Flag, SmilePlus } from "lucide-react-native";
+import { SERVER_URL } from "@/constants/server";
+import { ArrowLeft, Crown, Eye, Flame, Heart, PartyPopper, Skull, SmilePlus, Sparkles, Star, Timer as TimerIcon, Paperclip, Send, Target, Camera, Check, X, Flag, UserPlus, Zap } from "lucide-react-native";
 
-function PlayerBar({ players, currentTurn, playerName, profilePic }: {
+function getHttpBase() {
+  return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
+}
+
+const INTEREST_LABEL: Record<string, string> = {
+  "fun": "fun",
+  "life": "life",
+  "hot": "hot",
+  "connect": "connect",
+  "spicy": "spicy",
+  "deep": "deep",
+};
+
+function PlayerBar({ players, currentTurn, playerName, profilePic, onAvatarPress }: {
   players: { id: string; name: string }[];
   currentTurn: number;
   playerName: string | null;
   profilePic: string | null;
+  onAvatarPress?: (playerId: string, playerName: string) => void;
 }) {
   const { gameMood, currentMode } = useGame();
   let moodCfg = getMoodConfig(gameMood);
@@ -36,10 +52,14 @@ function PlayerBar({ players, currentTurn, playerName, profilePic }: {
   const active0 = currentTurn === 0;
   const active1 = currentTurn === 1;
 
-  const Avatar = ({ player, active }: { player: { name: string; profilePic?: string | null }; active: boolean }) => {
+  const handlePress = (playerId: string, playerName: string) => {
+    onAvatarPress?.(playerId, playerName);
+  };
+
+  const Avatar = ({ player, active, playerId }: { player: { name: string; profilePic?: string | null }; active: boolean; playerId: string }) => {
     const isMe = player.name === playerName;
     const pic = isMe ? profilePic : player.profilePic;
-    return pic
+    const content = pic
       ? <Image source={{ uri: pic }} style={[pb.avatar, { borderColor: moodCfg.color }, active && { borderColor: moodCfg.color, ...SHADOWS.glow }]} />
       : (
         <View style={[pb.avatar, { backgroundColor: active ? moodCfg.color : "rgba(255,255,255,0.06)" }]}>
@@ -48,12 +68,18 @@ function PlayerBar({ players, currentTurn, playerName, profilePic }: {
           </Text>
         </View>
       );
+    if (isMe) return content;
+    return (
+      <TouchableOpacity onPress={() => handlePress(playerId, player.name)} activeOpacity={0.7}>
+        {content}
+      </TouchableOpacity>
+    );
   };
 
   return (
     <View style={pb.bar}>
       <View style={[pb.slot, { alignItems: "flex-start" }]}>
-        <Avatar player={p0} active={active0} />
+        <Avatar player={p0} active={active0} playerId={p0.id} />
         <Text style={[pb.name, active0 && pb.nameOn]} numberOfLines={1}>
           {p0.name}
         </Text>
@@ -65,7 +91,7 @@ function PlayerBar({ players, currentTurn, playerName, profilePic }: {
       </View>
 
       <View style={[pb.slot, { alignItems: "flex-end" }]}>
-        <Avatar player={p1} active={active1} />
+        <Avatar player={p1} active={active1} playerId={p1.id} />
         <Text style={[pb.name, active1 && pb.nameOn]} numberOfLines={1}>
           {p1.name}
         </Text>
@@ -167,7 +193,7 @@ export default function GameScreen() {
     answer, media, answerMediaList, playerName, chooserName,
     askerName, responderName, profilePic, chooseMode, submitQuestion,
     submitAnswer, submitMedia, nextRound, quitGame, forfeit, gameMood,
-    reaction, sendReaction,
+    reaction, sendReaction, playerId,
   } = useGame();
   let moodCfg = getMoodConfig(gameMood);
   if (currentMode === "dare") moodCfg = { ...moodCfg, color: COLORS.red, accentColor: COLORS.red };
@@ -183,6 +209,40 @@ export default function GameScreen() {
   const [showReactions, setShowReactions] = useState(false);
   const [timer, setTimer]         = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pfModal, setPfModal] = useState<{ visible: boolean; authorId: string | null; name: string; bio: string; pic: string | null; interests: string[]; playStyle: string | null; reactions: Record<string, number>; loading: boolean }>({ visible: false, authorId: null, name: "", bio: "", pic: null, interests: [], playStyle: null, reactions: {}, loading: false });
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+
+  const base = getHttpBase();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${base}/friends/${playerId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setFriendIds(new Set(data.friends.map((f: { id: string }) => f.id)));
+          setSentIds(new Set(data.sent ?? []));
+        }
+      } catch {}
+    })();
+  }, []);
+  const openProfile = async (targetId: string, targetName: string) => {
+    if (!targetId) return;
+    setPfModal({ visible: true, authorId: targetId, name: targetName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, loading: true });
+    try {
+      const res = await fetch(`${base}/profile/${encodeURIComponent(targetId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPfModal({ visible: true, authorId: targetId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, loading: false });
+      } else {
+        setPfModal(prev => ({ ...prev, authorId: targetId, loading: false }));
+      }
+    } catch {
+      setPfModal(prev => ({ ...prev, authorId: targetId, loading: false }));
+    }
+  };
+  const onAvatarPress = (targetId: string, targetName: string) => openProfile(targetId, targetName);
   const prevTimerRef = useRef(0);
 
   const chooserName_ = chooserName ?? players[currentTurn]?.name ?? null;
@@ -268,7 +328,7 @@ export default function GameScreen() {
           <View style={{ width: 36 }} />
         </View>
 
-        <PlayerBar players={players} currentTurn={currentTurn} playerName={playerName} profilePic={profilePic} />
+        <PlayerBar players={players} currentTurn={currentTurn} playerName={playerName} profilePic={profilePic} onAvatarPress={onAvatarPress} />
 
         <ScrollView
           contentContainerStyle={s.scroll}
@@ -430,16 +490,29 @@ export default function GameScreen() {
                 <View style={s.divLine} />
               </View>
 
-              <View style={s.responderSection}>
-                {responderPic ? (
-                  <Image source={{ uri: responderPic }} style={[s.responderAvatar, { borderWidth: 2, borderColor: moodCfg.color }]} />
-                ) : (
-                  <View style={[s.responderAvatar, { backgroundColor: moodCfg.color }]}>
-                    <Text style={s.responderAvatarTxt}>{responderName?.slice(0, 2).toUpperCase()}</Text>
-                  </View>
-                )}
-                <Text style={s.responderName}>{responderName}</Text>
-              </View>
+              {responderName !== playerName ? (
+                <TouchableOpacity style={s.responderSection} onPress={() => responderPlayer?.id && openProfile(responderPlayer.id, responderName ?? "")} activeOpacity={0.7}>
+                  {responderPic ? (
+                    <Image source={{ uri: responderPic }} style={[s.responderAvatar, { borderWidth: 2, borderColor: moodCfg.color }]} />
+                  ) : (
+                    <View style={[s.responderAvatar, { backgroundColor: moodCfg.color }]}>
+                      <Text style={s.responderAvatarTxt}>{responderName?.slice(0, 2).toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <Text style={s.responderName}>{responderName}</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={s.responderSection}>
+                  {responderPic ? (
+                    <Image source={{ uri: responderPic }} style={[s.responderAvatar, { borderWidth: 2, borderColor: moodCfg.color }]} />
+                  ) : (
+                    <View style={[s.responderAvatar, { backgroundColor: moodCfg.color }]}>
+                      <Text style={s.responderAvatarTxt}>{responderName?.slice(0, 2).toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <Text style={s.responderName}>{responderName}</Text>
+                </View>
+              )}
 
               {answer || answerMediaList.length > 0 ? (
                 <View style={[s.answerCard, { backgroundColor: `${moodCfg.color}18`, borderColor: `${moodCfg.color}35` }]}>
@@ -553,6 +626,106 @@ export default function GameScreen() {
           </View>
         )}
 
+        {/* Profile modal */}
+        <Modal visible={pfModal.visible} transparent animationType="fade" onRequestClose={() => setPfModal(prev => ({ ...prev, visible: false }))}>
+          <TouchableOpacity style={s.pfOverlay} activeOpacity={1} onPress={() => setPfModal(prev => ({ ...prev, visible: false }))}>
+            <TouchableOpacity style={s.pfCard} activeOpacity={1} onPress={() => {}}>
+              {pfModal.loading ? (
+                <ActivityIndicator size="large" color={COLORS.purple} />
+              ) : (
+                <ScrollView contentContainerStyle={{ alignItems: "center", gap: 16 }} showsVerticalScrollIndicator={false}>
+                  {pfModal.pic ? (
+                    <Image source={{ uri: pfModal.pic }} style={s.pfAvatar} />
+                  ) : (
+                    <View style={[s.pfAvatar, { backgroundColor: `${COLORS.purple}20`, alignItems: "center", justifyContent: "center" }]}>
+                      <Text style={{ color: COLORS.purple, fontSize: 24, fontWeight: "800" }}>{pfModal.name.slice(0, 2).toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <Text style={s.pfName}>{pfModal.name}</Text>
+
+                  {pfModal.playStyle && (() => {
+                    const iconMap: Record<string, [React.ComponentType<{size: number; color: string}>, string]> = {
+                      "Rising Star":      [Star, COLORS.gold],
+                      "Hot Player":       [Flame, COLORS.orange],
+                      "Funny Player":     [SmilePlus, "#facc15"],
+                      "Heartthrob":       [Heart, COLORS.pink],
+                      "Shocking Player":  [Zap, COLORS.electricBlue],
+                      "Savage Player":    [Skull, "#a855f7"],
+                      "Emotional Player": [Heart, "#60a5fa"],
+                      "Life of the Party":[PartyPopper, "#f97316"],
+                      "Respected Player": [Crown, COLORS.gold],
+                    };
+                    const pair = iconMap[pfModal.playStyle ?? ""] ?? [Star, COLORS.sub];
+                    const Icon = pair[0];
+                    return (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: RADIUS.pill, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1, borderColor: COLORS.border }}>
+                        <Icon size={13} color={pair[1]} />
+                        <Text style={{ color: COLORS.text, fontSize: 11, fontWeight: "700" }}>{pfModal.playStyle}</Text>
+                      </View>
+                    );
+                  })()}
+
+                  {Object.keys(pfModal.reactions).length > 0 && (
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+                      {Object.entries(pfModal.reactions).map(([emoji, count]) => (
+                        <View key={emoji} style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: COLORS.border }}>
+                          <Text style={{ fontSize: 14 }}>{emoji}</Text>
+                          <Text style={{ color: COLORS.sub, fontSize: 11, fontWeight: "700" }}>{count}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {pfModal.bio ? <Text style={s.pfBio}>{pfModal.bio}</Text> : null}
+                  {pfModal.interests.length > 0 && (
+                    <>
+                      <Text style={{ color: COLORS.sub, fontSize: 10, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" }}>Interests</Text>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+                        {pfModal.interests.map((i) => (
+                          <View key={i} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: `${COLORS.purple}15`, borderWidth: 1, borderColor: `${COLORS.purple}30` }}>
+                            <Text style={{ color: COLORS.purple, fontSize: 11, fontWeight: "700" }}>{INTEREST_LABEL[i] ?? i}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                  {pfModal.authorId && pfModal.authorId !== playerId && !friendIds.has(pfModal.authorId) && (
+                    sentIds.has(pfModal.authorId)
+                      ? (
+                        <View style={[s.pfAddBtn, { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" }]}>
+                          <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: "700" }}>Request Sent</Text>
+                        </View>
+                      )
+                      : (
+                        <TouchableOpacity
+                          style={s.pfAddBtn}
+                          onPress={async () => {
+                            try {
+                              const res = await fetch(`${base}/friends/request`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ from_id: playerId, from_name: playerName, from_pic: profilePic, to_id: pfModal.authorId }),
+                              });
+                              if (res.ok) {
+                                const data = await res.json();
+                                if (data.status === "already_friends") Alert.alert("Already Friends", "You are already friends with this player.");
+                                else if (data.status === "already_requested") Alert.alert("Request Pending", "A friend request is already pending.");
+                                else Alert.alert("Sent", "Friend request sent!");
+                              }
+                            } catch {}
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <UserPlus size={14} color="#fff" />
+                          <Text style={s.pfAddTxt}>Add Friend</Text>
+                        </TouchableOpacity>
+                      )
+                  )}
+                </ScrollView>
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -813,4 +986,13 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: `${COLORS.red}30`,
   },
+
+  // ── Profile Modal ──
+  pfOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center", padding: 32 },
+  pfCard: { width: "100%", maxWidth: 300, backgroundColor: COLORS.bg, borderRadius: RADIUS.cardSm, borderWidth: 1, borderColor: COLORS.border, padding: 28, alignItems: "center", ...SHADOWS.glow },
+  pfAvatar: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: COLORS.purple },
+  pfName: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
+  pfBio: { color: COLORS.sub, fontSize: 13, textAlign: "center", lineHeight: 18 },
+  pfAddBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.purple, borderRadius: RADIUS.button, paddingVertical: 10, paddingHorizontal: 20, width: "100%", justifyContent: "center" },
+  pfAddTxt: { color: "#fff", fontSize: 13, fontWeight: "800" },
 });

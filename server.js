@@ -56,6 +56,9 @@ console.log("Server config:", {
 // ─── In-memory: only WebSocket connections (cannot be stored in Redis) ───────
 const playerSockets = new Map(); // playerId → WebSocket
 const profileStore = new Map(); // playerId → { name, bio, pic, interests }
+const friendStore = new Map(); // playerId → Set<friendId>
+const friendReqStore = new Map(); // requestId → { id, from, to, fromName, fromPic, status, createdAt }
+const notificationStore = new Map(); // playerId → Notification[]
 const memStore = {
   rooms: new Map(), // roomId → JSON string
   openRooms: new Set(), // roomId
@@ -226,6 +229,46 @@ function normalizeMediaList(mediaList = []) {
     ...item,
     media_data: normalizeMediaData(item.media_data),
   }));
+}
+
+// ─── Notifications & Friends helpers ──────────────────────────────────────────
+
+function pushNotification(playerId, notification) {
+  const list = notificationStore.get(playerId) || [];
+  list.unshift(notification);
+  notificationStore.set(playerId, list);
+  const ws = playerSockets.get(playerId);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "new_notification", notification }));
+  }
+}
+
+function createNotification(toId, fromId, fromName, fromPic, type, message) {
+  pushNotification(toId, {
+    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    type,
+    from: fromId,
+    fromName,
+    fromPic: fromPic ?? null,
+    message,
+    read: false,
+    createdAt: Date.now(),
+  });
+}
+
+function getFriendIds(playerId) {
+  return friendStore.get(playerId) || new Set();
+}
+
+function areFriends(a, b) {
+  return getFriendIds(a).has(b) && getFriendIds(b).has(a);
+}
+
+function addFriendPair(a, b) {
+  if (!friendStore.has(a)) friendStore.set(a, new Set());
+  if (!friendStore.has(b)) friendStore.set(b, new Set());
+  friendStore.get(a).add(b);
+  friendStore.get(b).add(a);
 }
 
 // ─── WebSocket handler ────────────────────────────────────────────────────────
@@ -1014,6 +1057,133 @@ app.post("/community/posts/:id/like", async (req, res) => {
 
     await saveCommunityPosts(posts);
     res.json({ likes: post.likes, likedByMe });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Friends & Notifications REST endpoints ───────────────────────────────────
+
+// POST /friends/request — send a friend request
+app.post("/friends/request", (req, res) => {
+  try {
+    const { from_id, from_name, from_pic, to_id } = req.body;
+    if (!from_id || !to_id || !from_name) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    if (from_id === to_id) {
+      return res.status(400).json({ error: "Cannot friend yourself" });
+    }
+    if (areFriends(from_id, to_id)) {
+      return res.json({ ok: true, status: "already_friends" });
+    }
+    // Check for existing pending request
+    for (const [reqId, r] of friendReqStore) {
+      if (r.from === from_id && r.to === to_id && r.status === "pending") {
+        return res.json({ ok: true, status: "already_requested" });
+      }
+      if (r.from === to_id && r.to === from_id && r.status === "pending") {
+        return res.json({ ok: true, status: "already_requested" });
+      }
+    }
+    const requestId = `freq-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const request = { id: requestId, from: from_id, to: to_id, fromName: from_name, fromPic: from_pic ?? null, status: "pending", createdAt: Date.now() };
+    friendReqStore.set(requestId, request);
+
+    // Notify the receiver
+    createNotification(to_id, from_id, from_name, from_pic, "friend_request", `${from_name} sent you a friend request`);
+    res.json({ ok: true, status: "sent" });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /friends/accept — accept a friend request
+app.post("/friends/accept", (req, res) => {
+  try {
+    const { request_id, actor_id } = req.body;
+    const request = friendReqStore.get(request_id);
+    if (!request || request.to !== actor_id || request.status !== "pending") {
+      return res.status(400).json({ error: "Invalid request" });
+    }
+    request.status = "accepted";
+    addFriendPair(request.from, request.to);
+
+    // Notify the requester
+    const requesterName = profileStore.get(request.from)?.name ?? request.fromName;
+    createNotification(request.from, request.to, requesterName, null, "friend_request_accepted", `${requesterName} accepted your friend request`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /friends/reject — reject a friend request
+app.post("/friends/reject", (req, res) => {
+  try {
+    const { request_id, actor_id } = req.body;
+    const request = friendReqStore.get(request_id);
+    if (!request || request.to !== actor_id || request.status !== "pending") {
+      return res.status(400).json({ error: "Invalid request" });
+    }
+    request.status = "rejected";
+
+    // Notify the requester that their request was rejected
+    createNotification(request.from, request.to, request.fromName, null, "friend_request_rejected", `${request.fromName} declined your friend request`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /friends/:player_id — get friends list and pending requests
+app.get("/friends/:player_id", (req, res) => {
+  try {
+    const { player_id } = req.params;
+    const friendIds = getFriendIds(player_id);
+    const friends = [];
+    for (const fid of friendIds) {
+      const p = profileStore.get(fid);
+      friends.push({ id: fid, name: p?.name ?? "Unknown", pic: p?.pic ?? null });
+    }
+    const requests = [];
+    const sent = [];
+    for (const [, r] of friendReqStore) {
+      if (r.status !== "pending") continue;
+      if (r.to === player_id) {
+        const p = profileStore.get(r.from);
+        requests.push({ id: r.id, from: r.from, fromName: p?.name ?? r.fromName, fromPic: p?.pic ?? r.fromPic, createdAt: r.createdAt });
+      }
+      if (r.from === player_id) {
+        sent.push(r.to);
+      }
+    }
+    res.json({ friends, requests, sent });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /notifications/:player_id — get notifications
+app.get("/notifications/:player_id", (req, res) => {
+  try {
+    const { player_id } = req.params;
+    const list = notificationStore.get(player_id) || [];
+    res.json({ notifications: list });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /notifications/read — mark all as read
+app.post("/notifications/read", (req, res) => {
+  try {
+    const { player_id } = req.body;
+    const list = notificationStore.get(player_id);
+    if (list) {
+      list.forEach(n => { n.read = true; });
+    }
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: "Server error" });
   }
