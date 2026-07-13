@@ -1,8 +1,8 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
+import { Image } from "expo-image";
 import {
     Alert,
-    Image,
     Platform,
     ScrollView,
     StyleSheet,
@@ -13,7 +13,7 @@ import {
 import { Clapperboard, X, Camera, Image as LucideImage, Video } from "lucide-react-native";
 
 export interface SelectedMedia {
-  type: "photo" | "video";
+  type: "photo" | "video" | "audio";
   base64: string;
   uri: string;
 }

@@ -2,6 +2,8 @@ const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
 const { createClient } = require("redis");
+const fs = require("fs");
+const path = require("path");
 
 const HOST = process.env.SERVER_HOST || "0.0.0.0";
 const PORT = Number(process.env.SERVER_PORT || 5000);
@@ -17,9 +19,56 @@ const REDIS_CONFIG = {
 };
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "10mb" }));
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: SOCKET_PATH });
+
+// Ping all clients every 30 seconds to keep connections alive
+const HEARTBEAT_INTERVAL = 30000;
+const heartbeatTimer = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.ping();
+    }
+  }
+}, HEARTBEAT_INTERVAL);
+
+// ─── Upload directory ──────────────────────────────────────────────────────────
+const UPLOADS_DIR = path.join(__dirname, "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+const PROFILE_DB_PATH = path.join(__dirname, "profiles.json");
+
+// ─── Profile persistence ─────────────────────────────────────────────────────
+function saveProfiles() {
+  try {
+    const obj = {};
+    for (const [k, v] of profileStore) {
+      obj[k] = v;
+    }
+    fs.writeFileSync(PROFILE_DB_PATH, JSON.stringify(obj, null, 2));
+  } catch (e) {
+    console.error("saveProfiles error:", e.message);
+  }
+}
+
+function loadProfiles() {
+  try {
+    if (fs.existsSync(PROFILE_DB_PATH)) {
+      const raw = fs.readFileSync(PROFILE_DB_PATH, "utf-8");
+      const obj = JSON.parse(raw);
+      for (const [k, v] of Object.entries(obj)) {
+        profileStore.set(k, v);
+      }
+      console.log(`✓ Loaded ${Object.keys(obj).length} profiles from disk`);
+    }
+  } catch (e) {
+    console.warn("loadProfiles error:", e.message);
+  }
+}
 
 // ─── Redis Client ────────────────────────────────────────────────────────────
 const redisClient = createClient({
@@ -56,6 +105,7 @@ console.log("Server config:", {
 // ─── In-memory: only WebSocket connections (cannot be stored in Redis) ───────
 const playerSockets = new Map(); // playerId → WebSocket
 const profileStore = new Map(); // playerId → { name, bio, pic, interests }
+loadProfiles();
 const friendStore = new Map(); // playerId → Set<friendId>
 const friendReqStore = new Map(); // requestId → { id, from, to, fromName, fromPic, status, createdAt }
 const notificationStore = new Map(); // playerId → Notification[]
@@ -66,6 +116,11 @@ const memStore = {
 };
 
 // ─── Redis helpers ────────────────────────────────────────────────────────────
+
+function getPlayerLevel(playerId) {
+  const data = profileStore.get(playerId);
+  return data ? Math.floor((data.gamesPlayed ?? 0) / 10) + 1 : 1;
+}
 
 // Key conventions:
 //   room:<ID>        → JSON string of the full room object
@@ -132,9 +187,15 @@ async function findAvailableRoom(interests = []) {
 
   for (const id of openIds) {
     const room = await getRoom(id);
-    if (!room || room.players.length >= 2 || room.phase !== "waiting" || room.is_private) {
-      if (room && room.is_private) continue;
-      await markRoomClosed(id); // stale
+    if (!room) {
+      await markRoomClosed(id);
+      continue;
+    }
+    if (room.is_private) {
+      continue;
+    }
+    if (room.players.length >= 2 || room.phase !== "waiting") {
+      await markRoomClosed(id);
       continue;
     }
     const creator = room.players[0];
@@ -330,6 +391,7 @@ wss.on("connection", (ws) => {
                 id: player_id,
                 name: player_name,
                 profile_pic: profile_pic ?? null,
+                level: getPlayerLevel(player_id),
               },
             ],
           });
@@ -351,53 +413,59 @@ wss.on("connection", (ws) => {
 
           const availableRoom = await findAvailableRoom(interests ?? []);
           if (availableRoom) {
-            if (availableRoom.players.some((p) => p.id === player_id)) {
+            if (availableRoom.is_private) {
+              console.log(`  ✗ auto_join skipped private room ${availableRoom.room_id}`);
+              await markRoomClosed(availableRoom.room_id);
+            } else {
+              if (availableRoom.players.some((p) => p.id === player_id)) {
+                sendToPlayer(player_id, {
+                  type: "error",
+                  message: "You are already in the room",
+                });
+                break;
+              }
+
+              const player = {
+                id: player_id,
+                name: player_name,
+                profile_pic: profile_pic ?? null,
+                interests: interests ?? [],
+              };
+              availableRoom.players.push(player);
+
+              if (availableRoom.players.length === 2) {
+                availableRoom.phase = "choosing";
+                availableRoom.current_turn = 0;
+                await markRoomClosed(availableRoom.room_id);
+              }
+              await saveRoom(availableRoom);
+
+              console.log(
+                `  ✓ ${player_name} auto-joined ${availableRoom.room_id}`,
+              );
               sendToPlayer(player_id, {
-                type: "error",
-                message: "You are already in the room",
+                type: "room_joined",
+                room_id: availableRoom.room_id,
               });
+              broadcastToRoom(availableRoom, {
+                type: "player_joined",
+                players: availableRoom.players.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  profile_pic: p.profile_pic ?? null,
+                  level: getPlayerLevel(p.id),
+                })),
+              });
+
+              if (availableRoom.players.length === 2) {
+                console.log(`  🎮 Game Started: ${availableRoom.room_id}`);
+                broadcastToRoom(availableRoom, {
+                  type: "game_started",
+                  current_turn: 0,
+                });
+              }
               break;
             }
-
-            const player = {
-              id: player_id,
-              name: player_name,
-              profile_pic: profile_pic ?? null,
-              interests: interests ?? [],
-            };
-            availableRoom.players.push(player);
-
-            if (availableRoom.players.length === 2) {
-              availableRoom.phase = "choosing";
-              availableRoom.current_turn = 0;
-              await markRoomClosed(availableRoom.room_id);
-            }
-            await saveRoom(availableRoom);
-
-            console.log(
-              `  ✓ ${player_name} auto-joined ${availableRoom.room_id}`,
-            );
-            sendToPlayer(player_id, {
-              type: "room_joined",
-              room_id: availableRoom.room_id,
-            });
-            broadcastToRoom(availableRoom, {
-              type: "player_joined",
-              players: availableRoom.players.map((p) => ({
-                id: p.id,
-                name: p.name,
-                profile_pic: p.profile_pic ?? null,
-              })),
-            });
-
-            if (availableRoom.players.length === 2) {
-              console.log(`  🎮 Game Started: ${availableRoom.room_id}`);
-              broadcastToRoom(availableRoom, {
-                type: "game_started",
-                current_turn: 0,
-              });
-            }
-            break;
           }
 
           const roomId = await createRoom({
@@ -703,6 +771,7 @@ wss.on("connection", (ws) => {
             reactions[reaction] = (reactions[reaction] ?? 0) + 1;
             respProfile.reactions = reactions;
             profileStore.set(responder.id, respProfile);
+            saveProfiles();
           }
 
           broadcastToRoom(room, {
@@ -810,6 +879,10 @@ wss.on("connection", (ws) => {
     }
   });
 
+  // Mark connection alive for heartbeat tracking
+  (ws).isAlive = true;
+  ws.on("pong", () => { (ws).isAlive = true; });
+
   ws.on("close", async () => {
     console.log("✗ Client Disconnected");
     try {
@@ -905,7 +978,7 @@ app.post("/profile/update", async (req, res) => {
 // POST /profile/sync
 app.post("/profile/sync", (req, res) => {
   try {
-    const { player_id, name, bio, pic, interests } = req.body;
+    const { player_id, name, bio, pic, interests, played_since, gamesPlayed } = req.body;
     if (!player_id) return res.status(400).json({ error: "Missing player_id" });
 
     const existing = profileStore.get(player_id) ?? {};
@@ -913,8 +986,22 @@ app.post("/profile/sync", (req, res) => {
     if (bio !== undefined) existing.bio = String(bio).slice(0, 80);
     if (pic !== undefined) existing.pic = pic;
     if (interests !== undefined) existing.interests = interests;
+    if (played_since !== undefined) existing.played_since = played_since;
+    if (gamesPlayed !== undefined) existing.gamesPlayed = gamesPlayed;
     profileStore.set(player_id, existing);
-    res.json({ ok: true });
+    saveProfiles();
+
+    const reactionCount = existing.reactions
+      ? Object.values(existing.reactions).reduce((sum, c) => sum + c, 0)
+      : 0;
+
+    res.json({
+      ok: true,
+      reactions: existing.reactions ?? {},
+      reactionCount,
+      played_since: existing.played_since ?? null,
+      gamesPlayed: existing.gamesPlayed ?? 0,
+    });
   } catch (e) {
     res.status(500).json({ error: "Server error" });
   }
@@ -943,13 +1030,61 @@ app.get("/profile/:player_id", (req, res) => {
     const { player_id } = req.params;
     const data = profileStore.get(player_id);
     if (!data) return res.status(404).json({ error: "Profile not found" });
+    const reactions = data.reactions ?? {};
+    const reactionCount = Object.values(reactions).reduce(
+      (sum, c) => sum + c,
+      0,
+    );
+    const gamesPlayed = data.gamesPlayed ?? 0;
+    const level = Math.max(1, Math.floor(gamesPlayed / 10) + 1);
     res.json({
       name: data.name ?? "Unknown",
       bio: data.bio ?? "",
       pic: data.pic ?? null,
       interests: data.interests ?? [],
-      reactions: data.reactions ?? {},
+      reactions,
+      reactionCount,
+      played_since: data.played_since ?? null,
       playStyle: getPlayStyle(data.reactions),
+      gamesPlayed,
+      level,
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Upload endpoint ──────────────────────────────────────────────────────────
+
+app.post("/upload", (req, res) => {
+  try {
+    const { base64, filename } = req.body;
+    if (!base64 || !filename) {
+      return res.status(400).json({ error: "Missing base64 or filename" });
+    }
+
+    let ext = "jpg";
+    let buffer;
+    if (base64.startsWith("data:")) {
+      const matches = base64.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(400).json({ error: "Invalid base64 image" });
+      }
+      ext = matches[1] === "jpeg" ? "jpg" : matches[1];
+      buffer = Buffer.from(matches[2], "base64");
+    } else {
+      buffer = Buffer.from(base64, "base64");
+    }
+
+    const safeName = `${filename.replace(/[^a-zA-Z0-9_-]/g, "")}-${Date.now()}.${ext}`;
+    const filePath = path.join(UPLOADS_DIR, safeName);
+    fs.writeFile(filePath, buffer, (err) => {
+      if (err) {
+        console.error("Upload write error:", err);
+        return res.status(500).json({ error: "Failed to save file" });
+      }
+      console.log(`  📤 Uploaded: ${safeName}`);
+      res.json({ url: `/uploads/${safeName}` });
     });
   } catch (e) {
     res.status(500).json({ error: "Server error" });
@@ -1004,6 +1139,7 @@ app.post("/community/posts", async (req, res) => {
     if (!author || !text || !["truth", "dare"].includes(type)) {
       return res.status(400).json({ error: "Invalid post data" });
     }
+    const authorProfile = profileStore.get(author_id);
     const post = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       author: String(author).slice(0, 30),
@@ -1013,6 +1149,7 @@ app.post("/community/posts", async (req, res) => {
       likes: 0,
       liked_by: [],
       createdAt: Date.now(),
+      profilePic: authorProfile?.pic ?? null,
     };
     const posts = await getCommunityPosts();
     posts.unshift(post);
@@ -1083,7 +1220,12 @@ app.post("/friends/request", (req, res) => {
         return res.json({ ok: true, status: "already_requested" });
       }
       if (r.from === to_id && r.to === from_id && r.status === "pending") {
-        return res.json({ ok: true, status: "already_requested" });
+        // Mutual — auto-accept
+        r.status = "accepted";
+        addFriendPair(from_id, to_id);
+        createNotification(from_id, to_id, from_name, from_pic, "friend_request_accepted", `${from_name} accepted your friend request`);
+        createNotification(to_id, from_id, from_name, from_pic, "friend_request_accepted", `${from_name} accepted your friend request`);
+        return res.json({ ok: true, status: "mutual" });
       }
     }
     const requestId = `freq-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -1130,6 +1272,23 @@ app.post("/friends/reject", (req, res) => {
 
     // Notify the requester that their request was rejected
     createNotification(request.from, request.to, request.fromName, null, "friend_request_rejected", `${request.fromName} declined your friend request`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /friends/remove — remove a friend
+app.post("/friends/remove", (req, res) => {
+  try {
+    const { player_id, friend_id } = req.body;
+    if (!player_id || !friend_id) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    const setA = friendStore.get(player_id);
+    const setB = friendStore.get(friend_id);
+    if (setA) setA.delete(friend_id);
+    if (setB) setB.delete(player_id);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: "Server error" });

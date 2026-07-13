@@ -1,27 +1,34 @@
+import { AudioRecorder } from "@/components/AudioRecorder";
+import { Avatar } from "@/components/Avatar";
 import { MediaDisplay } from "@/components/MediaDisplay";
 import { MediaPicker, SelectedMedia } from "@/components/MediaPicker";
 import { QuestionPicker } from "@/components/QuestionPicker";
 import { useGame } from "@/contexts/GameContext";
+import { useProfile } from "@/contexts/ProfileContext";
 import { getMoodConfig } from "@/data/moods";
-import { useEffect, useRef, useState } from "react";
+import { getLevelProgress } from "@/utils/levels";
+import { useSoundEffects } from "@/hooks/useSoundEffects";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
 import { SERVER_URL } from "@/constants/server";
-import { ArrowLeft, Crown, Eye, Flame, Heart, PartyPopper, Skull, SmilePlus, Sparkles, Star, Timer as TimerIcon, Paperclip, Send, Target, Camera, Check, X, Flag, UserPlus, Zap } from "lucide-react-native";
+import { ArrowLeft, CalendarDays, Crown, Eye, Flame, Gamepad2, Heart, Mic, PartyPopper, Skull, SmilePlus, Sparkles, Star, Timer as TimerIcon, Paperclip, Send, Target, Camera, Check, X, Flag, UserPlus, UserMinus, UserCheck, Users, Zap } from "lucide-react-native";
 
 function getHttpBase() {
   return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
@@ -36,54 +43,76 @@ const INTEREST_LABEL: Record<string, string> = {
   "deep": "deep",
 };
 
-function PlayerBar({ players, currentTurn, playerName, profilePic, onAvatarPress }: {
-  players: { id: string; name: string }[];
-  currentTurn: number;
+const PlayerAvatarItem = memo(function PlayerAvatarItem({
+  player, active, playerId, playerName, profilePic, onAvatarPress, moodColor,
+}: {
+  player: { name: string; profilePic?: string | null };
+  active: boolean;
+  playerId: string;
   playerName: string | null;
   profilePic: string | null;
   onAvatarPress?: (playerId: string, playerName: string) => void;
+  moodColor: string;
+}) {
+  const isMe = player.name === playerName;
+  const pic = isMe ? profilePic : player.profilePic;
+  const glowStyle = useMemo(() => active && pic ? { ...SHADOWS.glow } : undefined, [active, pic]);
+  const content = (
+    <Avatar
+      uri={pic}
+      name={player.name}
+      size={38}
+      borderWidth={2}
+      borderColor={pic ? moodColor : COLORS.border}
+      initialsBgColor={active ? moodColor : "rgba(255,255,255,0.06)"}
+      initialsTextColor={active ? "#fff" : COLORS.sub}
+      style={[glowStyle, { marginBottom: 2 }]}
+    />
+  );
+  if (isMe) return content;
+  return (
+    <TouchableOpacity onPress={() => onAvatarPress?.(playerId, player.name)} activeOpacity={0.7}>
+      {content}
+    </TouchableOpacity>
+  );
+});
+
+const PlayerBar = memo(function PlayerBar({ players, currentTurn, playerName, selfId, profilePic, onAvatarPress, playerLevels, selfLevel }: {
+  players: { id: string; name: string }[];
+  currentTurn: number;
+  playerName: string | null;
+  selfId: string;
+  profilePic: string | null;
+  onAvatarPress?: (playerId: string, playerName: string) => void;
+  playerLevels?: Record<string, number>;
+  selfLevel?: { current: number; needed: number; progress: number; level: number };
 }) {
   const { gameMood, currentMode } = useGame();
   let moodCfg = getMoodConfig(gameMood);
   if (currentMode === "dare") moodCfg = { ...moodCfg, color: COLORS.red, accentColor: COLORS.red };
   if (players.length < 2) return null;
-  const p0 = players[0];
-  const p1 = players[1];
-  const active0 = currentTurn === 0;
-  const active1 = currentTurn === 1;
 
-  const handlePress = (playerId: string, playerName: string) => {
-    onAvatarPress?.(playerId, playerName);
-  };
-
-  const Avatar = ({ player, active, playerId }: { player: { name: string; profilePic?: string | null }; active: boolean; playerId: string }) => {
-    const isMe = player.name === playerName;
-    const pic = isMe ? profilePic : player.profilePic;
-    const content = pic
-      ? <Image source={{ uri: pic }} style={[pb.avatar, { borderColor: moodCfg.color }, active && { borderColor: moodCfg.color, ...SHADOWS.glow }]} />
-      : (
-        <View style={[pb.avatar, { backgroundColor: active ? moodCfg.color : "rgba(255,255,255,0.06)" }]}>
-          <Text style={[pb.avatarTxt, { color: active ? "#fff" : COLORS.sub }]}>
-            {player.name.slice(0, 2).toUpperCase()}
-          </Text>
-        </View>
-      );
-    if (isMe) return content;
-    return (
-      <TouchableOpacity onPress={() => handlePress(playerId, player.name)} activeOpacity={0.7}>
-        {content}
-      </TouchableOpacity>
-    );
-  };
+  const meIdx = players.findIndex(p => p.id === selfId);
+  const me = meIdx >= 0 ? players[meIdx] : players[0];
+  const oppIdx = meIdx >= 0 ? (meIdx === 0 ? 1 : 0) : 1;
+  const opponent = players[oppIdx];
+  const activeMe = currentTurn === meIdx;
+  const activeOpp = currentTurn === oppIdx;
 
   return (
     <View style={pb.bar}>
       <View style={[pb.slot, { alignItems: "flex-start" }]}>
-        <Avatar player={p0} active={active0} playerId={p0.id} />
-        <Text style={[pb.name, active0 && pb.nameOn]} numberOfLines={1}>
-          {p0.name}
-        </Text>
-        {active0 && <Text style={[pb.turnTag, { color: moodCfg.color }]}>● TURN</Text>}
+        <PlayerAvatarItem player={me} active={activeMe} playerId={me.id} playerName={playerName} profilePic={profilePic} onAvatarPress={onAvatarPress} moodColor={moodCfg.color} />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Text style={[pb.name, activeMe && pb.nameOn]} numberOfLines={1}>
+            {me.name} (you)
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: "rgba(245,158,11,0.15)", borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 }}>
+            <Crown size={9} color={COLORS.gold} />
+            <Text style={{ color: COLORS.gold, fontSize: 9, fontWeight: "900" }}>{playerLevels?.[me.id] ?? selfLevel?.level}</Text>
+          </View>
+        </View>
+        {activeMe && <Text style={[pb.turnTag, { color: moodCfg.color }]}>● TURN</Text>}
       </View>
 
       <View style={[pb.vsWrap, { backgroundColor: `${moodCfg.color}20`, borderColor: `${moodCfg.color}40` }]}>
@@ -91,15 +120,21 @@ function PlayerBar({ players, currentTurn, playerName, profilePic, onAvatarPress
       </View>
 
       <View style={[pb.slot, { alignItems: "flex-end" }]}>
-        <Avatar player={p1} active={active1} playerId={p1.id} />
-        <Text style={[pb.name, active1 && pb.nameOn]} numberOfLines={1}>
-          {p1.name}
-        </Text>
-        {active1 && <Text style={[pb.turnTag, { color: moodCfg.color }]}>● TURN</Text>}
+        <PlayerAvatarItem player={opponent} active={activeOpp} playerId={opponent.id} playerName={playerName} profilePic={profilePic} onAvatarPress={onAvatarPress} moodColor={moodCfg.color} />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Text style={[pb.name, activeOpp && pb.nameOn]} numberOfLines={1}>
+            {opponent.name}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: "rgba(245,158,11,0.15)", borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 }}>
+            <Crown size={9} color={COLORS.gold} />
+            <Text style={{ color: COLORS.gold, fontSize: 9, fontWeight: "900" }}>{playerLevels?.[opponent.id] ?? "?"}</Text>
+          </View>
+        </View>
+        {activeOpp && <Text style={[pb.turnTag, { color: moodCfg.color }]}>● TURN</Text>}
       </View>
     </View>
   );
-}
+});
 
 const pb = StyleSheet.create({
   bar: {
@@ -194,7 +229,16 @@ export default function GameScreen() {
     askerName, responderName, profilePic, chooseMode, submitQuestion,
     submitAnswer, submitMedia, nextRound, quitGame, forfeit, gameMood,
     reaction, sendReaction, playerId,
+    setSoundCallbacks,
   } = useGame();
+  const { profile } = useProfile();
+  const {
+    playGameStart, playRoundStart, playModeSelect, playSend,
+    playQuestionReceived, playSubmit, playReveal, playPop,
+    playNextRound, playFail, playDisconnect, playTick,
+  } = useSoundEffects();
+  const selfLevel = getLevelProgress(profile.stats.gamesPlayed);
+  const [playerLevels, setPlayerLevels] = useState<Record<string, number>>({});
   let moodCfg = getMoodConfig(gameMood);
   if (currentMode === "dare") moodCfg = { ...moodCfg, color: COLORS.red, accentColor: COLORS.red };
   const answerInputRef = useRef<TextInput>(null);
@@ -202,18 +246,46 @@ export default function GameScreen() {
   const [inputQ, setInputQ]       = useState("");
   const [qMedia, setQMedia]       = useState<SelectedMedia[]>([]);
   const [showQMedia, setShowQMedia] = useState(false);
+  const [showQAudio, setShowQAudio] = useState(false);
   const [showQPicker, setShowQPicker] = useState(false);
   const [inputA, setInputA]       = useState("");
   const [aMedia, setAMedia]       = useState<SelectedMedia[]>([]);
   const [showAMedia, setShowAMedia] = useState(false);
+  const [showAAudio, setShowAAudio] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [timer, setTimer]         = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [pfModal, setPfModal] = useState<{ visible: boolean; authorId: string | null; name: string; bio: string; pic: string | null; interests: string[]; playStyle: string | null; reactions: Record<string, number>; loading: boolean }>({ visible: false, authorId: null, name: "", bio: "", pic: null, interests: [], playStyle: null, reactions: {}, loading: false });
+  const [pfModal, setPfModal] = useState<{ visible: boolean; authorId: string | null; name: string; bio: string; pic: string | null; interests: string[]; playStyle: string | null; reactions: Record<string, number>; gamesPlayed: number; level: number; playedSince: string; loading: boolean }>({ visible: false, authorId: null, name: "", bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: false });
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const rCardW = Math.min(screenW * 0.92, 480);
+  const rCardMaxH = Math.min(screenH * 0.85, 600);
+  const rHozPad = Math.max(16, Math.min(24, screenW * 0.065));
+  const rBotPad = Math.max(16, insets.bottom + 12);
+  const rTopRad = screenW < 380 ? 20 : 24;
+  const rGrabMarg = Math.max(12, Math.min(20, screenW * 0.05));
+
+  const pfScrollY = useRef(0);
+  const pfPanDismiss = useCallback(() => setPfModal(prev => ({ ...prev, visible: false })), []);
+  const pfPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gs) => gs.dy > 10 && gs.vy > 0 && pfScrollY.current <= 1,
+    onPanResponderRelease: (_, gs) => { if (gs.dy > 100) pfPanDismiss(); },
+  })).current;
 
   const base = getHttpBase();
+
+  const handleQAudioRecorded = useCallback((base64: string, uri: string) => {
+    setQMedia((prev) => [...prev, { type: "audio", base64, uri }]);
+    setShowQAudio(false);
+  }, []);
+  const handleAAudioRecorded = useCallback((base64: string, uri: string) => {
+    setAMedia((prev) => [...prev, { type: "audio", base64, uri }]);
+    setShowAAudio(false);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -227,34 +299,80 @@ export default function GameScreen() {
       } catch {}
     })();
   }, []);
-  const openProfile = async (targetId: string, targetName: string) => {
+
+  // Register sound callbacks for server-triggered events
+  useEffect(() => {
+    setSoundCallbacks({
+      gameStart: playGameStart,
+      roundStart: playRoundStart,
+      questionReceived: playQuestionReceived,
+      reveal: playReveal,
+      fail: playFail,
+      pop: playPop,
+      disconnect: playDisconnect,
+    });
+  }, [playGameStart, playRoundStart, playQuestionReceived, playReveal, playFail, playPop, playDisconnect, setSoundCallbacks]);
+
+  // Fetch levels for both players
+  useEffect(() => {
+    if (players.length < 2) return;
+    (async () => {
+      const levels: Record<string, number> = {};
+      for (const p of players) {
+        try {
+          const res = await fetch(`${base}/profile/${encodeURIComponent(p.id)}`);
+          if (res.ok) {
+            const data = await res.json();
+            levels[p.id] = data.level ?? 1;
+          }
+        } catch {}
+      }
+      if (Object.keys(levels).length > 0) setPlayerLevels(levels);
+    })();
+  }, [players.length >= 2 && players.map(p => p.id).join(",")]);
+  const openProfile = useCallback(async (targetId: string, targetName: string) => {
     if (!targetId) return;
-    setPfModal({ visible: true, authorId: targetId, name: targetName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, loading: true });
+    setPfModal({ visible: true, authorId: targetId, name: targetName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
+    try {
+      await fetch(`${base}/friends/${encodeURIComponent(playerId)}`).then(async r => {
+        if (r.ok) { const d = await r.json(); setFriendIds(new Set(d.friends.map((f: { id: string }) => f.id))); setSentIds(new Set(d.sent ?? [])); }
+      });
+    } catch {}
     try {
       const res = await fetch(`${base}/profile/${encodeURIComponent(targetId)}`);
       if (res.ok) {
         const data = await res.json();
-        setPfModal({ visible: true, authorId: targetId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, loading: false });
+        setPfModal({ visible: true, authorId: targetId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
       } else {
         setPfModal(prev => ({ ...prev, authorId: targetId, loading: false }));
       }
     } catch {
       setPfModal(prev => ({ ...prev, authorId: targetId, loading: false }));
     }
-  };
-  const onAvatarPress = (targetId: string, targetName: string) => openProfile(targetId, targetName);
+  }, [base, playerId]);
+  const onAvatarPress = useCallback((targetId: string, targetName: string) => openProfile(targetId, targetName), [openProfile]);
+  const isLocalPlayer = useCallback((name: string | null) => {
+    if (!name || !playerId) return false;
+    if (name === playerName) return true;
+    const match = players.find(p => p.name === name);
+    return match?.id === playerId;
+  }, [playerName, playerId, players]);
+  const youSuffix = useCallback((name: string | null) => isLocalPlayer(name) ? " (you)" : "", [isLocalPlayer]);
   const prevTimerRef = useRef(0);
 
-  const chooserName_ = chooserName ?? players[currentTurn]?.name ?? null;
-  const isMyTurn     = !!playerName && playerName === chooserName_;
-  const askerName_   = askerName ?? (players.length === 2 ? players[1 - currentTurn]?.name : null);
-  const isMyQ        = !!playerName && playerName === askerName_;
-  const responderPlayer = players.find(p => p.name === responderName);
-  const responderPic = responderName === playerName ? profilePic : (responderPlayer?.profilePic ?? null);
-  const canSendQ     = inputQ.trim().length > 0 || qMedia.length > 0;
-  const canSendA     = inputA.trim().length > 0 || aMedia.length > 0;
+  const chooserName_ = useMemo(() => chooserName ?? players[currentTurn]?.name ?? null, [chooserName, players, currentTurn]);
+  const isMyTurn     = useMemo(() => !!playerName && playerName === chooserName_, [playerName, chooserName_]);
+  const askerName_   = useMemo(() => askerName ?? (players.length === 2 ? players[1 - currentTurn]?.name : null), [askerName, players, currentTurn]);
+  const isMyQ        = useMemo(() => !!playerName && playerName === askerName_, [playerName, askerName_]);
+  const responderPlayer = useMemo(() => players.find(p => p.name === responderName), [players, responderName]);
+  const responderPic = useMemo(() => responderName === playerName ? profilePic : (responderPlayer?.profilePic ?? null), [responderName, playerName, profilePic, responderPlayer]);
+  const canSendQ     = useMemo(() => inputQ.trim().length > 0 || qMedia.length > 0, [inputQ, qMedia]);
+  const canSendA     = useMemo(() => {
+    if (currentMode === "dare") return aMedia.length > 0;
+    return inputA.trim().length > 0 || aMedia.length > 0;
+  }, [inputA, aMedia, currentMode]);
 
-  function getTimerDuration() {
+  const getTimerDuration = useCallback(() => {
     if (phase === "reveal" && currentMode === "dare") return 60;
     if (phase === "reveal") return 30;
     if (phase === "answering" && currentMode === "dare") return 180;
@@ -262,7 +380,7 @@ export default function GameScreen() {
     if (phase === "choosing") return 7;
     if (phase === "question_set") return 30;
     return 0;
-  }
+  }, [phase, currentMode]);
 
   useEffect(() => {
     const dur = getTimerDuration();
@@ -277,24 +395,45 @@ export default function GameScreen() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [phase, currentMode]);
 
-  const sendQ = (q: string) => {
+  const sendQ = useCallback(async (q: string) => {
+    playSend();
     submitQuestion(q);
-    qMedia.forEach(m => submitMedia(m.type, m.base64));
+    const media = [...qMedia];
     setInputQ(""); setQMedia([]); setShowQMedia(false);
-  };
-  const handleSendQ = () => { if (canSendQ) sendQ(inputQ); };
-  const autoSendQ = () => sendQ(inputQ);
+    for (const m of media) {
+      try {
+        const resp = await fetch(`${base}/upload`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64: m.base64, filename: `media-${playerId}-${Date.now()}` }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          submitMedia(m.type, `${base}${data.url}`);
+        } else {
+          submitMedia(m.type, m.base64);
+        }
+      } catch {
+        submitMedia(m.type, m.base64);
+      }
+    }
+  }, [submitQuestion, qMedia, submitMedia, playerId, base]);
+  const handleSendQ = useCallback(() => { if (canSendQ) sendQ(inputQ); }, [canSendQ, sendQ, inputQ]);
+  const autoSendQ = useCallback(() => sendQ(inputQ), [sendQ, inputQ]);
 
   useEffect(() => {
     const prev = prevTimerRef.current;
     prevTimerRef.current = timer;
+    if (timer > 0 && timer <= 3) {
+      playTick();
+    }
     if (prev === 1 && timer === 0) {
       if (phase === "answering" && isMyTurn) forfeit();
       if (phase === "choosing" && isMyTurn) chooseMode("truth");
       if (phase === "question_set" && isMyQ) autoSendQ();
       if (phase === "reveal") nextRound();
     }
-  }, [timer, phase, isMyTurn, isMyQ]);
+  }, [timer, phase, isMyTurn, isMyQ, forfeit, chooseMode, autoSendQ, nextRound, playTick]);
 
   useEffect(() => {
     if (phase === "answering" && isMyTurn) {
@@ -309,12 +448,30 @@ export default function GameScreen() {
     }
   }, [phase]);
 
-  const handleQuit  = () => Alert.alert("Quit Game", "Are you sure?", [{ text: "Cancel" }, { text: "Quit", onPress: quitGame, style: "destructive" }]);
-  const handleSendA = () => {
+  const handleQuit = useCallback(() => Alert.alert("Quit Game", "Are you sure?", [{ text: "Cancel" }, { text: "Quit", onPress: quitGame, style: "destructive" }]), [quitGame]);
+  const handleSendA = useCallback(async () => {
     if (!canSendA) return;
-    submitAnswer(inputA, aMedia.length > 0 ? aMedia.map(m => ({ type: m.type, base64: m.base64 })) : undefined);
+    let uploaded: { type: "photo" | "video" | "audio"; base64?: string; url?: string }[] | undefined;
+    if (aMedia.length > 0) {
+      uploaded = await Promise.all(aMedia.map(async (m) => {
+        try {
+          const resp = await fetch(`${base}/upload`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ base64: m.base64, filename: `game-${playerId}-${Date.now()}` }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            return { type: m.type, url: `${base}${data.url}` };
+          }
+        } catch {}
+        return { type: m.type, base64: m.base64 };
+      }));
+    }
+    playSubmit();
+    submitAnswer(inputA, uploaded);
     setInputA(""); setAMedia([]); setShowAMedia(false);
-  };
+  }, [canSendA, aMedia, base, playerId, submitAnswer, inputA, playSubmit]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -328,7 +485,7 @@ export default function GameScreen() {
           <View style={{ width: 36 }} />
         </View>
 
-        <PlayerBar players={players} currentTurn={currentTurn} playerName={playerName} profilePic={profilePic} onAvatarPress={onAvatarPress} />
+        <PlayerBar players={players} currentTurn={currentTurn} playerName={playerName} selfId={playerId} profilePic={profilePic} onAvatarPress={onAvatarPress} selfLevel={selfLevel} playerLevels={playerLevels} />
 
         <ScrollView
           contentContainerStyle={s.scroll}
@@ -350,14 +507,14 @@ export default function GameScreen() {
                 </View>
               </View>
               <View style={s.modeRow}>
-                <TouchableOpacity style={[s.modeCard, { backgroundColor: `${moodCfg.color}15`, borderColor: moodCfg.color }]} onPress={() => chooseMode("truth")} activeOpacity={0.82}>
+                <TouchableOpacity style={[s.modeCard, { backgroundColor: `${moodCfg.color}15`, borderColor: moodCfg.color }]} onPress={() => { playModeSelect(); chooseMode("truth"); }} activeOpacity={0.82}>
                   <View style={[s.modeIconWrap, { backgroundColor: `${moodCfg.color}20` }]}>
                     <Eye size={32} color={moodCfg.color} />
                   </View>
                   <Text style={[s.modeWord, { color: moodCfg.color }]}>TRUTH</Text>
                   <Text style={s.modeSub}>Answer honestly</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.modeCard, { backgroundColor: `${moodCfg.accentColor}15`, borderColor: moodCfg.accentColor }]} onPress={() => chooseMode("dare")} activeOpacity={0.82}>
+                <TouchableOpacity style={[s.modeCard, { backgroundColor: `${moodCfg.accentColor}15`, borderColor: moodCfg.accentColor }]} onPress={() => { playModeSelect(); chooseMode("dare"); }} activeOpacity={0.82}>
                   <View style={[s.modeIconWrap, { backgroundColor: `${moodCfg.accentColor}20` }]}>
                     <Flame size={32} color={moodCfg.accentColor} />
                   </View>
@@ -372,7 +529,7 @@ export default function GameScreen() {
             <View style={s.centerFill}>
               <View style={[s.waitingCard, { backgroundColor: `${moodCfg.color}10`, borderColor: `${moodCfg.color}30` }]}>
                 <ActivityIndicator size="large" color={moodCfg.color} />
-                <Text style={s.waitTitle}>{chooserName_} is choosing…</Text>
+                <Text style={s.waitTitle}>{chooserName_}{youSuffix(chooserName_)} is choosing…</Text>
                 <Text style={s.waitSub}>Truth or Dare?</Text>
               </View>
             </View>
@@ -383,7 +540,7 @@ export default function GameScreen() {
               <ModeBadge mode={currentMode} />
               <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
               <Text style={s.phaseLabel}>
-                {currentMode === "truth" ? `Ask ${chooserName_} a question` : `Give ${chooserName_} a dare`}
+                {currentMode === "truth" ? `Ask ${chooserName_}${youSuffix(chooserName_)} a question` : `Give ${chooserName_}${youSuffix(chooserName_)} a dare`}
               </Text>
               <TouchableOpacity style={[s.browseBtn, { backgroundColor: `${moodCfg.color}15`, borderColor: `${moodCfg.color}30` }]} onPress={() => setShowQPicker(true)} activeOpacity={0.85}>
                 <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
@@ -470,7 +627,7 @@ export default function GameScreen() {
               )}
               <View style={s.waitingAnswer}>
                 <ActivityIndicator size="small" color={moodCfg.color} />
-                <Text style={s.waitingAnswerText}>{responderName} is answering…</Text>
+                <Text style={s.waitingAnswerText}>{responderName}{youSuffix(responderName)} is answering…</Text>
               </View>
             </View>
           )}
@@ -492,25 +649,13 @@ export default function GameScreen() {
 
               {responderName !== playerName ? (
                 <TouchableOpacity style={s.responderSection} onPress={() => responderPlayer?.id && openProfile(responderPlayer.id, responderName ?? "")} activeOpacity={0.7}>
-                  {responderPic ? (
-                    <Image source={{ uri: responderPic }} style={[s.responderAvatar, { borderWidth: 2, borderColor: moodCfg.color }]} />
-                  ) : (
-                    <View style={[s.responderAvatar, { backgroundColor: moodCfg.color }]}>
-                      <Text style={s.responderAvatarTxt}>{responderName?.slice(0, 2).toUpperCase()}</Text>
-                    </View>
-                  )}
-                  <Text style={s.responderName}>{responderName}</Text>
+                  <Avatar uri={responderPic} name={responderName ?? ""} size={32} borderWidth={2} borderColor={moodCfg.color} initialsBgColor={moodCfg.color} initialsTextColor="#fff" />
+                  <Text style={s.responderName}>{responderName}{youSuffix(responderName)}</Text>
                 </TouchableOpacity>
               ) : (
                 <View style={s.responderSection}>
-                  {responderPic ? (
-                    <Image source={{ uri: responderPic }} style={[s.responderAvatar, { borderWidth: 2, borderColor: moodCfg.color }]} />
-                  ) : (
-                    <View style={[s.responderAvatar, { backgroundColor: moodCfg.color }]}>
-                      <Text style={s.responderAvatarTxt}>{responderName?.slice(0, 2).toUpperCase()}</Text>
-                    </View>
-                  )}
-                  <Text style={s.responderName}>{responderName}</Text>
+                  <Avatar uri={responderPic} name={responderName ?? ""} size={32} borderWidth={2} borderColor={moodCfg.color} initialsBgColor={moodCfg.color} initialsTextColor="#fff" />
+                  <Text style={s.responderName}>{responderName}{youSuffix(responderName)}</Text>
                 </View>
               )}
 
@@ -521,7 +666,7 @@ export default function GameScreen() {
                       {showReactions ? (
                         <View style={s.emojiPicker}>
                           {["😂", "🔥", "😍", "😮", "💀", "😢", "🎉", "👏"].map(e => (
-                            <TouchableOpacity key={e} onPress={() => { sendReaction(e); setShowReactions(false); }} activeOpacity={0.7} style={s.emojiBtn}>
+                            <TouchableOpacity key={e} onPress={() => { playPop(); sendReaction(e); setShowReactions(false); }} activeOpacity={0.7} style={s.emojiBtn}>
                               <Text style={s.emojiTxt}>{e}</Text>
                             </TouchableOpacity>
                           ))}
@@ -557,12 +702,12 @@ export default function GameScreen() {
               {timer > 0 && <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />}
               <TouchableOpacity
                 style={[s.nextBtn, { backgroundColor: moodCfg.color }, !isMyQ && s.nextBtnDisabled]}
-                onPress={nextRound}
+                onPress={() => { playNextRound(); nextRound(); }}
                 activeOpacity={0.85}
                 disabled={!isMyQ}
               >
                 <Text style={s.nextBtnTxt}>
-                  {isMyQ ? `Next Round  →  ${timer}s` : `Waiting for ${askerName_}…`}
+                  {isMyQ ? `Next Round  →  ${timer}s` : `Waiting for ${askerName_}${youSuffix(askerName_)}…`}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -573,10 +718,15 @@ export default function GameScreen() {
         {phase === "question_set" && isMyQ && (
           <View style={s.sticky}>
             {showQMedia && <MediaPicker selected={qMedia} onChange={setQMedia} />}
+            {showQAudio && <AudioRecorder onRecorded={handleQAudioRecorded} accentColor={moodCfg.color} />}
             <View style={s.stickyRow}>
               <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${COLORS.purple}15`, borderColor: COLORS.border }]} onPress={() => setShowQMedia(v => !v)} activeOpacity={0.82}>
                 <Paperclip size={20} color={COLORS.sub} />
                 {qMedia.length > 0 && <View style={[s.badge, { backgroundColor: moodCfg.color }]}><Text style={s.badgeTxt}>{qMedia.length}</Text></View>}
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${COLORS.purple}15`, borderColor: COLORS.border }]} onPress={() => setShowQAudio(v => !v)} activeOpacity={0.82}>
+                <Mic size={20} color={COLORS.sub} />
+                {qMedia.filter(m => m.type === "audio").length > 0 && <View style={[s.badge, { backgroundColor: moodCfg.color }]}><Text style={s.badgeTxt}>{qMedia.filter(m => m.type === "audio").length}</Text></View>}
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.stickyBtn, { backgroundColor: moodCfg.color, flex: 1 }, !canSendQ && s.stickyDisabled]}
@@ -599,10 +749,15 @@ export default function GameScreen() {
         {phase === "answering" && isMyTurn && (
           <View style={[s.sticky, { borderTopColor: `${moodCfg.color}20` }]}>
             {showAMedia && <MediaPicker selected={aMedia} onChange={setAMedia} />}
+            {showAAudio && <AudioRecorder onRecorded={handleAAudioRecorded} accentColor={moodCfg.color} />}
             <View style={s.stickyRow}>
               <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${COLORS.purple}15`, borderColor: COLORS.border }]} onPress={() => setShowAMedia(v => !v)} activeOpacity={0.82}>
                 <Camera size={20} color={COLORS.sub} />
                 {aMedia.length > 0 && <View style={[s.badge, { backgroundColor: COLORS.green }]}><Text style={s.badgeTxt}>{aMedia.length}</Text></View>}
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${COLORS.purple}15`, borderColor: COLORS.border }]} onPress={() => setShowAAudio(v => !v)} activeOpacity={0.82}>
+                <Mic size={20} color={COLORS.sub} />
+                {aMedia.filter(m => m.type === "audio").length > 0 && <View style={[s.badge, { backgroundColor: COLORS.green }]}><Text style={s.badgeTxt}>{aMedia.filter(m => m.type === "audio").length}</Text></View>}
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.submitBtn, !canSendA && s.submitBtnDisabled]}
@@ -619,28 +774,23 @@ export default function GameScreen() {
                   </Text>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.forfeitBtn]} onPress={forfeit} activeOpacity={0.82}>
+              <TouchableOpacity style={[s.forfeitBtn]} onPress={() => { playFail(); forfeit(); }} activeOpacity={0.82}>
                 <X size={18} color={COLORS.red} />
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* Profile modal */}
-        <Modal visible={pfModal.visible} transparent animationType="fade" onRequestClose={() => setPfModal(prev => ({ ...prev, visible: false }))}>
-          <TouchableOpacity style={s.pfOverlay} activeOpacity={1} onPress={() => setPfModal(prev => ({ ...prev, visible: false }))}>
-            <TouchableOpacity style={s.pfCard} activeOpacity={1} onPress={() => {}}>
+        {/* Profile modal — bottom sheet */}
+        <Modal visible={pfModal.visible} transparent animationType="slide" onRequestClose={() => setPfModal(prev => ({ ...prev, visible: false }))}>
+          <Pressable style={s.pfOverlay} onPress={() => setPfModal(prev => ({ ...prev, visible: false }))}>
+            <View style={[s.pfCard, { maxWidth: rCardW, maxHeight: rCardMaxH, paddingHorizontal: rHozPad, paddingBottom: rBotPad, borderTopLeftRadius: rTopRad, borderTopRightRadius: rTopRad }]} {...pfPanResponder.panHandlers}>
+              <View style={[s.pfGrabber, { marginBottom: rGrabMarg }]} />
               {pfModal.loading ? (
                 <ActivityIndicator size="large" color={COLORS.purple} />
               ) : (
-                <ScrollView contentContainerStyle={{ alignItems: "center", gap: 16 }} showsVerticalScrollIndicator={false}>
-                  {pfModal.pic ? (
-                    <Image source={{ uri: pfModal.pic }} style={s.pfAvatar} />
-                  ) : (
-                    <View style={[s.pfAvatar, { backgroundColor: `${COLORS.purple}20`, alignItems: "center", justifyContent: "center" }]}>
-                      <Text style={{ color: COLORS.purple, fontSize: 24, fontWeight: "800" }}>{pfModal.name.slice(0, 2).toUpperCase()}</Text>
-                    </View>
-                  )}
+                <ScrollView contentContainerStyle={{ alignItems: "center", gap: 16 }} showsVerticalScrollIndicator={false} style={{ alignSelf: "stretch" }} bounces={true} onScroll={(e) => { pfScrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
+                  <Avatar uri={pfModal.pic} name={pfModal.name} size={72} borderWidth={2} borderColor={COLORS.purple} />
                   <Text style={s.pfName}>{pfModal.name}</Text>
 
                   {pfModal.playStyle && (() => {
@@ -664,6 +814,37 @@ export default function GameScreen() {
                       </View>
                     );
                   })()}
+
+                  {/* Stats Card */}
+                  <View style={s.pfStatsCard}>
+                    <View style={s.pfStatColumn}>
+                      <Crown size={18} color={COLORS.gold} />
+                      <Text style={s.pfStatNumber}>{pfModal.level}</Text>
+                      <View style={{ width: "100%", height: 3, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden", marginTop: 2 }}>
+                        <View style={{ width: `${(pfModal.gamesPlayed % 10) * 10}%`, height: "100%", backgroundColor: COLORS.gold, borderRadius: 2 }} />
+                      </View>
+                      <Text style={s.pfStatLabel} numberOfLines={1}>Level</Text>
+                    </View>
+                    <View style={s.pfStatDivider} />
+                    <View style={s.pfStatColumn}>
+                      <SmilePlus size={18} color={COLORS.sub} />
+                      <Text style={s.pfStatNumber}>{Object.keys(pfModal.reactions).length > 0 ? Object.values(pfModal.reactions).reduce((a, b) => a + b, 0) : 0}</Text>
+                      <Text style={s.pfStatLabel} numberOfLines={1}>Reactions</Text>
+                    </View>
+                    <View style={s.pfStatDivider} />
+                    <View style={s.pfStatColumn}>
+                      <CalendarDays size={18} color={COLORS.sub} />
+                      <Text style={s.pfStatDate} numberOfLines={1}>
+                        {pfModal.playedSince
+                          ? new Date(pfModal.playedSince).toLocaleDateString("en-US", {
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "-"}
+                      </Text>
+                      <Text style={s.pfStatLabel} numberOfLines={1}>Played Since</Text>
+                    </View>
+                  </View>
 
                   {Object.keys(pfModal.reactions).length > 0 && (
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
@@ -689,42 +870,50 @@ export default function GameScreen() {
                       </View>
                     </>
                   )}
-                  {pfModal.authorId && pfModal.authorId !== playerId && !friendIds.has(pfModal.authorId) && (
-                    sentIds.has(pfModal.authorId)
-                      ? (
-                        <View style={[s.pfAddBtn, { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" }]}>
-                          <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: "700" }}>Request Sent</Text>
-                        </View>
-                      )
-                      : (
-                        <TouchableOpacity
-                          style={s.pfAddBtn}
-                          onPress={async () => {
-                            try {
-                              const res = await fetch(`${base}/friends/request`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ from_id: playerId, from_name: playerName, from_pic: profilePic, to_id: pfModal.authorId }),
-                              });
-                              if (res.ok) {
-                                const data = await res.json();
-                                if (data.status === "already_friends") Alert.alert("Already Friends", "You are already friends with this player.");
-                                else if (data.status === "already_requested") Alert.alert("Request Pending", "A friend request is already pending.");
-                                else Alert.alert("Sent", "Friend request sent!");
-                              }
-                            } catch {}
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <UserPlus size={14} color="#fff" />
-                          <Text style={s.pfAddTxt}>Add Friend</Text>
-                        </TouchableOpacity>
-                      )
-                  )}
                 </ScrollView>
               )}
-            </TouchableOpacity>
-          </TouchableOpacity>
+              {!pfModal.loading && pfModal.authorId && pfModal.authorId !== playerId && (
+                <View style={s.pfFriendIconWrap}>
+                  {friendIds.has(pfModal.authorId!) ? (
+                    <View style={s.pfFriendIcon}>
+                      <Users size={18} color={COLORS.green} />
+                    </View>
+                  ) : sentIds.has(pfModal.authorId!) ? (
+                    <View style={s.pfFriendIcon}>
+                      <UserCheck size={18} color={COLORS.blue} />
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={s.pfFriendIcon}
+                      onPress={async () => {
+                        try {
+                          const res = await fetch(`${base}/friends/request`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ from_id: playerId, from_name: playerName, from_pic: profilePic, to_id: pfModal.authorId }),
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            if (data.status === "mutual") {
+                              setFriendIds(prev => new Set(prev).add(pfModal.authorId!));
+                              setSentIds(prev => { const s = new Set(prev); s.delete(pfModal.authorId!); return s; });
+                            } else if (data.status !== "already_friends" && data.status !== "already_requested") {
+                              setSentIds(prev => new Set(prev).add(pfModal.authorId!));
+                            } else if (data.status === "already_friends") {
+                              setFriendIds(prev => new Set(prev).add(pfModal.authorId!));
+                            }
+                          }
+                        } catch {}
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <UserPlus size={18} color={COLORS.purple} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+          </Pressable>
         </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -987,12 +1176,27 @@ const s = StyleSheet.create({
     borderColor: `${COLORS.red}30`,
   },
 
-  // ── Profile Modal ──
-  pfOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center", padding: 32 },
-  pfCard: { width: "100%", maxWidth: 300, backgroundColor: COLORS.bg, borderRadius: RADIUS.cardSm, borderWidth: 1, borderColor: COLORS.border, padding: 28, alignItems: "center", ...SHADOWS.glow },
+  // ── Profile Modal (bottom sheet) ──
+  pfOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  pfCard: { width: "100%", backgroundColor: COLORS.bg, paddingTop: 4, alignItems: "center", alignSelf: "center", ...SHADOWS.glow },
+  pfGrabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.15)", alignSelf: "center" },
   pfAvatar: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: COLORS.purple },
   pfName: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
   pfBio: { color: COLORS.sub, fontSize: 13, textAlign: "center", lineHeight: 18 },
-  pfAddBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.purple, borderRadius: RADIUS.button, paddingVertical: 10, paddingHorizontal: 20, width: "100%", justifyContent: "center" },
-  pfAddTxt: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  pfFriendIconWrap: { position: "absolute", top: 4, right: 8, zIndex: 10 },
+  pfFriendIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
+  pfStatsCard: {
+    flexDirection: "row",
+    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    borderRadius: RADIUS.cardSm,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    width: "100%",
+  },
+  pfStatColumn: { flex: 1, alignItems: "center", gap: 4 },
+  pfStatNumber: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
+  pfStatLabel: { color: COLORS.sub, fontSize: 10, fontWeight: "600" },
+  pfStatDate: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  pfStatDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
 });

@@ -19,7 +19,6 @@ export type Interest = "fun" | "life" | "hot" | "connect" | "spicy" | "deep";
 
 export interface ProfileStats {
   gamesPlayed: number;
-  wins: number;
   level: number;
 }
 
@@ -39,12 +38,13 @@ export interface ProfileContextType {
   setPic: (v: string | null) => void;
   toggleInterest: (i: Interest) => void;
   clearProfile: () => void;
-  recordGameResult: (won: boolean) => void;
-  winRate: number;
+  recordGameResult: () => void;
+  reactions: number;
+  playedSince: string;
   playerId: string;
 }
 
-const DEFAULT_STATS: ProfileStats = { gamesPlayed: 0, wins: 0, level: 1 };
+const DEFAULT_STATS: ProfileStats = { gamesPlayed: 0, level: 1 };
 
 const DEFAULT: Profile = {
   name: "",
@@ -62,6 +62,8 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile>(DEFAULT);
   const [loaded, setLoaded] = useState(false);
+  const [reactions, setReactions] = useState(0);
+  const [playedSince, setPlayedSince] = useState("");
   const playerIdRef = useRef(
     `pid-${Math.random().toString(36).slice(2)}-${Date.now()}`,
   );
@@ -76,11 +78,25 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       "prof:interests",
       "prof:stats",
       "prof:player_id",
+      "prof:played_since",
     ]).then(async (pairs) => {
       const map: Record<string, string | null> = {};
       pairs.forEach(([k, v]) => (map[k] = v));
       if (map["prof:player_id"]) playerIdRef.current = map["prof:player_id"];
       else AsyncStorage.setItem("prof:player_id", playerIdRef.current);
+
+      // Derive playedSince from stored value or extract from player ID
+      let since = map["prof:played_since"];
+      if (!since) {
+        const id = playerIdRef.current;
+        const ts = parseInt(id.split("-").pop() ?? "", 10);
+        if (!isNaN(ts)) {
+          since = new Date(ts).toISOString();
+          AsyncStorage.setItem("prof:played_since", since);
+        }
+      }
+      if (!cancelled && since) setPlayedSince(since);
+
       setProfile({
         name: map["prof:name"] ?? "",
         bio: map["prof:bio"] ?? "",
@@ -96,6 +112,23 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     });
     return () => { cancelled = true; };
   }, []);
+
+  // Fetch reaction count from server after profile loads
+  useEffect(() => {
+    if (!loaded) return;
+    fetch(`${getHttpBase()}/profile/${encodeURIComponent(playerIdRef.current)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.reactions) {
+          const total = Object.values(data.reactions).reduce(
+            (sum: number, c: any) => sum + (typeof c === "number" ? c : 0),
+            0,
+          );
+          setReactions(total);
+        }
+      })
+      .catch(() => {});
+  }, [loaded]);
 
   const persist = useCallback((patch: Partial<Profile>) => {
     setProfile((prev) => {
@@ -131,13 +164,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Call this whenever a match finishes to keep stats (and level) up to date
-  const recordGameResult = useCallback((won: boolean) => {
+  // Call this whenever a game starts to keep stats (and level) up to date
+  const recordGameResult = useCallback(() => {
     setProfile((prev) => {
       const gamesPlayed = prev.stats.gamesPlayed + 1;
-      const wins = prev.stats.wins + (won ? 1 : 0);
       const level = Math.max(1, Math.floor(gamesPlayed / GAMES_PER_LEVEL) + 1);
-      const stats = { gamesPlayed, wins, level };
+      const stats = { gamesPlayed, level };
       AsyncStorage.setItem("prof:stats", JSON.stringify(stats));
       return { ...prev, stats };
     });
@@ -151,6 +183,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       "prof:pic",
       "prof:interests",
       "prof:stats",
+      "prof:played_since",
     ]);
   }, []);
 
@@ -176,8 +209,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loaded) return;
     const delayDebounce = setTimeout(() => {
-      const body: { player_id: string; name?: string; bio?: string; pic?: string | null; interests?: string[] } = {
+      const body: any = {
         player_id: playerIdRef.current,
+        gamesPlayed: profile.stats.gamesPlayed,
       };
       let hasData = false;
       if (profile.name.trim()) { body.name = profile.name.trim(); hasData = true; }
@@ -185,6 +219,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (profile.pic) { body.pic = profile.pic; hasData = true; }
       if (profile.interests.length > 0) { body.interests = profile.interests; hasData = true; }
       if (!hasData) return;
+      if (playedSince) body.played_since = playedSince;
       fetch(`${getHttpBase()}/profile/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -198,11 +233,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   if (!loaded) return null;
 
-  const winRate =
-    profile.stats.gamesPlayed > 0
-      ? Math.round((profile.stats.wins / profile.stats.gamesPlayed) * 100)
-      : 0;
-
   return (
     <ProfileContext.Provider
       value={{
@@ -214,7 +244,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         toggleInterest,
         clearProfile,
         recordGameResult,
-        winRate,
+        reactions,
+        playedSince,
         playerId: playerIdRef.current,
       }}
     >

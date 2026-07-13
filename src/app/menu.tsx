@@ -4,15 +4,18 @@ import { GameMood, MOODS, getMoodConfig } from "@/data/moods";
 import { SERVER_URL } from "@/constants/server";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
+import { Image } from "expo-image";
 import {
-  ActivityIndicator, Alert, Animated, Easing, Image,
+  ActivityIndicator, Alert, Animated, Easing,
   KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Switch, Text, TextInput, TouchableOpacity, View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { getLevelProgress } from "@/utils/levels";
 
-import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Trophy, Target, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves, Star, Skull, Heart } from "lucide-react-native";
+import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves, Star, Skull, Heart, CalendarDays } from "lucide-react-native";
 
 function getHttpBase() {
   return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
@@ -123,8 +126,10 @@ function BlurredBlob({ color, top, left, size }: { color: string; top: number; l
 type ScreenMode = "home" | "profile" | "random_waiting" | "private_join" | "private_waiting_creator" | "private_waiting_joiner";
 
 export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (screen: "questions" | "community" | "friends" | "notifications" | "settings") => void; initialMode?: string }) {
-  const { createRoom, autoJoin, joinRoom, roomId, players, isConnected, phase, reconnect, error, quitGame, setInterests, gameMood, setGameMood, playersOnline } = useGame();
-  const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, winRate, playerId } = useProfile();
+  const { createRoom, autoJoin, joinRoom, roomId, players, isConnected, phase, reconnect, error, quitGame, setInterests, gameMood, setGameMood, playersOnline, notificationCount } = useGame();
+  const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, reactions, playedSince, playerId } = useProfile();
+  const { width: screenW } = useWindowDimensions();
+  const isSmall = screenW < 380;
   
   const [code, setCode] = useState("");
   const [mode, setMode] = useState<ScreenMode>((initialMode as ScreenMode) || "home");
@@ -133,22 +138,11 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
   const [editingName, setEditingName] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
   const [playStyle, setPlayStyle] = useState<string | null>(null);
-  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const displayName = profile.name || "Player";
   const initialRun = useRef(true);
 
   const base = getHttpBase();
-  const fetchNotifCount = async () => {
-    try {
-      const res = await fetch(`${base}/notifications/${encodeURIComponent(playerId)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setUnreadNotifs((data.notifications ?? []).filter((n: any) => !n.read).length);
-      }
-    } catch {}
-  };
-
-  useEffect(() => { fetchNotifCount(); const iv = setInterval(fetchNotifCount, 15000); return () => clearInterval(iv); }, []);
 
   useEffect(() => { setInterests(profile.interests); }, [profile.interests]);
   useEffect(() => {
@@ -177,7 +171,26 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", allowsEditing: true, aspect: [1, 1], quality: 0.4, base64: true });
     if (!r.canceled && r.assets[0]) {
       const a = r.assets[0];
-      setPic(a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri);
+      const base64 = a.base64 ? `data:image/jpeg;base64,${a.base64}` : null;
+      if (base64) {
+        try {
+          const resp = await fetch(`${base}/upload`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ base64, filename: `prof-${playerId}` }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            setPic(`${base}${data.url}`);
+          } else {
+            setPic(base64);
+          }
+        } catch {
+          setPic(base64);
+        }
+      } else {
+        setPic(a.uri);
+      }
     }
   };
 
@@ -189,7 +202,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
 
   return (
     <SafeAreaView style={s.safe}>
-      <GlowParticles />
+      {mode === "home" && <GlowParticles />}
       <BlurredBlob color={COLORS.purple} top={-80} left={-60} size={200} />
       <BlurredBlob color={COLORS.pink} top={200} left={260} size={160} />
       <BlurredBlob color={COLORS.electricBlue} top={400} left={-40} size={140} />
@@ -217,8 +230,8 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                     <Users size={18} color={COLORS.sub} />
                   </TouchableOpacity>
                   <TouchableOpacity style={s.notifBtn} activeOpacity={0.8} onPress={() => onNavigate?.("notifications")}>
-                    {unreadNotifs > 0 && <View style={s.notifDot} />}
-                    <Bell size={18} color={unreadNotifs > 0 ? COLORS.purple : COLORS.sub} />
+                    {notificationCount > 0 && <View style={s.notifDot} />}
+                    <Bell size={18} color={notificationCount > 0 ? COLORS.purple : COLORS.sub} />
                   </TouchableOpacity>
                   <TouchableOpacity style={s.iconBtn} activeOpacity={0.8} onPress={() => onNavigate?.("settings")}>
                     <Settings size={18} color={COLORS.sub} />
@@ -309,26 +322,26 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
               {/* Profile Avatar */}
               <View style={s.profileAvatarSection}>
                 <TouchableOpacity onPress={pickPic} activeOpacity={0.8}>
-                  <View style={s.avatarRing}>
-                    <View style={s.avatarGlow}>
-                      {profile.pic ? (
-                        <Image source={{ uri: profile.pic }} style={s.avatarImage} />
+                  <View style={[s.avatarRing, { width: isSmall ? 80 : 96, height: isSmall ? 80 : 96, borderRadius: isSmall ? 40 : 48 }]}>
+                    <View style={[s.avatarGlow, { width: isSmall ? 72 : 88, height: isSmall ? 72 : 88, borderRadius: isSmall ? 36 : 44 }]}>
+                      {profile.pic && !avatarFailed ? (
+                        <Image source={{ uri: profile.pic }} style={[s.avatarImage, { width: isSmall ? 72 : 88, height: isSmall ? 72 : 88, borderRadius: isSmall ? 36 : 44 }]} onError={() => setAvatarFailed(true)} />
                       ) : (
-                        <View style={s.avatarPlaceholder}>
-                          <Gamepad2 size={32} color={COLORS.sub} />
+                        <View style={[s.avatarPlaceholder, { width: isSmall ? 72 : 88, height: isSmall ? 72 : 88, borderRadius: isSmall ? 36 : 44 }]}>
+                          <Gamepad2 size={isSmall ? 26 : 32} color={COLORS.sub} />
                         </View>
                       )}
                     </View>
                   </View>
-                  <View style={s.cameraBtn}>
-                    <Camera size={12} color={COLORS.sub} />
+                  <View style={[s.cameraBtn, { width: isSmall ? 24 : 28, height: isSmall ? 24 : 28, borderRadius: isSmall ? 12 : 14 }]}>
+                    <Camera size={isSmall ? 10 : 12} color={COLORS.sub} />
                   </View>
                 </TouchableOpacity>
 
                 {/* Editable Name */}
                 {editingName ? (
                   <TextInput
-                    style={s.editableName}
+                    style={[s.editableName, { fontSize: isSmall ? 20 : 24 }]}
                     placeholder="Your Name"
                     placeholderTextColor={COLORS.sub}
                     value={profile.name}
@@ -341,7 +354,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                   />
                 ) : (
                   <TouchableOpacity style={s.displayNameRow} onPress={() => setEditingName(true)} activeOpacity={0.7}>
-                    <Text style={s.displayName}>{profile.name || "Your Name"}</Text>
+                    <Text style={[s.displayName, { fontSize: isSmall ? 20 : 24 }]}>{profile.name || "Your Name"}</Text>
                     <Pencil size={14} color={COLORS.sub} />
                   </TouchableOpacity>
                 )}
@@ -372,26 +385,44 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                     <Text style={s.achievementLabel}>Level {profile.stats.level}</Text>
                   </View>
                 </View>
+                {(() => {
+                  const gp = getLevelProgress(profile.stats.gamesPlayed);
+                  return (
+                    <View style={{ width: "100%", marginTop: 8 }}>
+                      <View style={{ width: "100%", height: 4, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
+                        <View style={{ width: `${gp.progress * 100}%`, height: "100%", backgroundColor: COLORS.gold, borderRadius: 2 }} />
+                      </View>
+                      <Text style={{ color: COLORS.sub, fontSize: 9, fontWeight: "600", textAlign: "center", marginTop: 4 }}>{gp.current} / {gp.needed} XP to next level</Text>
+                    </View>
+                  );
+                })()}
               </View>
 
               {/* Stats Card */}
               <View style={s.statsCard}>
                 <View style={s.statColumn}>
-                  <Gamepad2 size={20} color={COLORS.sub} />
-                  <Text style={s.statNumber}>{profile.stats.gamesPlayed}</Text>
+                  <Gamepad2 size={isSmall ? 16 : 20} color={COLORS.sub} />
+                  <Text style={[s.statNumber, { fontSize: isSmall ? 18 : 22 }]}>{profile.stats.gamesPlayed}</Text>
                   <Text style={s.statLabel}>Games Played</Text>
                 </View>
                 <View style={s.statDivider} />
                 <View style={s.statColumn}>
-                  <Trophy size={20} color={COLORS.sub} />
-                  <Text style={s.statNumber}>{profile.stats.wins}</Text>
-                  <Text style={s.statLabel}>Wins</Text>
+                  <SmilePlus size={isSmall ? 16 : 20} color={COLORS.sub} />
+                  <Text style={[s.statNumber, { fontSize: isSmall ? 18 : 22 }]}>{reactions}</Text>
+                  <Text style={s.statLabel}>Reactions</Text>
                 </View>
                 <View style={s.statDivider} />
                 <View style={s.statColumn}>
-                  <Target size={20} color={COLORS.sub} />
-                  <Text style={s.statNumber}>{winRate}%</Text>
-                  <Text style={s.statLabel}>Win Rate</Text>
+                  <CalendarDays size={isSmall ? 16 : 20} color={COLORS.sub} />
+                  <Text style={[s.statDate, { fontSize: isSmall ? 12 : 14 }]}>
+                    {playedSince
+                      ? new Date(playedSince).toLocaleDateString("en-US", {
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "-"}
+                  </Text>
+                  <Text style={s.statLabel}>Played Since</Text>
                 </View>
               </View>
 
@@ -448,11 +479,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                 </View>
               </View>
 
-              {profile.pic && (
-                <TouchableOpacity onPress={() => setPic(null)} style={{ alignSelf: "center", marginTop: 12, marginBottom: 12 }}>
-                  <Text style={{ color: COLORS.sub, fontSize: 12, fontWeight: "600" }}>Remove photo</Text>
-                </TouchableOpacity>
-              )}
+
             </View>
           )}
 
@@ -669,7 +696,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  editableName: { color: COLORS.text, fontSize: 24, fontWeight: "900", textAlign: "center", paddingVertical: 6, marginTop: 8, minWidth: 200 },
+  editableName: { color: COLORS.text, fontWeight: "900", textAlign: "center", paddingVertical: 6, marginTop: 8, width: "100%", maxWidth: 280 },
   displayNameRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, paddingVertical: 6 },
   displayName: { color: COLORS.text, fontSize: 24, fontWeight: "900", textAlign: "center" },
   // Achievements
@@ -700,6 +727,7 @@ const s = StyleSheet.create({
   statColumn: { flex: 1, alignItems: "center", gap: 4 },
   statNumber: { color: COLORS.text, fontSize: 22, fontWeight: "900" },
   statLabel: { color: COLORS.sub, fontSize: 11, fontWeight: "600" },
+  statDate: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
   statDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
 
   // Bio Card

@@ -1,24 +1,28 @@
+import { Avatar } from "@/components/Avatar";
 import { SERVER_URL } from "@/constants/server";
 import { useProfile } from "@/contexts/ProfileContext";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import { Crown, Eye, Flame, Heart, Inbox, PartyPopper, Skull, SmilePlus, Star, UserPlus, Zap } from "lucide-react-native";
+import { getLevelProgress } from "@/utils/levels";
+import { CalendarDays, Crown, Eye, Flame, Gamepad2, Heart, Inbox, PartyPopper, Skull, SmilePlus, Star, UserPlus, UserMinus, UserCheck, Users, Zap } from "lucide-react-native";
 
 function getHttpBase() {
   return SERVER_URL.replace(/^ws:\/\//, "http://")
@@ -63,10 +67,27 @@ export default function CommunityScreen() {
   const [postType, setPostType] = useState<"truth" | "dare">("truth");
   const [postText, setPostText] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [filter, setFilter] = useState<"all" | "truth" | "dare">("all");
-  const [profileModal, setProfileModal] = useState<{ visible: boolean; authorId: string | null; name: string; bio: string; pic: string | null; interests: string[]; playStyle: string | null; reactions: Record<string, number>; loading: boolean }>({ visible: false, authorId: null, name: "", bio: "", pic: null, interests: [], playStyle: null, reactions: {}, loading: false });
+
+  const [profileModal, setProfileModal] = useState<{ visible: boolean; authorId: string | null; name: string; bio: string; pic: string | null; interests: string[]; playStyle: string | null; reactions: Record<string, number>; gamesPlayed: number; level: number; playedSince: string; loading: boolean }>({ visible: false, authorId: null, name: "", bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: false });
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const rCardW = Math.min(screenW * 0.92, 480);
+  const rCardMaxH = Math.min(screenH * 0.85, 600);
+  const rHozPad = Math.max(16, Math.min(24, screenW * 0.065));
+  const rBotPad = Math.max(16, insets.bottom + 12);
+  const rTopRad = screenW < 380 ? 20 : 24;
+  const rGrabMarg = Math.max(12, Math.min(20, screenW * 0.05));
+
+  const pfScrollY = useRef(0);
+  const pfPanDismiss = useCallback(() => setProfileModal(prev => ({ ...prev, visible: false })), []);
+  const pfPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gs) => gs.dy > 10 && gs.vy > 0 && pfScrollY.current <= 1,
+    onPanResponderRelease: (_, gs) => { if (gs.dy > 100) pfPanDismiss(); },
+  })).current;
 
   const base = getHttpBase();
 
@@ -123,7 +144,7 @@ export default function CommunityScreen() {
       });
       const data = await res.json();
       if (data.post) {
-        setPosts((prev) => [data.post, ...prev]);
+        setPosts((prev) => [{ ...data.post, profilePic: data.post.profilePic ?? profile.pic }, ...prev]);
         setPostText("");
       }
     } catch {
@@ -156,12 +177,17 @@ export default function CommunityScreen() {
 
   const openProfile = async (authorId: string | undefined, authorName: string) => {
     if (!authorId) return;
-    setProfileModal({ visible: true, authorId, name: authorName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, loading: true });
+    setProfileModal({ visible: true, authorId, name: authorName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
+    try {
+      await fetch(`${base}/friends/${encodeURIComponent(playerId)}`).then(async r => {
+        if (r.ok) { const d = await r.json(); setFriendIds(new Set(d.friends.map((f: { id: string }) => f.id))); setSentIds(new Set(d.sent ?? [])); }
+      });
+    } catch {}
     try {
       const res = await fetch(`${base}/profile/${encodeURIComponent(authorId)}`);
       if (res.ok) {
         const data = await res.json();
-        setProfileModal({ visible: true, authorId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, loading: false });
+        setProfileModal({ visible: true, authorId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
       } else {
         setProfileModal(prev => ({ ...prev, authorId, loading: false }));
       }
@@ -170,36 +196,20 @@ export default function CommunityScreen() {
     }
   };
 
-  const filtered = posts.filter((p) => filter === "all" || p.type === filter);
+  const filtered = posts.filter((p) => p.type === postType);
 
   const renderPost = ({ item }: { item: CommunityPost }) => (
     <View style={s.postCard}>
       <View style={s.postTop}>
         {item.author_id && item.author_id !== playerId ? (
           <TouchableOpacity onPress={() => openProfile(item.author_id, item.author)} activeOpacity={0.7}>
-            {item.profilePic ? (
-              <Image source={{ uri: item.profilePic }} style={s.postAvatarImg} />
-            ) : (
-              <View style={s.postAvatar}>
-                <Text style={s.postAvatarTxt}>
-                  {item.author.slice(0, 2).toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <Avatar uri={item.profilePic} name={item.author} size={36} borderWidth={1.5} borderColor={COLORS.border} />
           </TouchableOpacity>
         ) : (
-          item.profilePic ? (
-            <Image source={{ uri: item.profilePic }} style={s.postAvatarImg} />
-          ) : (
-            <View style={s.postAvatar}>
-              <Text style={s.postAvatarTxt}>
-                {item.author.slice(0, 2).toUpperCase()}
-              </Text>
-            </View>
-          )
+          <Avatar uri={item.profilePic} name={item.author} size={36} borderWidth={1.5} borderColor={COLORS.border} />
         )}
         <View style={{ flex: 1 }}>
-          <Text style={s.postAuthor}>{item.author}</Text>
+          <Text style={s.postAuthor}>{item.author}{item.author_id === playerId ? " (you)" : ""}</Text>
           <Text style={s.postTime}>{timeAgo(item.createdAt)}</Text>
         </View>
         <View
@@ -307,25 +317,7 @@ export default function CommunityScreen() {
         </View>
 
         <View style={s.filterRow}>
-          {(["all", "truth", "dare"] as const).map((f) => (
-            <TouchableOpacity
-              key={f}
-              style={[s.filterBtn, filter === f && { backgroundColor: `${COLORS.purple}20`, borderColor: COLORS.purple }]}
-              onPress={() => setFilter(f)}
-              activeOpacity={0.8}
-            >
-              {f === "all" ? (
-                <Text style={[s.filterBtnTxt, filter === f && { color: COLORS.text }]}>All</Text>
-              ) : (
-                <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-                  {f === "truth" ? <Eye size={12} color={filter === f ? COLORS.text : COLORS.sub} /> : <Flame size={12} color={filter === f ? COLORS.text : COLORS.sub} />}
-                  <Text style={[s.filterBtnTxt, filter === f && { color: COLORS.text }]}>{f === "truth" ? "Truth" : "Dare"}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
-          <View style={{ flex: 1 }} />
-          <Text style={s.postCount}>{filtered.length} posts</Text>
+          <Text style={s.postCount}>{filtered.length} {postType} posts</Text>
         </View>
 
         {loading ? (
@@ -344,6 +336,9 @@ export default function CommunityScreen() {
             showsVerticalScrollIndicator={false}
             refreshing={refreshing}
             onRefresh={() => fetchPosts(true)}
+            windowSize={5}
+            maxToRenderPerBatch={10}
+            removeClippedSubviews
             ListEmptyComponent={
               <View style={s.empty}>
                 <Inbox size={48} color={COLORS.sub} />
@@ -356,20 +351,15 @@ export default function CommunityScreen() {
         )}
       </KeyboardAvoidingView>
 
-      <Modal visible={profileModal.visible} transparent animationType="fade" onRequestClose={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
-          <TouchableOpacity style={s.modalCard} activeOpacity={1} onPress={() => {}}>
+      <Modal visible={profileModal.visible} transparent animationType="slide" onRequestClose={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
+        <Pressable style={s.modalOverlay} onPress={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
+          <View style={[s.modalCard, { maxWidth: rCardW, maxHeight: rCardMaxH, paddingHorizontal: rHozPad, paddingBottom: rBotPad, borderTopLeftRadius: rTopRad, borderTopRightRadius: rTopRad }]} {...pfPanResponder.panHandlers}>
+            <View style={[s.modalGrabber, { marginBottom: rGrabMarg }]} />
             {profileModal.loading ? (
               <ActivityIndicator size="large" color={COLORS.purple} />
             ) : (
-              <ScrollView contentContainerStyle={{ alignItems: "center", gap: 16 }} showsVerticalScrollIndicator={false}>
-                {profileModal.pic ? (
-                  <Image source={{ uri: profileModal.pic }} style={s.modalAvatar} />
-                ) : (
-                  <View style={[s.modalAvatar, s.modalAvatarPlaceholder]}>
-                    <Text style={s.modalAvatarTxt}>{profileModal.name.slice(0, 2).toUpperCase()}</Text>
-                  </View>
-                )}
+              <ScrollView contentContainerStyle={{ alignItems: "center", gap: 16 }} showsVerticalScrollIndicator={false} style={{ alignSelf: "stretch" }} bounces={true} onScroll={(e) => { pfScrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
+                <Avatar uri={profileModal.pic} name={profileModal.name} size={72} borderWidth={2} borderColor={COLORS.purple} />
                 <Text style={s.modalName}>{profileModal.name}</Text>
 
                 {profileModal.playStyle && (() => {
@@ -393,6 +383,37 @@ export default function CommunityScreen() {
                     </View>
                   );
                 })()}
+
+                {/* Stats Card */}
+                <View style={s.modalStatsCard}>
+                  <View style={s.modalStatColumn}>
+                    <Crown size={18} color={COLORS.gold} />
+                    <Text style={s.modalStatNumber}>{profileModal.level}</Text>
+                    <View style={{ width: "100%", height: 3, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden", marginTop: 2 }}>
+                      <View style={{ width: `${(profileModal.gamesPlayed % 10) * 10}%`, height: "100%", backgroundColor: COLORS.gold, borderRadius: 2 }} />
+                    </View>
+                    <Text style={s.modalStatLabel} numberOfLines={1}>Level</Text>
+                  </View>
+                  <View style={s.modalStatDivider} />
+                  <View style={s.modalStatColumn}>
+                    <SmilePlus size={18} color={COLORS.sub} />
+                    <Text style={s.modalStatNumber}>{Object.keys(profileModal.reactions).length > 0 ? Object.values(profileModal.reactions).reduce((a, b) => a + b, 0) : 0}</Text>
+                    <Text style={s.modalStatLabel} numberOfLines={1}>Reactions</Text>
+                  </View>
+                  <View style={s.modalStatDivider} />
+                  <View style={s.modalStatColumn}>
+                    <CalendarDays size={18} color={COLORS.sub} />
+                    <Text style={s.modalStatDate} numberOfLines={1}>
+                      {profileModal.playedSince
+                        ? new Date(profileModal.playedSince).toLocaleDateString("en-US", {
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "-"}
+                    </Text>
+                    <Text style={s.modalStatLabel} numberOfLines={1}>Played Since</Text>
+                  </View>
+                </View>
 
                 {Object.keys(profileModal.reactions).length > 0 && (
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
@@ -418,42 +439,43 @@ export default function CommunityScreen() {
                     </View>
                   </>
                 )}
-                {profileModal.authorId && profileModal.authorId !== playerId && !friendIds.has(profileModal.authorId) && (
-                  sentIds.has(profileModal.authorId)
-                    ? (
-                      <View style={[s.addFriendBtn, { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" }]}>
-                        <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: "700" }}>Request Sent</Text>
-                      </View>
-                    )
-                    : (
-                      <TouchableOpacity
-                        style={s.addFriendBtn}
-                        onPress={async () => {
-                          try {
-                            const res = await fetch(`${base}/friends/request`, {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ from_id: playerId, from_name: profile.name, from_pic: profile.pic, to_id: profileModal.authorId }),
-                            });
-                            if (res.ok) {
-                              const data = await res.json();
-                              if (data.status === "already_friends") { Alert.alert("Already Friends", "You are already friends with this player."); }
-                              else if (data.status === "already_requested") { Alert.alert("Request Pending", "A friend request is already pending."); }
-                              else { Alert.alert("Sent", "Friend request sent!"); }
-                            }
-                          } catch {}
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <UserPlus size={14} color="#fff" />
-                        <Text style={s.addFriendTxt}>Add Friend</Text>
-                      </TouchableOpacity>
-                    )
-                )}
               </ScrollView>
-            )}
-          </TouchableOpacity>
-        </TouchableOpacity>
+              )}
+              {!profileModal.loading && profileModal.authorId && profileModal.authorId !== playerId && (
+                <View style={s.modalFriendIconWrap}>
+                  {friendIds.has(profileModal.authorId!) ? (
+                    <View style={s.modalFriendIcon}>
+                      <Users size={18} color={COLORS.green} />
+                    </View>
+                  ) : sentIds.has(profileModal.authorId!) ? (
+                    <View style={s.modalFriendIcon}>
+                      <UserCheck size={18} color={COLORS.blue} />
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={s.modalFriendIcon}
+                      onPress={async () => {
+                        try {
+                          const res = await fetch(`${base}/friends/request`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ from_id: playerId, from_name: profile.name, from_pic: profile.pic, to_id: profileModal.authorId }),
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            if (data.status !== "already_friends" && data.status !== "already_requested") { setSentIds(prev => new Set(prev).add(profileModal.authorId!)); }
+                          }
+                        } catch {}
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <UserPlus size={18} color={COLORS.purple} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+          </Pressable>
       </Modal>
     </SafeAreaView>
   );
@@ -586,22 +608,18 @@ const s = StyleSheet.create({
   emptyText: { color: COLORS.sub, fontSize: 14, textAlign: "center" },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 32,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
   },
   modalCard: {
     width: "100%",
-    maxWidth: 300,
     backgroundColor: COLORS.bg,
-    borderRadius: RADIUS.cardSm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 28,
+    paddingTop: 4,
     alignItems: "center",
+    alignSelf: "center",
     ...SHADOWS.glow,
   },
+  modalGrabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.15)", alignSelf: "center" },
   modalAvatar: {
     width: 72,
     height: 72,
@@ -627,6 +645,20 @@ const s = StyleSheet.create({
     borderColor: `${COLORS.purple}30`,
   },
   modalInterestTxt: { color: COLORS.purple, fontSize: 11, fontWeight: "700" },
-  addFriendBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: COLORS.purple, borderRadius: RADIUS.button, paddingVertical: 10, paddingHorizontal: 20, width: "100%", justifyContent: "center" },
-  addFriendTxt: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  modalFriendIconWrap: { position: "absolute", top: 4, right: 8, zIndex: 10 },
+  modalFriendIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
+  modalStatsCard: {
+    flexDirection: "row",
+    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    borderRadius: RADIUS.cardSm,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    width: "100%",
+  },
+  modalStatColumn: { flex: 1, alignItems: "center", gap: 4 },
+  modalStatNumber: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
+  modalStatLabel: { color: COLORS.sub, fontSize: 10, fontWeight: "600" },
+  modalStatDate: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  modalStatDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
 });

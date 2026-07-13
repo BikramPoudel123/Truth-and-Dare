@@ -1,3 +1,4 @@
+import { schedulePushForNotification } from "@/hooks/usePushNotifications";
 import { SERVER_URL } from "@/constants/server";
 import { GameMood } from "@/data/moods";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -6,6 +7,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -32,7 +34,7 @@ export interface Player {
 }
 
 export interface Media {
-  type: "photo" | "video";
+  type: "photo" | "video" | "audio";
   data: string;
   playerName: string;
   playerId: string;
@@ -43,6 +45,7 @@ export interface GameContextType {
   ws: WebSocket | null;
   isConnected: boolean;
   playersOnline: number;
+  notificationCount: number;
   profilePic: string | null;
   setProfilePic: (uri: string | null) => void;
   interests: string[];
@@ -81,24 +84,27 @@ export interface GameContextType {
   submitQuestion: (question: string) => void;
   submitAnswer: (
     answer: string,
-    mediaList?: { type: "photo" | "video"; base64: string }[],
+    mediaList?: { type: "photo" | "video" | "audio"; base64?: string; url?: string }[],
   ) => void;
-  submitMedia: (mediaType: "photo" | "video", base64: string) => void;
+  submitMedia: (mediaType: "photo" | "video" | "audio", base64: string) => void;
   nextRound: () => void;
   quitGame: () => void;
   forfeit: () => void;
   reset: () => void;
   reconnect: () => void;
+  setSoundCallbacks: (cbs: Record<string, () => void>) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const { playerId: profilePlayerId } = useProfile();
+  const { playerId: profilePlayerId, recordGameResult } = useProfile();
   const playerId = useRef(profilePlayerId);
   // keep the ref in sync if the profile playerId changes (it shouldn't, but just in case)
   playerId.current = profilePlayerId;
   const wsRef = useRef<WebSocket | null>(null);
+  const gameRecordedRef = useRef(false);
+  const soundCallbacksRef = useRef<Record<string, () => void>>({});
 
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -121,6 +127,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [profilePic, setProfilePicState] = useState<string | null>(null);
   const [interests, setInterestsState] = useState<string[]>([]);
   const [gameMood, setGameMood] = useState<GameMood>("casual");
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  const setSoundCallbacks = useCallback((cbs: Record<string, () => void>) => {
+    soundCallbacksRef.current = cbs;
+  }, []);
 
   // Use refs for values needed inside callbacks to avoid stale closures
   const roomIdRef = useRef<string | null>(null);
@@ -189,6 +200,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       case "game_started":
         setCurrentTurn(message.current_turn);
         setPhase("choosing");
+        soundCallbacksRef.current.gameStart?.();
+        if (!gameRecordedRef.current) {
+          gameRecordedRef.current = true;
+          recordGameResult();
+        }
         break;
 
       case "mode_chosen":
@@ -204,6 +220,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setResponderName(message.responder_name);
         setAnswer(null);
         setPhase("answering");
+        soundCallbacksRef.current.questionReceived?.();
         break;
 
       case "both_answered":
@@ -211,6 +228,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setAnswerMediaList([]);
         if (message.responder_name) setResponderName(message.responder_name);
         setPhase("reveal");
+        soundCallbacksRef.current.reveal?.();
         break;
 
       case "answer_with_media_multiple":
@@ -225,6 +243,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           })),
         );
         setPhase("reveal");
+        soundCallbacksRef.current.reveal?.();
         break;
 
       case "answer_with_media":
@@ -239,6 +258,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           },
         ]);
         setPhase("reveal");
+        soundCallbacksRef.current.reveal?.();
         break;
 
       case "forfeit":
@@ -246,10 +266,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setAnswerMediaList([]);
         if (message.responder_name) setResponderName(message.responder_name);
         setPhase("reveal");
+        soundCallbacksRef.current.fail?.();
         break;
 
       case "reaction":
         setReaction(message.reaction);
+        soundCallbacksRef.current.pop?.();
         break;
 
       case "round_started":
@@ -264,11 +286,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setAskerName(null);
         setResponderName(null);
         setPhase("choosing");
+        soundCallbacksRef.current.roundStart?.();
         break;
 
       case "player_quit":
         setError(message.message);
         setPhase("error");
+        soundCallbacksRef.current.disconnect?.();
         break;
 
       case "game_state":
@@ -313,12 +337,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           },
         ]);
         break;
+
+      case "new_notification":
+        setNotificationCount((prev) => prev + 1);
+        if (message.notification) {
+          schedulePushForNotification(message.notification);
+        }
+        break;
     }
   }, []);
 
-  // FIX: stable connect function — no deps that change, uses refs for roomId
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const connectWebSocket = useCallback(() => {
-    // Close any existing socket first
     if (wsRef.current) {
       wsRef.current.onclose = null;
       wsRef.current.close();
@@ -326,7 +357,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
 
     setPhase("connecting");
-    // Avoid printing internal WS URL/IP in logs
     console.log("Connecting to server");
 
     const socket = new WebSocket(SERVER_URL);
@@ -338,7 +368,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(true);
       setError(null);
 
-      // If we have an active room, attempt reconnect
       if (roomIdRef.current) {
         console.log("Reconnecting to room:", roomIdRef.current);
         socket.send(
@@ -377,10 +406,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       wsRef.current = null;
       setWs(null);
       setIsConnected(false);
-    };
-  }, [handleMessage]); // handleMessage is stable (no deps), so this never re-runs
 
-  // FIX: run only once on mount
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        console.log("Reconnecting...");
+        connectWebSocket();
+      }, 3000);
+    };
+  }, [handleMessage]);
+
   useEffect(() => {
     connectWebSocket();
     return () => {
@@ -388,6 +422,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         wsRef.current.onclose = null;
         wsRef.current.close();
       }
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -400,6 +435,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const reset = useCallback(() => {
+    gameRecordedRef.current = false;
     roomIdRef.current = null;
     playerNameRef.current = null;
     setRoomId(null);
@@ -495,7 +531,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const submitAnswer = useCallback(
     (
       answerText: string,
-      mediaList?: { type: "photo" | "video"; base64: string }[],
+      mediaList?: { type: "photo" | "video" | "audio"; base64?: string; url?: string }[],
     ) => {
       if (!roomIdRef.current) return;
       if (mediaList && mediaList.length > 0) {
@@ -506,7 +542,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           answer: answerText,
           media_list: mediaList.map((m) => ({
             media_type: m.type,
-            media_data: splitBase64Payload(m.base64),
+            media_data: m.url ?? splitBase64Payload(m.base64 ?? ""),
           })),
         });
       } else {
@@ -522,7 +558,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   );
 
   const submitMedia = useCallback(
-    (mediaType: "photo" | "video", base64: string) => {
+    (mediaType: "photo" | "video" | "audio", base64: string) => {
       if (roomIdRef.current) {
         sendMessage({
           type: "send_media",
@@ -577,6 +613,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         player_id: playerId.current,
       });
     }
+    gameRecordedRef.current = false;
     // Inline reset to avoid circular dependency
     roomIdRef.current = null;
     playerNameRef.current = null;
@@ -600,10 +637,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     connectWebSocket();
   }, [connectWebSocket]);
 
-  const value: GameContextType = {
+  const value = useMemo<GameContextType>(() => ({
     ws,
     isConnected,
     playersOnline,
+    notificationCount,
     profilePic,
     setProfilePic,
     interests,
@@ -639,7 +677,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     forfeit,
     reset,
     reconnect,
-  };
+    setSoundCallbacks,
+  }), [
+    ws, isConnected, playersOnline, notificationCount, profilePic,
+    interests, gameMood, players, currentTurn, phase,
+    currentMode, currentQuestion, answer, reaction,
+    media, answerMediaList, roomId, playerName, error,
+    chooserName, askerName, responderName,
+    setProfilePic, setInterests, setGameMood,
+    createRoom, autoJoin, joinRoom, chooseMode,
+    submitQuestion, submitAnswer, submitMedia,
+    sendReaction, nextRound, quitGame, forfeit, reset, reconnect,
+    setSoundCallbacks,
+  ]);
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }

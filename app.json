@@ -9,6 +9,7 @@
     "userInterfaceStyle": "dark",
     "plugins": [
       "expo-router",
+      "expo-audio",
       "expo-video",
       [
         "expo-image-picker",
@@ -22,7 +23,8 @@
       "expo-image",
       "expo-splash-screen",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-audio"
     ],
     "android": {
       "permissions": [

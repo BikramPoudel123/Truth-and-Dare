@@ -1,16 +1,17 @@
+import { createAudioPlayer } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Image } from "expo-image";
 import {
     Dimensions,
-    Image,
     Modal,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from "react-native";
-import { Search, X } from "lucide-react-native";
+import { Play, Search, X } from "lucide-react-native";
 import {
     Gesture,
     GestureDetector,
@@ -26,7 +27,7 @@ const SCREEN = Dimensions.get("window");
 
 interface MediaDisplayProps {
   media: {
-    type: "photo" | "video";
+    type: "photo" | "video" | "audio";
     data: string;
     playerName?: string;
   };
@@ -45,7 +46,7 @@ async function base64ToFileUri(data: string, ext: string): Promise<string> {
   const base64 = data.includes(",") ? data.split(",")[1] : data;
   if (!base64) return "";
 
-  const mime = ext === "mp4" ? "video/mp4" : "image/jpeg";
+  const mime = ext === "mp4" ? "video/mp4" : ext === "m4a" ? "audio/mp4" : "image/jpeg";
 
   try {
     if (typeof window !== "undefined" && typeof Blob !== "undefined") {
@@ -135,7 +136,7 @@ function ZoomableImage({ uri }: { uri: string }) {
           <Image
             source={{ uri }}
             style={{ width: SCREEN.width, height: SCREEN.height * 0.8 }}
-            resizeMode="contain"
+            contentFit="contain"
           />
         </Animated.View>
       </GestureDetector>
@@ -187,6 +188,54 @@ function VideoPlayer({ data, style }: { data: string; style: any }) {
   );
 }
 
+function AudioPlayer({ data, dims }: { data: string; dims: { width: number; height: number } }) {
+  const [fileUri, setFileUri] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const playerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    base64ToFileUri(data, "m4a")
+      .then((uri) => { if (!cancelled) setFileUri(uri || null); })
+      .catch(() => { if (!cancelled) setFileUri(null); });
+    return () => { cancelled = true; playerRef.current?.remove(); };
+  }, [data]);
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || !playing) return;
+    const id = setInterval(() => {
+      if (!player.playing) setPlaying(false);
+    }, 200);
+    return () => clearInterval(id);
+  }, [playing]);
+
+  const togglePlay = () => {
+    if (!fileUri) return;
+    const player = playerRef.current;
+    if (player) {
+      if (player.playing) {
+        player.pause();
+        setPlaying(false);
+        return;
+      }
+      player.play();
+      setPlaying(true);
+      return;
+    }
+    const newPlayer = createAudioPlayer({ uri: fileUri });
+    playerRef.current = newPlayer;
+    newPlayer.play();
+    setPlaying(true);
+  };
+
+  return (
+    <TouchableOpacity onPress={togglePlay} activeOpacity={0.7} style={[dims, { alignItems: "center", justifyContent: "center", backgroundColor: "#1f2937", borderRadius: 8 }]}>
+      <Play size={24} color={playing ? "#a855f7" : "#fff"} />
+    </TouchableOpacity>
+  );
+}
+
 export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const dims = sizeDimensions[size];
@@ -202,7 +251,7 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
           <Image
             source={{ uri: media.data }}
             style={styles.fill}
-            resizeMode="cover"
+            contentFit="cover"
           />
           {media.playerName && (
             <View style={styles.nameOverlay}>
@@ -251,6 +300,10 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
         )}
       </View>
     );
+  }
+
+  if (media.type === "audio") {
+    return <AudioPlayer data={media.data} dims={{ width: dims.width as number, height: dims.height as number }} />;
   }
 
   return null;

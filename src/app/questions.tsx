@@ -1,7 +1,8 @@
 import { useGame } from "@/contexts/GameContext";
-import { getMoodConfig, MOODS } from "@/data/moods";
-import { QUESTIONS, QCategory, QTag, Question } from "@/data/questions";
-import { useState } from "react";
+import { getMoodConfig } from "@/data/moods";
+import { QCategory, QTag, Question } from "@/data/questions";
+import { useQuestions } from "@/stores/questionBankStore";
+import { memo, useCallback, useState } from "react";
 import { Eye, Flame, Sparkles, SmilePlus, MessageCircle, Handshake, Waves, Balloon, Heart, Skull } from "lucide-react-native";
 import {
   FlatList, StyleSheet, Text,
@@ -24,65 +25,79 @@ const TAGS: { key: QTag | "all"; label: string; emoji: string; icon: string }[] 
 
 interface Props { onUse?: (q: Question) => void; }
 
-export default function QuestionsScreen({ onUse }: Props) {
+const QuestionCard = memo(function QuestionCard({ item, picked, onUse, onPress }: { item: Question; picked: Question | null; onUse?: (q: Question) => void; onPress: () => void }) {
+  const isTruth = item.type === "truth";
+  const isSelected = picked?.id === item.id;
+  return (
+    <TouchableOpacity
+      style={[s.qCard, isSelected && s.qCardSelected, isTruth ? s.qCardTruth : s.qCardDare]}
+      activeOpacity={0.8}
+      onPress={onPress}
+    >
+      <View style={s.qTop}>
+        <View style={[s.typeBadge, isTruth ? s.typeBadgeTruth : s.typeBadgeDare]}>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+            {isTruth ? <Eye size={12} color={COLORS.purple} /> : <Flame size={12} color="#c2410c" />}
+            <Text style={[s.typeBadgeText, { color: isTruth ? COLORS.purple : "#c2410c" }]}>
+              {isTruth ? "TRUTH" : "DARE"}
+            </Text>
+          </View>
+        </View>
+        <View style={s.tagRow}>
+          {item.tags.slice(0, 2).map(t => {
+            const tag = TAGS.find(x => x.key === t);
+            const IconComp = tag ? iconMap[tag.icon] : null;
+            return IconComp ? <IconComp key={t} size={16} color={COLORS.sub} /> : <Text key={t} style={s.tagPill}>{t}</Text>;
+          })}
+        </View>
+      </View>
+      <Text style={s.qText}>{item.text}</Text>
+      {isSelected && onUse && (
+        <TouchableOpacity style={s.useBtn} onPress={() => { onUse(item); }} activeOpacity={0.85}>
+          <Text style={s.useBtnText}>Use in Game →</Text>
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+});
+
+function MoodBadge() {
   const { gameMood } = useGame();
   const moodCfg = getMoodConfig(gameMood);
+  const IconComp = iconMap[moodCfg.icon];
+  return (
+    <View style={[s.moodBadge, { backgroundColor: `${moodCfg.color}20`, borderColor: `${moodCfg.color}40` }]}>
+      <IconComp size={14} color={moodCfg.color} />
+      <Text style={[s.moodBadgeLabel, { color: moodCfg.color }]}>{moodCfg.label}</Text>
+    </View>
+  );
+}
+
+export default function QuestionsScreen({ onUse }: Props) {
   const [typeFilter, setTypeFilter] = useState<QCategory | "all">("all");
   const [tagFilter,  setTagFilter]  = useState<QTag | "all">("all");
   const [picked, setPicked] = useState<Question | null>(null);
 
-  const filtered = QUESTIONS.filter(q =>
-    (typeFilter === "all" || q.type === typeFilter) &&
-    (tagFilter  === "all" || q.tags.includes(tagFilter as QTag))
-  );
+  const filtered = useQuestions(typeFilter, tagFilter);
 
-  const renderItem = ({ item }: { item: Question }) => {
-    const isTruth = item.type === "truth";
-    const isSelected = picked?.id === item.id;
-    return (
-      <TouchableOpacity
-        style={[s.qCard, isSelected && s.qCardSelected, isTruth ? s.qCardTruth : s.qCardDare]}
-        onPress={() => setPicked(isSelected ? null : item)}
-        activeOpacity={0.8}
-      >
-        <View style={s.qTop}>
-          <View style={[s.typeBadge, isTruth ? s.typeBadgeTruth : s.typeBadgeDare]}>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-              {isTruth ? <Eye size={12} color={moodCfg.color} /> : <Flame size={12} color="#c2410c" />}
-              <Text style={[s.typeBadgeText, { color: isTruth ? moodCfg.color : "#c2410c" }]}>
-                {isTruth ? "TRUTH" : "DARE"}
-              </Text>
-            </View>
-          </View>
-          <View style={s.tagRow}>
-            {item.tags.slice(0, 2).map(t => {
-              const tag = TAGS.find(x => x.key === t);
-              const IconComp = tag ? iconMap[tag.icon] : null;
-              return IconComp ? <IconComp key={t} size={16} color={COLORS.sub} /> : <Text key={t} style={s.tagPill}>{t}</Text>;
-            })}
-          </View>
-        </View>
-        <Text style={s.qText}>{item.text}</Text>
-        {isSelected && onUse && (
-          <TouchableOpacity style={s.useBtn} onPress={() => { onUse(item); }} activeOpacity={0.85}>
-            <Text style={s.useBtnText}>Use in Game →</Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-    );
-  };
+  const handlePick = useCallback((item: Question) => {
+    setPicked(prev => prev?.id === item.id ? null : item);
+  }, []);
+
+  const renderItem = useCallback(({ item }: { item: Question }) => (
+    <QuestionCard item={item} picked={picked} onUse={onUse} onPress={() => handlePick(item)} />
+  ), [picked, onUse, handlePick]);
+
+  const keyExtractor = useCallback((i: Question) => String(i.id), []);
 
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
         <View style={{ flex: 1 }}>
           <Text style={s.title}>Question Bank</Text>
-          <Text style={s.subtitle}>70 viral truth & dare questions</Text>
+          <Text style={s.subtitle}>Truth & dare questions</Text>
         </View>
-        <View style={[s.moodBadge, { backgroundColor: `${moodCfg.color}20`, borderColor: `${moodCfg.color}40` }]}>
-          {(() => { const IconComp = iconMap[moodCfg.icon]; return <IconComp size={14} color={moodCfg.color} />; })()}
-          <Text style={[s.moodBadgeLabel, { color: moodCfg.color }]}>{moodCfg.label}</Text>
-        </View>
+        <MoodBadge />
       </View>
 
       <View style={s.typeRow}>
@@ -119,9 +134,12 @@ export default function QuestionsScreen({ onUse }: Props) {
       <Text style={s.countText}>{filtered.length} questions</Text>
 
       <FlatList
-        data={filtered} keyExtractor={i => String(i.id)} renderItem={renderItem}
+        data={filtered} keyExtractor={keyExtractor} renderItem={renderItem}
         contentContainerStyle={s.list} showsVerticalScrollIndicator={false}
         style={{ flex: 1 }}
+        windowSize={5}
+        maxToRenderPerBatch={10}
+        removeClippedSubviews
       />
     </SafeAreaView>
   );
