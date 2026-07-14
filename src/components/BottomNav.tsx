@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/design-system";
@@ -17,7 +18,7 @@ interface BottomNavProps {
 
 const icons: Record<string, React.ComponentType<{ size: number; color: string }>> = { Home, User, HelpCircle, Users };
 
-export default function BottomNav({ activeTab, onNavigate }: BottomNavProps) {
+function BottomNavInner({ activeTab, onNavigate }: BottomNavProps) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[s.bottomNav, { paddingBottom: insets.bottom || 8 }]}>
@@ -43,6 +44,8 @@ export default function BottomNav({ activeTab, onNavigate }: BottomNavProps) {
     </View>
   );
 }
+
+export default memo(BottomNavInner);
 
 const s = StyleSheet.create({
   bottomNav: {

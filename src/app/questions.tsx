@@ -2,9 +2,10 @@ import { useGame } from "@/contexts/GameContext";
 import { getMoodConfig } from "@/data/moods";
 import { QCategory, QTag, Question } from "@/data/questions";
 import { useQuestions } from "@/stores/questionBankStore";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Eye, Flame, Sparkles, SmilePlus, MessageCircle, Handshake, Waves, Balloon, Heart, Skull } from "lucide-react-native";
 import {
+  Animated,
   FlatList, StyleSheet, Text,
   TouchableOpacity, View,
 } from "react-native";
@@ -28,7 +29,18 @@ interface Props { onUse?: (q: Question) => void; }
 const QuestionCard = memo(function QuestionCard({ item, picked, onUse, onPress }: { item: Question; picked: Question | null; onUse?: (q: Question) => void; onPress: () => void }) {
   const isTruth = item.type === "truth";
   const isSelected = picked?.id === item.id;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(15)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, friction: 8, tension: 80 }),
+    ]).start();
+  }, []);
+
   return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
     <TouchableOpacity
       style={[s.qCard, isSelected && s.qCardSelected, isTruth ? s.qCardTruth : s.qCardDare]}
       activeOpacity={0.8}
@@ -58,6 +70,7 @@ const QuestionCard = memo(function QuestionCard({ item, picked, onUse, onPress }
         </TouchableOpacity>
       )}
     </TouchableOpacity>
+    </Animated.View>
   );
 });
 

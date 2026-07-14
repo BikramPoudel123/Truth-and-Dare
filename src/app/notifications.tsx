@@ -1,8 +1,9 @@
 import { SERVER_URL } from "@/constants/server";
 import { useProfile } from "@/contexts/ProfileContext";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   StyleSheet,
   Text,
@@ -11,11 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { getHttpBase } from "@/utils/http";
 import { ArrowLeft, Bell, CheckCheck, Heart, UserPlus, UserX } from "lucide-react-native";
-
-function getHttpBase() {
-  return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
-}
 
 interface NotificationItem {
   id: string;
@@ -41,6 +39,25 @@ function timeAgo(ts: number) {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
 }
+
+function AnimatedNotificationItemInner({ children }: { children: React.ReactNode }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(-12)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 8, tension: 80 }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateX }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+const AnimatedNotificationItem = memo(AnimatedNotificationItemInner);
 
 export default function NotificationsScreen({ onBack, onNavigateFriends }: { onBack?: () => void; onNavigateFriends?: () => void }) {
   const { playerId } = useProfile();
@@ -76,12 +93,13 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
     } catch {}
   };
 
-  const unreadCount = notifs.filter(n => !n.read).length;
+  const unreadCount = useMemo(() => notifs.filter(n => !n.read).length, [notifs]);
 
-  const renderItem = ({ item: n }: { item: NotificationItem }) => {
+  const renderItem = useCallback(({ item: n }: { item: NotificationItem }) => {
     const Icon = NOTIF_ICONS[n.type] ?? Bell;
     const isFriendRequest = n.type === "friend_request";
     const card = (
+      <AnimatedNotificationItem>
       <View style={[s.card, !n.read && s.unread]}>
         <View style={[s.iconWrap, { backgroundColor: !n.read ? `${COLORS.purple}20` : "rgba(255,255,255,0.04)" }]}>
           <Icon size={18} color={!n.read ? COLORS.purple : COLORS.sub} />
@@ -92,6 +110,7 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
         </View>
         {!n.read && <View style={s.dot} />}
       </View>
+      </AnimatedNotificationItem>
     );
     if (isFriendRequest && onNavigateFriends) {
       return (
@@ -101,7 +120,7 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
       );
     }
     return card;
-  };
+  }, [onNavigateFriends]);
 
   const ListEmpty = () => (
     <View style={s.emptyState}>
@@ -141,6 +160,9 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
             refreshing={refreshing}
             onRefresh={() => fetchNotifs(true)}
             ListEmptyComponent={ListEmpty}
+            windowSize={5}
+            maxToRenderPerBatch={10}
+            removeClippedSubviews
           />
         )}
       </View>

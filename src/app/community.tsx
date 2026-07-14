@@ -1,17 +1,15 @@
 import { Avatar } from "@/components/Avatar";
-import { SERVER_URL } from "@/constants/server";
+import { ProfileModal, ProfileModalData, DEFAULT_MODAL_DATA } from "@/components/ProfileModal";
 import { useProfile } from "@/contexts/ProfileContext";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
-  Modal,
-  PanResponder,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,23 +19,8 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import { getLevelProgress } from "@/utils/levels";
-import { CalendarDays, Crown, Eye, Flame, Gamepad2, Heart, Inbox, PartyPopper, Skull, SmilePlus, Star, UserPlus, UserMinus, UserCheck, Users, Zap } from "lucide-react-native";
-
-function getHttpBase() {
-  return SERVER_URL.replace(/^ws:\/\//, "http://")
-    .replace(/^wss:\/\//, "https://")
-    .replace(/\/$/, "");
-}
-
-const INTEREST_LABEL: Record<string, string> = {
-  fun: "fun",
-  life: "life",
-  hot: "hot",
-  connect: "connect",
-  spicy: "spicy",
-  deep: "deep",
-};
+import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi } from "@/utils/http";
+import { Eye, Flame, Heart, Inbox } from "lucide-react-native";
 
 export interface CommunityPost {
   id: string;
@@ -59,6 +42,58 @@ function timeAgo(ts: number) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
+function LikeButtonInner({ liked, count, onPress }: { liked: boolean; count: number; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const heartScale = useRef(new Animated.Value(liked ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(heartScale, { toValue: liked ? 1 : 0, useNativeDriver: true, friction: 4, tension: 200 }).start();
+  }, [liked]);
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 0.85, useNativeDriver: true, friction: 4, tension: 300 }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 200 }),
+    ]).start();
+    onPress();
+  };
+
+  return (
+    <TouchableOpacity
+      style={[s.likeBtn, liked && s.likeBtnActive]}
+      onPress={handlePress}
+      activeOpacity={0.8}
+    >
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+        <Animated.View style={{ transform: [{ scale: Animated.add(0.3, Animated.multiply(heartScale, 0.7)) }] }}>
+          <Heart size={14} color={liked ? COLORS.pink : COLORS.sub} fill={liked ? COLORS.pink : "transparent"} />
+        </Animated.View>
+        <Text style={s.likeBtnText}>{count}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+const LikeButton = memo(LikeButtonInner);
+
+function AnimatedPostCardInner({ children, index }: { children: React.ReactNode; index: number }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, friction: 8, tension: 80 }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+const AnimatedPostCard = memo(AnimatedPostCardInner);
+
 export default function CommunityScreen() {
   const { profile, playerId } = useProfile();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
@@ -68,27 +103,10 @@ export default function CommunityScreen() {
   const [postText, setPostText] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const [profileModal, setProfileModal] = useState<{ visible: boolean; authorId: string | null; name: string; bio: string; pic: string | null; interests: string[]; playStyle: string | null; reactions: Record<string, number>; gamesPlayed: number; level: number; playedSince: string; loading: boolean }>({ visible: false, authorId: null, name: "", bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: false });
+  const [pfModal, setPfModal] = useState<ProfileModalData>(DEFAULT_MODAL_DATA);
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
-  const { width: screenW, height: screenH } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-
-  const rCardW = Math.min(screenW * 0.92, 480);
-  const rCardMaxH = Math.min(screenH * 0.85, 600);
-  const rHozPad = Math.max(16, Math.min(24, screenW * 0.065));
-  const rBotPad = Math.max(16, insets.bottom + 12);
-  const rTopRad = screenW < 380 ? 20 : 24;
-  const rGrabMarg = Math.max(12, Math.min(20, screenW * 0.05));
-
-  const pfScrollY = useRef(0);
-  const pfPanDismiss = useCallback(() => setProfileModal(prev => ({ ...prev, visible: false })), []);
-  const pfPanResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gs) => gs.dy > 10 && gs.vy > 0 && pfScrollY.current <= 1,
-    onPanResponderRelease: (_, gs) => { if (gs.dy > 100) pfPanDismiss(); },
-  })).current;
-
+  const { width: screenW } = useWindowDimensions();
   const base = getHttpBase();
 
   useEffect(() => {
@@ -177,28 +195,24 @@ export default function CommunityScreen() {
 
   const openProfile = async (authorId: string | undefined, authorName: string) => {
     if (!authorId) return;
-    setProfileModal({ visible: true, authorId, name: authorName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
+    setPfModal({ visible: true, authorId, name: authorName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
     try {
       await fetch(`${base}/friends/${encodeURIComponent(playerId)}`).then(async r => {
         if (r.ok) { const d = await r.json(); setFriendIds(new Set(d.friends.map((f: { id: string }) => f.id))); setSentIds(new Set(d.sent ?? [])); }
       });
     } catch {}
-    try {
-      const res = await fetch(`${base}/profile/${encodeURIComponent(authorId)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setProfileModal({ visible: true, authorId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
-      } else {
-        setProfileModal(prev => ({ ...prev, authorId, loading: false }));
-      }
-    } catch {
-      setProfileModal(prev => ({ ...prev, authorId, loading: false }));
+    const data = await fetchProfileCached(authorId);
+    if (data) {
+      setPfModal({ visible: true, authorId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
+    } else {
+      setPfModal(prev => ({ ...prev, authorId, loading: false }));
     }
   };
 
-  const filtered = posts.filter((p) => p.type === postType);
+  const filtered = useMemo(() => posts.filter((p) => p.type === postType), [posts, postType]);
 
-  const renderPost = ({ item }: { item: CommunityPost }) => (
+  const renderPost = useCallback(({ item, index }: { item: CommunityPost; index: number }) => (
+    <AnimatedPostCard index={index}>
     <View style={s.postCard}>
       <View style={s.postTop}>
         {item.author_id && item.author_id !== playerId ? (
@@ -233,19 +247,11 @@ export default function CommunityScreen() {
       </View>
       <Text style={s.postText}>{item.text}</Text>
       <View style={s.postActions}>
-        <TouchableOpacity
-          style={[s.likeBtn, item.likedByMe && s.likeBtnActive]}
-          onPress={() => likePost(item.id)}
-          activeOpacity={0.8}
-        >
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-            <Heart size={14} color={item.likedByMe ? COLORS.pink : COLORS.sub} fill={item.likedByMe ? COLORS.pink : "transparent"} />
-            <Text style={s.likeBtnText}>{item.likes}</Text>
-          </View>
-        </TouchableOpacity>
+        <LikeButton liked={!!item.likedByMe} count={item.likes} onPress={() => likePost(item.id)} />
       </View>
-    </View>
-  );
+      </View>
+    </AnimatedPostCard>
+  ), [playerId, likePost, openProfile]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -351,132 +357,19 @@ export default function CommunityScreen() {
         )}
       </KeyboardAvoidingView>
 
-      <Modal visible={profileModal.visible} transparent animationType="slide" onRequestClose={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
-        <Pressable style={s.modalOverlay} onPress={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
-          <View style={[s.modalCard, { maxWidth: rCardW, maxHeight: rCardMaxH, paddingHorizontal: rHozPad, paddingBottom: rBotPad, borderTopLeftRadius: rTopRad, borderTopRightRadius: rTopRad }]} {...pfPanResponder.panHandlers}>
-            <View style={[s.modalGrabber, { marginBottom: rGrabMarg }]} />
-            {profileModal.loading ? (
-              <ActivityIndicator size="large" color={COLORS.purple} />
-            ) : (
-              <ScrollView contentContainerStyle={{ alignItems: "center", gap: 16 }} showsVerticalScrollIndicator={false} style={{ alignSelf: "stretch" }} bounces={true} onScroll={(e) => { pfScrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
-                <Avatar uri={profileModal.pic} name={profileModal.name} size={72} borderWidth={2} borderColor={COLORS.purple} />
-                <Text style={s.modalName}>{profileModal.name}</Text>
-
-                {profileModal.playStyle && (() => {
-                  const iconMap: Record<string, [React.ComponentType<{size: number; color: string}>, string]> = {
-                    "Rising Star":      [Star, COLORS.gold],
-                    "Hot Player":       [Flame, COLORS.orange],
-                    "Funny Player":     [SmilePlus, "#facc15"],
-                    "Heartthrob":       [Heart, COLORS.pink],
-                    "Shocking Player":  [Zap, COLORS.electricBlue],
-                    "Savage Player":    [Skull, "#a855f7"],
-                    "Emotional Player": [Heart, "#60a5fa"],
-                    "Life of the Party":[PartyPopper, "#f97316"],
-                    "Respected Player": [Crown, COLORS.gold],
-                  };
-                  const pair = iconMap[profileModal.playStyle ?? ""] ?? [Star, COLORS.sub];
-                  const Icon = pair[0];
-                  return (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: RADIUS.pill, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1, borderColor: COLORS.border }}>
-                      <Icon size={13} color={pair[1]} />
-                      <Text style={{ color: COLORS.text, fontSize: 11, fontWeight: "700" }}>{profileModal.playStyle}</Text>
-                    </View>
-                  );
-                })()}
-
-                {/* Stats Card */}
-                <View style={s.modalStatsCard}>
-                  <View style={s.modalStatColumn}>
-                    <Crown size={18} color={COLORS.gold} />
-                    <Text style={s.modalStatNumber}>{profileModal.level}</Text>
-                    <View style={{ width: "100%", height: 3, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden", marginTop: 2 }}>
-                      <View style={{ width: `${(profileModal.gamesPlayed % 10) * 10}%`, height: "100%", backgroundColor: COLORS.gold, borderRadius: 2 }} />
-                    </View>
-                    <Text style={s.modalStatLabel} numberOfLines={1}>Level</Text>
-                  </View>
-                  <View style={s.modalStatDivider} />
-                  <View style={s.modalStatColumn}>
-                    <SmilePlus size={18} color={COLORS.sub} />
-                    <Text style={s.modalStatNumber}>{Object.keys(profileModal.reactions).length > 0 ? Object.values(profileModal.reactions).reduce((a, b) => a + b, 0) : 0}</Text>
-                    <Text style={s.modalStatLabel} numberOfLines={1}>Reactions</Text>
-                  </View>
-                  <View style={s.modalStatDivider} />
-                  <View style={s.modalStatColumn}>
-                    <CalendarDays size={18} color={COLORS.sub} />
-                    <Text style={s.modalStatDate} numberOfLines={1}>
-                      {profileModal.playedSince
-                        ? new Date(profileModal.playedSince).toLocaleDateString("en-US", {
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "-"}
-                    </Text>
-                    <Text style={s.modalStatLabel} numberOfLines={1}>Played Since</Text>
-                  </View>
-                </View>
-
-                {Object.keys(profileModal.reactions).length > 0 && (
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-                    {Object.entries(profileModal.reactions).map(([emoji, count]) => (
-                      <View key={emoji} style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: COLORS.border }}>
-                        <Text style={{ fontSize: 14 }}>{emoji}</Text>
-                        <Text style={{ color: COLORS.sub, fontSize: 11, fontWeight: "700" }}>{count}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {profileModal.bio ? <Text style={s.modalBio}>{profileModal.bio}</Text> : null}
-                {profileModal.interests.length > 0 && (
-                  <>
-                    <Text style={{ color: COLORS.sub, fontSize: 10, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" }}>Interests</Text>
-                    <View style={s.modalInterestsWrap}>
-                      {profileModal.interests.map((i) => (
-                        <View key={i} style={s.modalInterestTag}>
-                          <Text style={s.modalInterestTxt}>{INTEREST_LABEL[i] ?? i}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </>
-                )}
-              </ScrollView>
-              )}
-              {!profileModal.loading && profileModal.authorId && profileModal.authorId !== playerId && (
-                <View style={s.modalFriendIconWrap}>
-                  {friendIds.has(profileModal.authorId!) ? (
-                    <View style={s.modalFriendIcon}>
-                      <Users size={18} color={COLORS.green} />
-                    </View>
-                  ) : sentIds.has(profileModal.authorId!) ? (
-                    <View style={s.modalFriendIcon}>
-                      <UserCheck size={18} color={COLORS.blue} />
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={s.modalFriendIcon}
-                      onPress={async () => {
-                        try {
-                          const res = await fetch(`${base}/friends/request`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ from_id: playerId, from_name: profile.name, from_pic: profile.pic, to_id: profileModal.authorId }),
-                          });
-                          if (res.ok) {
-                            const data = await res.json();
-                            if (data.status !== "already_friends" && data.status !== "already_requested") { setSentIds(prev => new Set(prev).add(profileModal.authorId!)); }
-                          }
-                        } catch {}
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <UserPlus size={18} color={COLORS.purple} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-            </View>
-          </Pressable>
-      </Modal>
+      <ProfileModal
+        data={pfModal}
+        onClose={() => setPfModal(prev => ({ ...prev, visible: false }))}
+        actionMode="community"
+        isFriend={pfModal.authorId ? friendIds.has(pfModal.authorId) : false}
+        isSent={pfModal.authorId ? sentIds.has(pfModal.authorId) : false}
+        onSendFriendRequest={async (authorId) => {
+          const result = await sendFriendRequestApi(playerId, profile.name, profile.pic, authorId);
+          if (result.ok && result.status !== "already_friends" && result.status !== "already_requested") {
+            setSentIds(prev => new Set(prev).add(authorId));
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -606,59 +499,4 @@ const s = StyleSheet.create({
   likeBtnText: { fontSize: 13, fontWeight: "700", color: COLORS.text },
   empty: { alignItems: "center", paddingTop: 60, gap: 10 },
   emptyText: { color: COLORS.sub, fontSize: 14, textAlign: "center" },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    width: "100%",
-    backgroundColor: COLORS.bg,
-    paddingTop: 4,
-    alignItems: "center",
-    alignSelf: "center",
-    ...SHADOWS.glow,
-  },
-  modalGrabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.15)", alignSelf: "center" },
-  modalAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
-    borderColor: COLORS.purple,
-  },
-  modalAvatarPlaceholder: {
-    backgroundColor: `${COLORS.purple}20`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalAvatarTxt: { color: COLORS.purple, fontSize: 24, fontWeight: "800" },
-  modalName: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
-  modalBio: { color: COLORS.sub, fontSize: 13, textAlign: "center", lineHeight: 18 },
-  modalInterestsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" },
-  modalInterestTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: `${COLORS.purple}15`,
-    borderWidth: 1,
-    borderColor: `${COLORS.purple}30`,
-  },
-  modalInterestTxt: { color: COLORS.purple, fontSize: 11, fontWeight: "700" },
-  modalFriendIconWrap: { position: "absolute", top: 4, right: 8, zIndex: 10 },
-  modalFriendIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  modalStatsCard: {
-    flexDirection: "row",
-    backgroundColor: "rgba(23, 19, 50, 0.7)",
-    borderRadius: RADIUS.cardSm,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    width: "100%",
-  },
-  modalStatColumn: { flex: 1, alignItems: "center", gap: 4 },
-  modalStatNumber: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
-  modalStatLabel: { color: COLORS.sub, fontSize: 10, fontWeight: "600" },
-  modalStatDate: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
-  modalStatDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
 });

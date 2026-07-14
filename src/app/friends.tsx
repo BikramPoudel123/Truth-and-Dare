@@ -1,57 +1,101 @@
 import { SERVER_URL } from "@/constants/server";
 import { useProfile } from "@/contexts/ProfileContext";
 import { Avatar } from "@/components/Avatar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ProfileModal, ProfileModalData, DEFAULT_MODAL_DATA } from "@/components/ProfileModal";
+import { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
+  Keyboard,
   Modal,
-  PanResponder,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import { getLevelProgress } from "@/utils/levels";
-import { ArrowLeft, CalendarDays, Check, Crown, Flame, Gamepad2, Heart, PartyPopper, Skull, SmilePlus, Star, Users, UserPlus, UserMinus, X, User, Zap } from "lucide-react-native";
-
-function getHttpBase() {
-  return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
-}
+import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi } from "@/utils/http";
+import { ArrowLeft, Check, Users, UserPlus, UserMinus, UserCheck, X, User, Search, Loader2 } from "lucide-react-native";
 
 interface FriendItem { id: string; name: string; pic: string | null; }
 interface RequestItem { id: string; from: string; fromName: string; fromPic: string | null; createdAt: number; }
+interface SearchResult { id: string; name: string; pic: string | null; isFriend: boolean; requestSent: boolean; }
+
+function AnimatedListItemInner({ children }: { children: React.ReactNode }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(-15)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 8, tension: 80 }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateX }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+const AnimatedListItem = memo(AnimatedListItemInner);
+
+const SearchResultItem = memo(function SearchResultItemInner({
+  item,
+  sending,
+  onSend,
+  onViewProfile,
+}: {
+  item: SearchResult;
+  sending: boolean;
+  onSend: (id: string) => void;
+  onViewProfile: (id: string, name: string, pic: string | null) => void;
+}) {
+  const status = useMemo(() => {
+    if (item.isFriend) return { icon: Users, color: COLORS.green, disabled: true };
+    if (item.requestSent) return { icon: UserCheck, color: COLORS.blue, disabled: true };
+    return { icon: UserPlus, color: COLORS.purple, disabled: false };
+  }, [item.isFriend, item.requestSent]);
+
+  const Icon = status.icon;
+
+  return (
+    <View style={ss.resultCard}>
+      <TouchableOpacity onPress={() => onViewProfile(item.id, item.name, item.pic)} activeOpacity={0.7}>
+        <Avatar uri={item.pic} name={item.name} size={40} borderWidth={1.5} borderColor={COLORS.border} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => onViewProfile(item.id, item.name, item.pic)} activeOpacity={0.7} style={{ flex: 1 }}>
+        <Text style={ss.resultName} numberOfLines={1}>{item.name}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[ss.iconBtn, { backgroundColor: `${status.color}18`, borderColor: `${status.color}40` }, status.disabled && { opacity: 0.7 }]}
+        onPress={() => !status.disabled && onSend(item.id)}
+        disabled={status.disabled || sending}
+        activeOpacity={0.7}
+      >
+        {sending ? (
+          <ActivityIndicator size="small" color={status.color} />
+        ) : (
+          <Icon size={18} color={status.color} />
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+});
 
 export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => void; initialTab?: "friends" | "requests" }) {
-  const { playerId } = useProfile();
+  const { playerId, profile } = useProfile();
   const [tab, setTab] = useState<"friends" | "requests">(initialTab ?? "friends");
   const [friends, setFriends] = useState<FriendItem[]>([]);
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState<string | null>(null);
-  const [profileModal, setProfileModal] = useState<{ visible: boolean; id: string; name: string; bio: string; pic: string | null; interests: string[]; playStyle: string | null; reactions: Record<string, number>; gamesPlayed: number; level: number; playedSince: string; loading: boolean }>({ visible: false, id: "", name: "", bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: false });
-  const { width: screenW, height: screenH } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-
-  const rCardW = Math.min(screenW * 0.92, 480);
-  const rCardMaxH = Math.min(screenH * 0.85, 600);
-  const rHozPad = Math.max(16, Math.min(24, screenW * 0.065));
-  const rBotPad = Math.max(16, insets.bottom + 12);
-  const rTopRad = screenW < 380 ? 20 : 24;
-  const rGrabMarg = Math.max(12, Math.min(20, screenW * 0.05));
-
-  const pfScrollY = useRef(0);
-  const pfPanDismiss = useCallback(() => setProfileModal(prev => ({ ...prev, visible: false })), []);
-  const pfPanResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gs) => gs.dy > 10 && gs.vy > 0 && pfScrollY.current <= 1,
-    onPanResponderRelease: (_, gs) => { if (gs.dy > 100) pfPanDismiss(); },
-  })).current;
+  const [pfModal, setPfModal] = useState<ProfileModalData>(DEFAULT_MODAL_DATA);
+  const { width: screenW } = useWindowDimensions();
 
   const base = getHttpBase();
 
@@ -97,33 +141,28 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
   };
 
   const openProfile = async (id: string, name: string) => {
-    setProfileModal({ visible: true, id, name, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
-    try {
-      const res = await fetch(`${base}/profile/${encodeURIComponent(id)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setProfileModal({ visible: true, id, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
-      } else {
-        setProfileModal(prev => ({ ...prev, loading: false }));
-      }
-    } catch {
-      setProfileModal(prev => ({ ...prev, loading: false }));
+    setPfModal({ visible: true, authorId: id, name, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
+    const data = await fetchProfileCached(id);
+    if (data) {
+      setPfModal({ visible: true, authorId: id, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
+    } else {
+      setPfModal(prev => ({ ...prev, loading: false }));
     }
   };
 
-  const renderAvatar = (pic: string | null, name: string, size = 40) =>
-    <Avatar uri={pic} name={name} size={size} borderWidth={1.5} borderColor={COLORS.border} />;
-
-  const renderFriend = ({ item }: { item: FriendItem }) => (
+  const renderFriend = useCallback(({ item }: { item: FriendItem }) => (
+    <AnimatedListItem>
     <TouchableOpacity style={s.card} onPress={() => openProfile(item.id, item.name)} activeOpacity={0.7}>
-      {renderAvatar(item.pic, item.name)}
+      <Avatar uri={item.pic} name={item.name} size={40} borderWidth={1.5} borderColor={COLORS.border} />
       <Text style={s.cardName}>{item.name}</Text>
     </TouchableOpacity>
-  );
+    </AnimatedListItem>
+  ), [openProfile]);
 
-  const renderRequest = ({ item }: { item: RequestItem }) => (
+  const renderRequest = useCallback(({ item }: { item: RequestItem }) => (
+    <AnimatedListItem>
     <View style={s.card}>
-      {renderAvatar(item.fromPic, item.fromName)}
+      <Avatar uri={item.fromPic} name={item.fromName} size={40} borderWidth={1.5} borderColor={COLORS.border} />
       <Text style={s.cardName}>{item.fromName}</Text>
       <View style={s.actions}>
         <TouchableOpacity
@@ -139,7 +178,8 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
         </TouchableOpacity>
       </View>
     </View>
-  );
+    </AnimatedListItem>
+  ), [accepting, handleAccept, handleReject]);
 
   const ListEmpty = ({ icon: Icon, text }: { icon: React.ComponentType<{size: number; color: string}>; text: string }) => (
     <View style={s.emptyState}>
@@ -149,6 +189,79 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
   );
 
   const data = tab === "friends" ? friends : requests;
+
+  // ─── Search state ────────────────────────────────────────────────────────
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [sendingTo, setSendingTo] = useState<string | null>(null);
+  const searchInputRef = useRef<TextInput>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const doSearch = useCallback(async (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      const res = await fetch(`${base}/players/search?query=${encodeURIComponent(trimmed)}&player_id=${encodeURIComponent(playerId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data.results ?? []);
+      }
+    } catch {}
+    setSearchLoading(false);
+  }, [base, playerId]);
+
+  const onSearchChange = useCallback((text: string) => {
+    setSearchQuery(text);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(text), 300);
+  }, [doSearch]);
+
+  const openSearch = useCallback(() => {
+    setSearchVisible(true);
+    setSearchQuery("");
+    setSearchResults([]);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    Keyboard.dismiss();
+    setSearchVisible(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
+  const sendFriendRequest = useCallback(async (targetId: string) => {
+    setSendingTo(targetId);
+    const result = await sendFriendRequestApi(playerId, profile.name, profile.pic, targetId);
+    if (result.ok) {
+      setSearchResults(prev => prev.map(r => {
+        if (r.id !== targetId) return r;
+        if (result.status === "already_friends") return { ...r, isFriend: true };
+        return { ...r, requestSent: true };
+      }));
+    }
+    setSendingTo(null);
+  }, [playerId, profile.name, profile.pic]);
+
+  const viewSearchProfile = useCallback(async (id: string, name: string, pic: string | null) => {
+    setPfModal({ visible: true, authorId: id, name, bio: "", pic, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
+    const data = await fetchProfileCached(id);
+    if (data) {
+      setPfModal({ visible: true, authorId: id, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
+    } else {
+      setPfModal(prev => ({ ...prev, loading: false }));
+    }
+  }, []);
+
+  const renderSearchResult = useCallback(({ item }: { item: SearchResult }) => (
+    <SearchResultItem item={item} sending={sendingTo === item.id} onSend={sendFriendRequest} onViewProfile={viewSearchProfile} />
+  ), [sendingTo, sendFriendRequest, viewSearchProfile]);
+
+  const searchKeyExtractor = useCallback((item: SearchResult) => item.id, []);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -160,6 +273,9 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
           <Text style={s.title}>Friends</Text>
           <Text style={s.subtitle}>Manage your friends</Text>
         </View>
+        <TouchableOpacity style={s.searchBtn} onPress={openSearch} activeOpacity={0.7}>
+          <UserPlus size={18} color={COLORS.purple} />
+        </TouchableOpacity>
         {tab === "requests" && requests.length > 0 && (
           <View style={s.badge}>
             <Text style={s.badgeTxt}>{requests.length}</Text>
@@ -195,129 +311,105 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
             style={{ flex: 1 }}
             contentContainerStyle={s.list}
             showsVerticalScrollIndicator={false}
+            windowSize={5}
+            maxToRenderPerBatch={10}
+            removeClippedSubviews
             ListEmptyComponent={
               tab === "friends"
-                ? <ListEmpty icon={User} text={"No friends yet\nSend a friend request from someone's profile!"} />
+                ? <ListEmpty icon={User} text={"No friends yet\nTap + to search for players!"} />
                 : <ListEmpty icon={UserPlus} text="No pending requests" />
             }
           />
         )}
       </View>
-      <Modal visible={profileModal.visible} transparent animationType="slide" onRequestClose={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
-        <Pressable style={s.modalOverlay} onPress={() => setProfileModal(prev => ({ ...prev, visible: false }))}>
-          <View style={[s.modalCard, { maxWidth: rCardW, maxHeight: rCardMaxH, paddingHorizontal: rHozPad, paddingBottom: rBotPad, borderTopLeftRadius: rTopRad, borderTopRightRadius: rTopRad }]} {...pfPanResponder.panHandlers}>
-            <View style={[s.modalGrabber, { marginBottom: rGrabMarg }]} />
-            {profileModal.loading ? (
-              <ActivityIndicator size="large" color={COLORS.purple} />
-            ) : (
-              <ScrollView contentContainerStyle={{ alignItems: "center", gap: 16 }} showsVerticalScrollIndicator={false} style={{ alignSelf: "stretch" }} bounces={true} onScroll={(e) => { pfScrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
-                <Avatar uri={profileModal.pic} name={profileModal.name} size={72} borderWidth={2} borderColor={COLORS.purple} />
-                <Text style={s.modalName}>{profileModal.name}</Text>
+      <ProfileModal
+        data={pfModal}
+        onClose={() => setPfModal(prev => ({ ...prev, visible: false }))}
+        actionMode="friends"
+        onRemoveFriend={async (friendId) => {
+          try {
+            const res = await fetch(`${base}/friends/remove`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ player_id: playerId, friend_id: friendId }),
+            });
+            if (res.ok) {
+              setFriends(prev => prev.filter(f => f.id !== friendId));
+              setPfModal(prev => ({ ...prev, visible: false }));
+            }
+          } catch {}
+        }}
+      />
 
-                {profileModal.playStyle && (() => {
-                  const iconMap: Record<string, [React.ComponentType<{size: number; color: string}>, string]> = {
-                    "Rising Star":      [Star, COLORS.gold],
-                    "Hot Player":       [Flame, COLORS.orange],
-                    "Funny Player":     [SmilePlus, "#facc15"],
-                    "Heartthrob":       [Heart, COLORS.pink],
-                    "Shocking Player":  [Zap, COLORS.electricBlue],
-                    "Savage Player":    [Skull, "#a855f7"],
-                    "Emotional Player": [Heart, "#60a5fa"],
-                    "Life of the Party":[PartyPopper, "#f97316"],
-                    "Respected Player": [Crown, COLORS.gold],
-                  };
-                  const pair = iconMap[profileModal.playStyle ?? ""] ?? [Star, COLORS.sub];
-                  const Icon = pair[0];
-                  return (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: RADIUS.pill, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1, borderColor: COLORS.border }}>
-                      <Icon size={13} color={pair[1]} />
-                      <Text style={{ color: COLORS.text, fontSize: 11, fontWeight: "700" }}>{profileModal.playStyle}</Text>
-                    </View>
-                  );
-                })()}
-
-                {/* Stats Card */}
-                <View style={s.modalStatsCard}>
-                  <View style={s.modalStatColumn}>
-                    <Crown size={18} color={COLORS.gold} />
-                    <Text style={s.modalStatNumber}>{profileModal.level}</Text>
-                    <View style={{ width: "100%", height: 3, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden", marginTop: 2 }}>
-                      <View style={{ width: `${(profileModal.gamesPlayed % 10) * 10}%`, height: "100%", backgroundColor: COLORS.gold, borderRadius: 2 }} />
-                    </View>
-                    <Text style={s.modalStatLabel} numberOfLines={1}>Level</Text>
-                  </View>
-                  <View style={s.modalStatDivider} />
-                  <View style={s.modalStatColumn}>
-                    <SmilePlus size={18} color={COLORS.sub} />
-                    <Text style={s.modalStatNumber}>{Object.keys(profileModal.reactions).length > 0 ? Object.values(profileModal.reactions).reduce((a, b) => a + b, 0) : 0}</Text>
-                    <Text style={s.modalStatLabel} numberOfLines={1}>Reactions</Text>
-                  </View>
-                  <View style={s.modalStatDivider} />
-                  <View style={s.modalStatColumn}>
-                    <CalendarDays size={18} color={COLORS.sub} />
-                    <Text style={s.modalStatDate} numberOfLines={1}>
-                      {profileModal.playedSince
-                        ? new Date(profileModal.playedSince).toLocaleDateString("en-US", {
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "-"}
-                    </Text>
-                    <Text style={s.modalStatLabel} numberOfLines={1}>Played Since</Text>
-                  </View>
-                </View>
-
-                {Object.keys(profileModal.reactions).length > 0 && (
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-                    {Object.entries(profileModal.reactions).map(([emoji, count]) => (
-                      <View key={emoji} style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: COLORS.border }}>
-                        <Text style={{ fontSize: 14 }}>{emoji}</Text>
-                        <Text style={{ color: COLORS.sub, fontSize: 11, fontWeight: "700" }}>{count}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {profileModal.bio ? <Text style={s.modalBio}>{profileModal.bio}</Text> : null}
-                {profileModal.interests.length > 0 && (
-                  <>
-                    <Text style={{ color: COLORS.sub, fontSize: 10, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" }}>Interests</Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-                      {profileModal.interests.map((i) => (
-                        <View key={i} style={s.modalInterestTag}>
-                          <Text style={s.modalInterestTxt}>{(i)}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </>
-                )}
-              </ScrollView>
-              )}
-              {!profileModal.loading && profileModal.id && (
-                <View style={s.modalFriendIconWrap}>
-                  <TouchableOpacity
-                    style={s.modalFriendIcon}
-                    onPress={async () => {
-                      try {
-                        const res = await fetch(`${base}/friends/remove`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ player_id: playerId, friend_id: profileModal.id }),
-                        });
-                        if (res.ok) {
-                          setFriends(prev => prev.filter(f => f.id !== profileModal.id));
-                          setProfileModal(prev => ({ ...prev, visible: false }));
-                        }
-                      } catch {}
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <UserMinus size={18} color={COLORS.red} />
-                  </TouchableOpacity>
-                </View>
+      {/* ─── Search overlay ────────────────────────────────────────────── */}
+      <Modal visible={searchVisible} animationType="slide" onRequestClose={closeSearch}>
+        <SafeAreaView style={ss.safe}>
+          <View style={ss.header}>
+            <TouchableOpacity onPress={closeSearch} style={ss.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <ArrowLeft size={18} color={COLORS.text} />
+            </TouchableOpacity>
+            <View style={ss.inputWrap}>
+              <Search size={16} color={COLORS.sub} />
+              <TextInput
+                ref={searchInputRef}
+                style={ss.input}
+                placeholder="Search players by name..."
+                placeholderTextColor={COLORS.subAlt}
+                value={searchQuery}
+                onChangeText={onSearchChange}
+                returnKeyType="search"
+                autoCorrect={false}
+                autoCapitalize="words"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <X size={16} color={COLORS.sub} />
+                </TouchableOpacity>
               )}
             </View>
-          </Pressable>
+          </View>
+
+          {searchLoading ? (
+            <View style={ss.center}><ActivityIndicator size="large" color={COLORS.purple} /></View>
+          ) : searchQuery.trim().length === 0 ? (
+            <View style={ss.center}>
+              <Search size={48} color={COLORS.subAlt} />
+              <Text style={ss.emptyTxt}>Search for players by name</Text>
+            </View>
+          ) : searchResults.length === 0 ? (
+            <View style={ss.center}>
+              <User size={48} color={COLORS.subAlt} />
+              <Text style={ss.emptyTxt}>No players found</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={searchResults}
+              keyExtractor={searchKeyExtractor}
+              renderItem={renderSearchResult}
+              contentContainerStyle={ss.list}
+              showsVerticalScrollIndicator={false}
+              keyboardDismissMode="on-drag"
+              keyboardShouldPersistTaps="handled"
+            />
+          )}
+        </SafeAreaView>
+        <ProfileModal
+          data={pfModal}
+          onClose={() => setPfModal(prev => ({ ...prev, visible: false }))}
+          actionMode="community"
+          isFriend={pfModal.authorId ? (searchResults.find(r => r.id === pfModal.authorId)?.isFriend ?? false) : false}
+          isSent={pfModal.authorId ? (searchResults.find(r => r.id === pfModal.authorId)?.requestSent ?? false) : false}
+          onSendFriendRequest={async (authorId) => {
+            const result = await sendFriendRequestApi(playerId, profile.name, profile.pic, authorId);
+            if (result.ok) {
+              if (result.status === "already_friends") {
+                setSearchResults(prev => prev.map(r => r.id === authorId ? { ...r, isFriend: true } : r));
+              } else if (result.status !== "already_requested") {
+                setSearchResults(prev => prev.map(r => r.id === authorId ? { ...r, requestSent: true } : r));
+              }
+            }
+          }}
+        />
       </Modal>
     </SafeAreaView>
   );
@@ -337,6 +429,7 @@ const s = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
   title: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
   subtitle: { color: COLORS.sub, fontSize: 12, marginTop: 1 },
+  searchBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: `${COLORS.purple}18`, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: `${COLORS.purple}40` },
   badge: { backgroundColor: COLORS.purple, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, minWidth: 24, alignItems: "center" },
   badgeTxt: { color: "#fff", fontSize: 11, fontWeight: "800" },
   tabs: { flexDirection: "row", backgroundColor: "rgba(23, 19, 50, 0.7)", borderBottomWidth: 1, borderBottomColor: COLORS.border },
@@ -355,45 +448,54 @@ const s = StyleSheet.create({
   actions: { flexDirection: "row", gap: 8 },
   acceptBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.green, alignItems: "center", justifyContent: "center" },
   rejectBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: `${COLORS.red}20`, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: `${COLORS.red}40` },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    width: "100%",
-    backgroundColor: COLORS.bg,
-    paddingTop: 4,
-    alignItems: "center",
-    alignSelf: "center",
-    ...SHADOWS.glow,
-  },
-  modalGrabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.15)", alignSelf: "center" },
-  modalName: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
-  modalBio: { color: COLORS.sub, fontSize: 13, textAlign: "center", lineHeight: 18 },
-  modalInterestTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: `${COLORS.purple}15`,
-    borderWidth: 1,
-    borderColor: `${COLORS.purple}30`,
-  },
-  modalInterestTxt: { color: COLORS.purple, fontSize: 11, fontWeight: "700" },
-  modalFriendIconWrap: { position: "absolute", top: 4, right: 8, zIndex: 10 },
-  modalFriendIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  modalStatsCard: {
+});
+
+const ss = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.bg },
+  header: {
     flexDirection: "row",
-    backgroundColor: "rgba(23, 19, 50, 0.7)",
-    borderRadius: RADIUS.cardSm,
-    padding: 16,
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
+  inputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 14,
+    height: 42,
     borderWidth: 1,
     borderColor: COLORS.border,
-    width: "100%",
   },
-  modalStatColumn: { flex: 1, alignItems: "center", gap: 4 },
-  modalStatNumber: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
-  modalStatLabel: { color: COLORS.sub, fontSize: 10, fontWeight: "600" },
-  modalStatDate: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
-  modalStatDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
+  input: { flex: 1, color: COLORS.text, fontSize: 15, fontWeight: "600", paddingVertical: 0 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
+  emptyTxt: { color: COLORS.sub, fontSize: 14, textAlign: "center" },
+  list: { padding: 16, gap: 10, flexGrow: 1 },
+  resultCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    borderRadius: RADIUS.cardSm,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.subtle,
+  },
+  resultName: { color: COLORS.text, fontSize: 14, fontWeight: "700", flex: 1 },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

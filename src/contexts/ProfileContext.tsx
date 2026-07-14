@@ -4,16 +4,11 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
-import { SERVER_URL } from "@/constants/server";
-
-function getHttpBase() {
-  return SERVER_URL.replace(/^ws:\/\//, "http://")
-    .replace(/^wss:\/\//, "https://")
-    .replace(/\/$/, "");
-}
+import { getHttpBase } from "@/utils/http";
 
 export type Interest = "fun" | "life" | "hot" | "connect" | "spicy" | "deep";
 
@@ -231,24 +226,24 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(delayDebounce);
   }, [profile.name, profile.bio, profile.pic, profile.interests, loaded]);
 
+  const value = useMemo<ProfileContextType>(() => ({
+    profile,
+    isProfileReady: profile.name.trim().length > 0,
+    setName,
+    setBio,
+    setPic,
+    toggleInterest,
+    clearProfile,
+    recordGameResult,
+    reactions,
+    playedSince,
+    playerId: playerIdRef.current,
+  }), [profile, setName, setBio, setPic, toggleInterest, clearProfile, recordGameResult, reactions, playedSince]);
+
   if (!loaded) return null;
 
   return (
-    <ProfileContext.Provider
-      value={{
-        profile,
-        isProfileReady: profile.name.trim().length > 0,
-        setName,
-        setBio,
-        setPic,
-        toggleInterest,
-        clearProfile,
-        recordGameResult,
-        reactions,
-        playedSince,
-        playerId: playerIdRef.current,
-      }}
-    >
+    <ProfileContext.Provider value={value}>
       {children}
     </ProfileContext.Provider>
   );

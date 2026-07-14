@@ -1,7 +1,7 @@
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
 import { GameProvider, useGame } from "@/contexts/GameContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import MenuScreen from "./menu";
 import GameScreen from "./game";
 import ErrorScreen from "./error";
@@ -21,16 +21,41 @@ function AppContent() {
   const [menuTab, setMenuTab] = useState("home");
   const [friendsInitialTab, setFriendsInitialTab] = useState<"friends" | "requests">("friends");
 
-  // Hooks must be called on every render before any early return
+  const menuOpacity = useRef(new Animated.Value(1)).current;
+  const questionsOpacity = useRef(new Animated.Value(0)).current;
+  const communityOpacity = useRef(new Animated.Value(0)).current;
+
+  const prevScreen = useRef<AppScreen>("menu");
+
+  const animateTransition = useCallback((next: AppScreen) => {
+    const screens: { key: AppScreen; opacity: Animated.Value }[] = [
+      { key: "menu", opacity: menuOpacity },
+      { key: "questions", opacity: questionsOpacity },
+      { key: "community", opacity: communityOpacity },
+    ];
+    const outgoing = screens.find(s => s.key === prevScreen.current);
+    const incoming = screens.find(s => s.key === next);
+    if (!outgoing || !incoming || prevScreen.current === next) return;
+
+    Animated.parallel([
+      Animated.timing(outgoing.opacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(incoming.opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+    ]).start();
+    prevScreen.current = next;
+  }, [menuOpacity, questionsOpacity, communityOpacity]);
+
   const goHome = useCallback(() => { setScreen("menu"); setMenuTab("home"); setFriendsInitialTab("friends"); }, []);
   const onNav = useCallback((tab: string) => {
     setMenuTab(tab);
     if (tab === "questions" || tab === "community") {
-      setScreen(tab as AppScreen);
+      const next = tab as AppScreen;
+      animateTransition(next);
+      setScreen(next);
     } else {
+      animateTransition("menu");
       setScreen("menu");
     }
-  }, []);
+  }, [animateTransition]);
 
   const navigateToFriendsRequests = useCallback(() => {
     setFriendsInitialTab("requests");
@@ -62,32 +87,26 @@ function AppContent() {
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
-      {/* Tab screens always mounted — only active one is visible/interactive */}
       {!isBackScreen && (
         <View style={{ flex: 1, position: "relative" }}>
-          {/* Menu */}
-          <View style={[s.screenAbs, { opacity: isActive("menu") ? 1 : 0 }]} pointerEvents={isActive("menu") ? "auto" : "none"}>
-            <MenuScreen key={menuTab} onNavigate={(s) => { setMenuTab("home"); setScreen(s); }} initialMode={menuTab} />
-          </View>
+          <Animated.View style={[s.screenAbs, { opacity: menuOpacity }]} pointerEvents={isActive("menu") ? "auto" : "none"}>
+            <MenuScreen onNavigate={(s) => { setMenuTab("home"); setScreen(s); }} initialMode={menuTab} />
+          </Animated.View>
 
-          {/* Questions */}
-          <View style={[s.screenAbs, { opacity: isActive("questions") ? 1 : 0 }]} pointerEvents={isActive("questions") ? "auto" : "none"}>
+          <Animated.View style={[s.screenAbs, { opacity: questionsOpacity }]} pointerEvents={isActive("questions") ? "auto" : "none"}>
             <QuestionsScreen />
-          </View>
+          </Animated.View>
 
-          {/* Community */}
-          <View style={[s.screenAbs, { opacity: isActive("community") ? 1 : 0 }]} pointerEvents={isActive("community") ? "auto" : "none"}>
+          <Animated.View style={[s.screenAbs, { opacity: communityOpacity }]} pointerEvents={isActive("community") ? "auto" : "none"}>
             <CommunityScreen />
-          </View>
+          </Animated.View>
         </View>
       )}
 
-      {/* Back screens — fill entire space when active */}
       {isActive("friends") && <FriendsScreen key={friendsInitialTab} onBack={goHome} initialTab={friendsInitialTab} />}
       {isActive("notifications") && <NotificationsScreen onBack={goHome} onNavigateFriends={navigateToFriendsRequests} />}
       {isActive("settings") && <SettingsScreen onBack={goHome} />}
 
-      {/* Single BottomNav at the bottom */}
       {!isBackScreen && (
         <BottomNav activeTab={activeTab} onNavigate={onNav} />
       )}

@@ -3,7 +3,6 @@
  * They can browse the local question bank OR community posts and tap one to fill the input.
  */
 import { QUESTIONS, QCategory, QTag, Question } from "@/data/questions";
-import { SERVER_URL } from "@/constants/server";
 import { useProfile } from "@/contexts/ProfileContext";
 import { Avatar } from "@/components/Avatar";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -16,6 +15,7 @@ import { COLORS as APP_COLORS, SHADOWS, RADIUS } from "@/constants/design-system
 import { CalendarDays, Crown, Eye, Flame, Gamepad2, Heart, PartyPopper, Skull, SmilePlus, Sparkles, Star, UserPlus, UserMinus, UserCheck, Users, Zap, Megaphone, X } from "lucide-react-native";
 
 import { getLevelProgress } from "@/utils/levels";
+import { getHttpBase, sendFriendRequest as sendFriendRequestApi } from "@/utils/http";
 
 const BG = APP_COLORS.bg;
 const CARD = "rgba(23, 19, 50, 0.7)";
@@ -23,10 +23,6 @@ const BORDER = APP_COLORS.border;
 const TEXT = APP_COLORS.text;
 const SUB = APP_COLORS.sub;
 const HINT = APP_COLORS.subAlt;
-
-function getHttpBase() {
-  return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
-}
 
 const INTEREST_LABEL: Record<string, string> = {
   "fun": "fun",
@@ -350,17 +346,10 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
                     <TouchableOpacity
                       style={s.pfFriendIcon}
                       onPress={async () => {
-                        try {
-                          const res = await fetch(`${getHttpBase()}/friends/request`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ from_id: playerId, from_name: profile.name, from_pic: profile.pic, to_id: pfModal.authorId }),
-                          });
-                          if (res.ok) {
-                            const data = await res.json();
-                            if (data.status !== "already_friends" && data.status !== "already_requested") { setSentIds(prev => new Set(prev).add(pfModal.authorId!)); }
-                          }
-                        } catch {}
+                        const result = await sendFriendRequestApi(playerId, profile.name, profile.pic, pfModal.authorId!);
+                        if (result.ok && result.status !== "already_friends" && result.status !== "already_requested") {
+                          setSentIds(prev => new Set(prev).add(pfModal.authorId!));
+                        }
                       }}
                       activeOpacity={0.7}
                     >

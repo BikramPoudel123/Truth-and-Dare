@@ -12,6 +12,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -27,12 +28,9 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import { SERVER_URL } from "@/constants/server";
+import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi } from "@/utils/http";
 import { ArrowLeft, CalendarDays, Crown, Eye, Flame, Gamepad2, Heart, Mic, PartyPopper, Skull, SmilePlus, Sparkles, Star, Timer as TimerIcon, Paperclip, Send, Target, Camera, Check, X, Flag, UserPlus, UserMinus, UserCheck, Users, Zap } from "lucide-react-native";
-
-function getHttpBase() {
-  return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
-}
+import { ParticleBurst } from "@/components/ParticleBurst";
 
 const INTEREST_LABEL: Record<string, string> = {
   "fun": "fun",
@@ -222,6 +220,54 @@ const tib = StyleSheet.create({
   fill:  { height: "100%", borderRadius: 2 },
 });
 
+function ModeCard({ icon, label, sub, color, onPress, burstColors }: { icon: React.ReactNode; label: string; sub: string; color: string; onPress: () => void; burstColors?: string[] }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const [burst, setBurst] = useState(false);
+
+  const onPressIn = () => Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, friction: 6, tension: 200 }).start();
+  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 150 }).start();
+
+  const handlePress = () => {
+    setBurst(true);
+    setTimeout(() => setBurst(false), 100);
+    onPress();
+  };
+
+  return (
+    <Animated.View style={[{ transform: [{ scale }] }]}>
+      <TouchableOpacity
+        style={[s.modeCard, { backgroundColor: `${color}15`, borderColor: color }]}
+        onPress={handlePress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={0.82}
+      >
+        <ParticleBurst trigger={burst} count={10} colors={burstColors || [color]} spread={70} />
+        <View style={[s.modeIconWrap, { backgroundColor: `${color}20` }]}>
+          {icon}
+        </View>
+        <Text style={[s.modeWord, { color }]}>{label}</Text>
+        <Text style={s.modeSub}>{sub}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+function ActionButton({ children, onPress, disabled, style }: { children: React.ReactNode; onPress: () => void; disabled?: boolean; style?: any }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => { if (!disabled) Animated.spring(scale, { toValue: 0.93, useNativeDriver: true, friction: 6, tension: 200 }).start(); };
+  const onPressOut = () => { if (!disabled) Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 150 }).start(); };
+
+  return (
+    <Animated.View style={[{ transform: [{ scale }] }, style]}>
+      <TouchableOpacity onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} disabled={disabled} activeOpacity={0.85}>
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function GameScreen() {
   const {
     players, currentTurn, phase, currentMode, currentQuestion,
@@ -319,13 +365,8 @@ export default function GameScreen() {
     (async () => {
       const levels: Record<string, number> = {};
       for (const p of players) {
-        try {
-          const res = await fetch(`${base}/profile/${encodeURIComponent(p.id)}`);
-          if (res.ok) {
-            const data = await res.json();
-            levels[p.id] = data.level ?? 1;
-          }
-        } catch {}
+        const data = await fetchProfileCached(p.id);
+        if (data) levels[p.id] = data.level ?? 1;
       }
       if (Object.keys(levels).length > 0) setPlayerLevels(levels);
     })();
@@ -338,15 +379,10 @@ export default function GameScreen() {
         if (r.ok) { const d = await r.json(); setFriendIds(new Set(d.friends.map((f: { id: string }) => f.id))); setSentIds(new Set(d.sent ?? [])); }
       });
     } catch {}
-    try {
-      const res = await fetch(`${base}/profile/${encodeURIComponent(targetId)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPfModal({ visible: true, authorId: targetId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
-      } else {
-        setPfModal(prev => ({ ...prev, authorId: targetId, loading: false }));
-      }
-    } catch {
+    const data = await fetchProfileCached(targetId);
+    if (data) {
+      setPfModal({ visible: true, authorId: targetId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
+    } else {
       setPfModal(prev => ({ ...prev, authorId: targetId, loading: false }));
     }
   }, [base, playerId]);
@@ -507,20 +543,22 @@ export default function GameScreen() {
                 </View>
               </View>
               <View style={s.modeRow}>
-                <TouchableOpacity style={[s.modeCard, { backgroundColor: `${moodCfg.color}15`, borderColor: moodCfg.color }]} onPress={() => { playModeSelect(); chooseMode("truth"); }} activeOpacity={0.82}>
-                  <View style={[s.modeIconWrap, { backgroundColor: `${moodCfg.color}20` }]}>
-                    <Eye size={32} color={moodCfg.color} />
-                  </View>
-                  <Text style={[s.modeWord, { color: moodCfg.color }]}>TRUTH</Text>
-                  <Text style={s.modeSub}>Answer honestly</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.modeCard, { backgroundColor: `${moodCfg.accentColor}15`, borderColor: moodCfg.accentColor }]} onPress={() => { playModeSelect(); chooseMode("dare"); }} activeOpacity={0.82}>
-                  <View style={[s.modeIconWrap, { backgroundColor: `${moodCfg.accentColor}20` }]}>
-                    <Flame size={32} color={moodCfg.accentColor} />
-                  </View>
-                  <Text style={[s.modeWord, { color: moodCfg.accentColor }]}>DARE</Text>
-                  <Text style={s.modeSub}>Accept challenge</Text>
-                </TouchableOpacity>
+                <ModeCard
+                  icon={<Eye size={32} color={moodCfg.color} />}
+                  label="TRUTH"
+                  sub="Answer honestly"
+                  color={moodCfg.color}
+                  onPress={() => { playModeSelect(); chooseMode("truth"); }}
+                  burstColors={[moodCfg.color, "#a78bfa", COLORS.purple]}
+                />
+                <ModeCard
+                  icon={<Flame size={32} color={moodCfg.accentColor} />}
+                  label="DARE"
+                  sub="Accept challenge"
+                  color={moodCfg.accentColor}
+                  onPress={() => { playModeSelect(); chooseMode("dare"); }}
+                  burstColors={[moodCfg.accentColor, COLORS.orange, COLORS.pink]}
+                />
               </View>
             </View>
           )}
@@ -700,16 +738,17 @@ export default function GameScreen() {
               )}
 
               {timer > 0 && <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />}
-              <TouchableOpacity
-                style={[s.nextBtn, { backgroundColor: moodCfg.color }, !isMyQ && s.nextBtnDisabled]}
+              <ActionButton
                 onPress={() => { playNextRound(); nextRound(); }}
-                activeOpacity={0.85}
                 disabled={!isMyQ}
+                style={[{ borderRadius: RADIUS.button }, !isMyQ && s.nextBtnDisabled]}
               >
-                <Text style={s.nextBtnTxt}>
-                  {isMyQ ? `Next Round  →  ${timer}s` : `Waiting for ${askerName_}${youSuffix(askerName_)}…`}
-                </Text>
-              </TouchableOpacity>
+                <View style={[s.nextBtn, { backgroundColor: moodCfg.color }]}>
+                  <Text style={s.nextBtnTxt}>
+                    {isMyQ ? `Next Round  →  ${timer}s` : `Waiting for ${askerName_}${youSuffix(askerName_)}…`}
+                  </Text>
+                </View>
+              </ActionButton>
             </View>
           )}
 
@@ -728,20 +767,21 @@ export default function GameScreen() {
                 <Mic size={20} color={COLORS.sub} />
                 {qMedia.filter(m => m.type === "audio").length > 0 && <View style={[s.badge, { backgroundColor: moodCfg.color }]}><Text style={s.badgeTxt}>{qMedia.filter(m => m.type === "audio").length}</Text></View>}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.stickyBtn, { backgroundColor: moodCfg.color, flex: 1 }, !canSendQ && s.stickyDisabled]}
+              <ActionButton
                 onPress={handleSendQ}
                 disabled={!canSendQ}
-                activeOpacity={0.85}
+                style={[{ backgroundColor: moodCfg.color, borderRadius: RADIUS.button, flex: 1 }, !canSendQ && s.stickyDisabled]}
               >
-                <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-                  {currentMode === "truth" ? <Send size={16} color="#fff" /> : <Target size={16} color="#fff" />}
-                  <Text style={s.stickyBtnTxt}>
-                    Send {currentMode === "truth" ? "Question" : "Dare"}
-                    {qMedia.length > 0 ? `  (${qMedia.length})` : ""}
-                  </Text>
+                <View style={[s.stickyBtn, { backgroundColor: "transparent" }]}>
+                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                    {currentMode === "truth" ? <Send size={16} color="#fff" /> : <Target size={16} color="#fff" />}
+                    <Text style={s.stickyBtnTxt}>
+                      Send {currentMode === "truth" ? "Question" : "Dare"}
+                      {qMedia.length > 0 ? `  (${qMedia.length})` : ""}
+                    </Text>
+                  </View>
                 </View>
-              </TouchableOpacity>
+              </ActionButton>
             </View>
           </View>
         )}
@@ -759,21 +799,22 @@ export default function GameScreen() {
                 <Mic size={20} color={COLORS.sub} />
                 {aMedia.filter(m => m.type === "audio").length > 0 && <View style={[s.badge, { backgroundColor: COLORS.green }]}><Text style={s.badgeTxt}>{aMedia.filter(m => m.type === "audio").length}</Text></View>}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.submitBtn, !canSendA && s.submitBtnDisabled]}
+              <ActionButton
                 onPress={handleSendA}
                 disabled={!canSendA}
-                activeOpacity={0.85}
+                style={[{ borderRadius: RADIUS.button }, !canSendA && s.submitBtnDisabled]}
               >
-                <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-                  <Check size={18} color="#fff" />
-                  <Text style={s.submitBtnTxt}>
-                    {aMedia.length > 0 && !inputA.trim()
-                      ? `Send ${aMedia.length} file${aMedia.length > 1 ? "s" : ""}`
-                      : "Submit Answer"}
-                  </Text>
+                <View style={[s.submitBtn, { backgroundColor: moodCfg.color }]}>
+                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                    <Check size={18} color="#fff" />
+                    <Text style={s.submitBtnTxt}>
+                      {aMedia.length > 0 && !inputA.trim()
+                        ? `Send ${aMedia.length} file${aMedia.length > 1 ? "s" : ""}`
+                        : "Submit Answer"}
+                    </Text>
+                  </View>
                 </View>
-              </TouchableOpacity>
+              </ActionButton>
               <TouchableOpacity style={[s.forfeitBtn]} onPress={() => { playFail(); forfeit(); }} activeOpacity={0.82}>
                 <X size={18} color={COLORS.red} />
               </TouchableOpacity>
@@ -886,24 +927,17 @@ export default function GameScreen() {
                     <TouchableOpacity
                       style={s.pfFriendIcon}
                       onPress={async () => {
-                        try {
-                          const res = await fetch(`${base}/friends/request`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ from_id: playerId, from_name: playerName, from_pic: profilePic, to_id: pfModal.authorId }),
-                          });
-                          if (res.ok) {
-                            const data = await res.json();
-                            if (data.status === "mutual") {
-                              setFriendIds(prev => new Set(prev).add(pfModal.authorId!));
-                              setSentIds(prev => { const s = new Set(prev); s.delete(pfModal.authorId!); return s; });
-                            } else if (data.status !== "already_friends" && data.status !== "already_requested") {
-                              setSentIds(prev => new Set(prev).add(pfModal.authorId!));
-                            } else if (data.status === "already_friends") {
-                              setFriendIds(prev => new Set(prev).add(pfModal.authorId!));
-                            }
+                        const result = await sendFriendRequestApi(playerId, playerName, profilePic, pfModal.authorId!);
+                        if (result.ok) {
+                          if (result.status === "mutual") {
+                            setFriendIds(prev => new Set(prev).add(pfModal.authorId!));
+                            setSentIds(prev => { const s = new Set(prev); s.delete(pfModal.authorId!); return s; });
+                          } else if (result.status === "already_friends") {
+                            setFriendIds(prev => new Set(prev).add(pfModal.authorId!));
+                          } else if (result.status !== "already_requested") {
+                            setSentIds(prev => new Set(prev).add(pfModal.authorId!));
                           }
-                        } catch {}
+                        }
                       }}
                       activeOpacity={0.7}
                     >

@@ -13,13 +13,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { getHttpBase } from "@/utils/http";
 import { getLevelProgress } from "@/utils/levels";
 
 import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves, Star, Skull, Heart, CalendarDays } from "lucide-react-native";
-
-function getHttpBase() {
-  return SERVER_URL.replace(/^ws:\/\//, "http://").replace(/^wss:\/\//, "https://").replace(/\/$/, "");
-}
+import { ParticleBurst } from "@/components/ParticleBurst";
 
 const ICON_MAP: Record<string, any> = { SmilePlus, MessageCircle, Flame, Handshake, Waves };
 
@@ -101,25 +99,28 @@ function GlowParticles() {
   );
 }
 
-function BlurredBlob({ color, top, left, size }: { color: string; top: number; left: number; size: number }) {
+function FloatingBlob({ color, top, left, size }: { color: string; top: number; left: number; size: number }) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const dur = 8000 + Math.random() * 6000;
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(translateX, { toValue: 20 + Math.random() * 20, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(translateX, { toValue: -(20 + Math.random() * 20), duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(translateY, { toValue: 15 + Math.random() * 20, duration: dur * 1.2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(translateY, { toValue: -(15 + Math.random() * 20), duration: dur * 1.2, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ]),
+      ])
+    ).start();
+  }, []);
   return (
-    <View
-      style={[StyleSheet.absoluteFill, { opacity: 0.15 }]}
-      pointerEvents="none"
-    >
-      <View
-        style={{
-          position: "absolute",
-          top: top,
-          left: left,
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: color,
-          opacity: 0.3,
-        }}
-      />
-    </View>
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: 0.15 }]} pointerEvents="none">
+      <Animated.View style={{ position: "absolute", top, left, width: size, height: size, borderRadius: size / 2, backgroundColor: color, opacity: 0.3, transform: [{ translateX }, { translateY }] }} />
+    </Animated.View>
   );
 }
 
@@ -134,6 +135,8 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
   const [code, setCode] = useState("");
   const [mode, setMode] = useState<ScreenMode>((initialMode as ScreenMode) || "home");
   const [joining, setJoining] = useState(false);
+  const [quickMatchBurst, setQuickMatchBurst] = useState(false);
+  const [privateGameBurst, setPrivateGameBurst] = useState(false);
   const [spicyMode, setSpicyMode] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
@@ -145,6 +148,9 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
   const base = getHttpBase();
 
   useEffect(() => { setInterests(profile.interests); }, [profile.interests]);
+  useEffect(() => {
+    if (initialMode) setMode(initialMode as ScreenMode);
+  }, [initialMode]);
   useEffect(() => {
     if (initialRun.current) { initialRun.current = false; return; }
     if (phase === "menu") { setMode("home"); setJoining(false); setCode(""); }
@@ -164,6 +170,66 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
         .catch(() => setPlayStyle(null));
     }
   }, [mode]);
+
+  // ── Home entrance animations ──
+  const logoAnim       = useRef(new Animated.Value(0)).current;
+  const headerIconsAnim = useRef(new Animated.Value(0)).current;
+  const onlineAnim     = useRef(new Animated.Value(0)).current;
+  const heroAnim       = useRef(new Animated.Value(0)).current;
+  const quickAnim      = useRef(new Animated.Value(0)).current;
+  const privateAnim    = useRef(new Animated.Value(0)).current;
+  const onlineDotScale = useRef(new Animated.Value(1)).current;
+  const pillGlow       = useRef(new Animated.Value(0.3)).current;
+  const logoFloat      = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (mode !== "home") return;
+    [logoAnim, headerIconsAnim, onlineAnim, heroAnim, quickAnim, privateAnim].forEach(v => v.setValue(0));
+    Animated.stagger(80, [
+      Animated.parallel([
+        Animated.timing(logoAnim, { toValue: 1, duration: 600, easing: Easing.out(Easing.back(1.5)), useNativeDriver: true }),
+        Animated.timing(headerIconsAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      ]),
+      Animated.timing(onlineAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(heroAnim, { toValue: 1, duration: 500, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(quickAnim, { toValue: 1, duration: 500, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(privateAnim, { toValue: 1, duration: 500, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+    ]).start();
+
+    // Online dot pulse
+    const dotPulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(onlineDotScale, { toValue: 1.5, duration: 1000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(onlineDotScale, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    dotPulse.start();
+
+    // Quick Match pill glow pulse
+    const glowPulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pillGlow, { toValue: 1, duration: 1250, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pillGlow, { toValue: 0.3, duration: 1250, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    glowPulse.start();
+
+    // Logo gentle float
+    const floatAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoFloat, { toValue: -4, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(logoFloat, { toValue: 4, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    floatAnim.start();
+
+    return () => { dotPulse.stop(); glowPulse.stop(); floatAnim.stop(); };
+  }, [mode]);
+
+  const homeEntrance = (anim: Animated.Value, translateY = 30) => ({
+    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [translateY, 0] }) }],
+  });
 
   const pickPic = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -203,21 +269,21 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
   return (
     <SafeAreaView style={s.safe}>
       {mode === "home" && <GlowParticles />}
-      <BlurredBlob color={COLORS.purple} top={-80} left={-60} size={200} />
-      <BlurredBlob color={COLORS.pink} top={200} left={260} size={160} />
-      <BlurredBlob color={COLORS.electricBlue} top={400} left={-40} size={140} />
+      <FloatingBlob color={COLORS.purple} top={-80} left={-60} size={200} />
+      <FloatingBlob color={COLORS.pink} top={200} left={260} size={160} />
+      <FloatingBlob color={COLORS.electricBlue} top={400} left={-40} size={140} />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: 110 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
             {mode === "home" && (
               <View style={s.homeCenter}>
                 {/* Header with Logo */}
-                <View style={s.header}>
+                <Animated.View style={[s.header, homeEntrance(logoAnim, -20)]}>
                   <View style={s.logoWrap}>
                   <View style={s.logoRow}>
-                    <View style={s.maskRow}>
-                      <Text style={s.maskBlue}>🎭</Text>
-                    </View>
+                    <Animated.View style={s.maskRow}>
+                      <Animated.Text style={[s.maskBlue, { transform: [{ translateY: logoFloat }] }]}>🎭</Animated.Text>
+                    </Animated.View>
                 <View style={s.logoTextCol}>
                   <Text style={s.logoTruth}>Truth</Text>
                   <Text style={s.logoDare}>Dare</Text>
@@ -225,7 +291,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                 </View>
                   </View>
                 </View>
-                <View style={s.headerRight}>
+                <Animated.View style={[s.headerRight, { opacity: headerIconsAnim, transform: [{ translateX: headerIconsAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }] }]}>
                   <TouchableOpacity style={s.iconBtn} activeOpacity={0.8} onPress={() => onNavigate?.("friends")}>
                     <Users size={18} color={COLORS.sub} />
                   </TouchableOpacity>
@@ -236,14 +302,14 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                   <TouchableOpacity style={s.iconBtn} activeOpacity={0.8} onPress={() => onNavigate?.("settings")}>
                     <Settings size={18} color={COLORS.sub} />
                   </TouchableOpacity>
-                </View>
-              </View>
+                </Animated.View>
+              </Animated.View>
 
               {/* Online Players */}
-              <View style={s.onlineRow}>
-                <View style={s.onlineDot} />
+              <Animated.View style={[s.onlineRow, homeEntrance(onlineAnim, 15)]}>
+                <Animated.View style={[s.onlineDot, { transform: [{ scale: onlineDotScale }]}]} />
                 <Text style={s.onlineTxt}>{isConnected ? `${playersOnline.toLocaleString()} Players Online` : "Connecting..."}</Text>
-              </View>
+              </Animated.View>
 
               {/* Profile missing warning */}
               {!isProfileReady && (
@@ -258,7 +324,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
               )}
 
               {/* Hero Card */}
-              <View style={[s.matchCard, { backgroundColor: "#29002b", borderColor: "rgba(255, 0, 110, 0.25)" }]}>
+              <Animated.View style={[s.matchCard, { backgroundColor: "#29002b", borderColor: "rgba(255, 0, 110, 0.25)" }, homeEntrance(heroAnim)]}>
                 <View style={s.matchContent}>
                   <View style={[s.matchIconWrap, s.matchIconWrapPink]}>
                     <Image source={require("../../assets/images/fun.png")} style={{ width: 36, height: 36 }} />
@@ -268,14 +334,16 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                     <Text style={s.matchDesc}>Truth reveals. Dare dares. Let the game begin!</Text>
                   </View>
                 </View>
-              </View>
+              </Animated.View>
 
               {/* Quick Match Card */}
+              <Animated.View style={homeEntrance(quickAnim)}>
               <TouchableOpacity
                 style={[s.matchCard, (!isProfileReady) && s.disabled]}
-                onPress={() => guard(() => { setJoining(true); autoJoin(profile.name.trim()); setMode("random_waiting"); })}
+                onPress={() => { setQuickMatchBurst(true); setTimeout(() => setQuickMatchBurst(false), 100); guard(() => { setJoining(true); autoJoin(profile.name.trim()); setMode("random_waiting"); }); }}
                 activeOpacity={0.85}
               >
+                <ParticleBurst trigger={quickMatchBurst} count={12} colors={[COLORS.purple, COLORS.pink, COLORS.electricBlue, "#a78bfa"]} spread={80} />
                 <View style={s.matchContent}>
                   <View style={s.matchIconWrap}>
                     <Zap size={24} color={COLORS.purple} />
@@ -284,19 +352,22 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                     <Text style={s.matchTitle}>Quick Match</Text>
                     <Text style={s.matchDesc}>Find a random player{"\n"}and start instantly</Text>
                   </View>
-                  <View style={s.matchBtnPill}>
+                  <Animated.View style={[s.matchBtnPill, { opacity: pillGlow }]}>
                     <Text style={s.matchBtnText}>Play Now</Text>
                     <Text style={s.matchBtnArrow}>→</Text>
-                  </View>
+                  </Animated.View>
                 </View>
               </TouchableOpacity>
+              </Animated.View>
 
               {/* Private Game Card */}
+              <Animated.View style={homeEntrance(privateAnim)}>
               <TouchableOpacity
                 style={[s.matchCard, s.matchCardPrivate, (!isProfileReady) && s.disabled]}
-                onPress={() => guard(() => setMode("private_join"))}
+                onPress={() => { setPrivateGameBurst(true); setTimeout(() => setPrivateGameBurst(false), 100); guard(() => setMode("private_join")); }}
                 activeOpacity={0.85}
               >
+                <ParticleBurst trigger={privateGameBurst} count={10} colors={[COLORS.pink, COLORS.orange, COLORS.purple, "#f472b6"]} spread={70} />
                 <View style={s.matchContent}>
                   <View style={[s.matchIconWrap, s.matchIconWrapPink]}>
                     <Users size={24} color={COLORS.pink} />
@@ -311,6 +382,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                   </View>
                 </View>
               </TouchableOpacity>
+              </Animated.View>
 
 
             </View>

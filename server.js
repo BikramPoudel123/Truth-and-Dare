@@ -1199,6 +1199,40 @@ app.post("/community/posts/:id/like", async (req, res) => {
   }
 });
 
+// ─── Players search ───────────────────────────────────────────────────────────
+
+// GET /players/search?query=...&player_id=... — search players by name
+app.get("/players/search", (req, res) => {
+  try {
+    const { query, player_id } = req.query;
+    if (!query || !player_id) {
+      return res.status(400).json({ error: "Missing required params" });
+    }
+    const q = query.toLowerCase();
+    const myFriends = getFriendIds(player_id);
+    const mySent = [];
+    for (const [, r] of friendReqStore) {
+      if (r.from === player_id && r.status === "pending") mySent.push(r.to);
+    }
+    const results = [];
+    for (const [pid, p] of profileStore) {
+      if (pid === player_id) continue;
+      if (!p?.name?.toLowerCase().includes(q)) continue;
+      results.push({
+        id: pid,
+        name: p.name,
+        pic: p.pic ?? null,
+        isFriend: myFriends.has(pid),
+        requestSent: mySent.includes(pid),
+      });
+      if (results.length >= 20) break;
+    }
+    res.json({ results });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // ─── Friends & Notifications REST endpoints ───────────────────────────────────
 
 // POST /friends/request — send a friend request
