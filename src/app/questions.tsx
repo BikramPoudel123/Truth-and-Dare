@@ -1,5 +1,3 @@
-import { useGame } from "@/contexts/GameContext";
-import { getMoodConfig } from "@/data/moods";
 import { QCategory, QTag, Question } from "@/data/questions";
 import { useQuestions } from "@/stores/questionBankStore";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
@@ -74,20 +72,8 @@ const QuestionCard = memo(function QuestionCard({ item, picked, onUse, onPress }
   );
 });
 
-function MoodBadge() {
-  const { gameMood } = useGame();
-  const moodCfg = getMoodConfig(gameMood);
-  const IconComp = iconMap[moodCfg.icon];
-  return (
-    <View style={[s.moodBadge, { backgroundColor: `${moodCfg.color}20`, borderColor: `${moodCfg.color}40` }]}>
-      <IconComp size={14} color={moodCfg.color} />
-      <Text style={[s.moodBadgeLabel, { color: moodCfg.color }]}>{moodCfg.label}</Text>
-    </View>
-  );
-}
-
 export default function QuestionsScreen({ onUse }: Props) {
-  const [typeFilter, setTypeFilter] = useState<QCategory | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<QCategory>("truth");
   const [tagFilter,  setTagFilter]  = useState<QTag | "all">("all");
   const [picked, setPicked] = useState<Question | null>(null);
 
@@ -108,22 +94,17 @@ export default function QuestionsScreen({ onUse }: Props) {
       <View style={s.header}>
         <View style={{ flex: 1 }}>
           <Text style={s.title}>Question Bank</Text>
-          <Text style={s.subtitle}>Truth & dare questions</Text>
+          <Text style={s.subtitle}>You can use these questions while playing the game</Text>
         </View>
-        <MoodBadge />
       </View>
 
       <View style={s.typeRow}>
-        {(["all", "truth", "dare"] as const).map(t => (
-          <TouchableOpacity key={t} style={[s.typeBtn, typeFilter === t && { backgroundColor: COLORS.purple, borderColor: COLORS.purple }]} onPress={() => setTypeFilter(t)} activeOpacity={0.8}>
-            {t === "all" ? (
-              <Text style={[s.typeBtnText, typeFilter === t && { color: "#fff" }]}>All</Text>
-            ) : (
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-                {t === "truth" ? <Eye size={14} color={typeFilter === t ? "#fff" : COLORS.sub} /> : <Flame size={14} color={typeFilter === t ? "#fff" : COLORS.sub} />}
-                <Text style={[s.typeBtnText, typeFilter === t && { color: "#fff" }]}>{t === "truth" ? "Truth" : "Dare"}</Text>
-              </View>
-            )}
+        {(["truth", "dare"] as const).map(t => (
+          <TouchableOpacity key={t} style={[s.typeBtn, typeFilter === t && { backgroundColor: t === "truth" ? COLORS.purple : COLORS.orange, borderColor: t === "truth" ? COLORS.purple : COLORS.orange }]} onPress={() => setTypeFilter(t)} activeOpacity={0.8}>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+              {t === "truth" ? <Eye size={14} color={typeFilter === t ? "#fff" : COLORS.sub} /> : <Flame size={14} color={typeFilter === t ? "#fff" : COLORS.sub} />}
+              <Text style={[s.typeBtnText, typeFilter === t && { color: "#fff" }]}>{t === "truth" ? "Truth" : "Dare"}</Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>

@@ -37,11 +37,6 @@ export interface CommunityPost {
 
 function LikeButtonInner({ liked, count, onPress }: { liked: boolean; count: number; onPress: () => void }) {
   const scale = useRef(new Animated.Value(1)).current;
-  const heartScale = useRef(new Animated.Value(liked ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.spring(heartScale, { toValue: liked ? 1 : 0, useNativeDriver: true, friction: 4, tension: 200 }).start();
-  }, [liked]);
 
   const handlePress = () => {
     Animated.sequence([
@@ -58,9 +53,7 @@ function LikeButtonInner({ liked, count, onPress }: { liked: boolean; count: num
       activeOpacity={0.8}
     >
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-        <Animated.View style={{ transform: [{ scale: Animated.add(0.3, Animated.multiply(heartScale, 0.7)) }] }}>
-          <Heart size={14} color={liked ? COLORS.pink : COLORS.sub} fill={liked ? COLORS.pink : "transparent"} />
-        </Animated.View>
+          <Heart size={18} color={liked ? COLORS.pink : COLORS.sub} fill={liked ? COLORS.pink : "transparent"} />
         <Text style={s.likeBtnText}>{count}</Text>
       </View>
     </TouchableOpacity>
@@ -197,6 +190,32 @@ export default function CommunityScreen() {
 
   const filtered = useMemo(() => posts.filter((p) => p.type === postType), [posts, postType]);
 
+  const sorted = useMemo(() => {
+    if (filtered.length <= 3) return [...filtered].sort((a, b) => b.createdAt - a.createdAt);
+    const now = Date.now();
+    const scored = filtered.map(p => {
+      const ageH = (now - p.createdAt) / 3600000;
+      const velocity = p.likes / (ageH + 1);
+      return { p, velocity, ageH };
+    });
+    scored.sort((a, b) => b.velocity - a.velocity);
+    const mid = Math.ceil(scored.length / 2);
+    const popular = scored.slice(0, mid);
+    const recent = scored.slice(mid).sort((a, b) => a.ageH - b.ageH);
+    const result: typeof filtered = [];
+    let pi = 0, ri = 0;
+    for (let i = 0; i < scored.length; i++) {
+      if (i % 2 === 0 && pi < popular.length) {
+        result.push(popular[pi++].p);
+      } else if (ri < recent.length) {
+        result.push(recent[ri++].p);
+      } else {
+        result.push(popular[pi++].p);
+      }
+    }
+    return result;
+  }, [filtered]);
+
   const renderPost = useCallback(({ item, index }: { item: CommunityPost; index: number }) => (
     <AnimatedPostCard index={index}>
     <View style={s.postCard}>
@@ -321,7 +340,7 @@ export default function CommunityScreen() {
           </View>
         ) : (
           <FlatList
-            data={filtered}
+            data={sorted}
             keyExtractor={(i) => i.id}
             renderItem={renderPost}
             contentContainerStyle={s.list}
@@ -413,6 +432,7 @@ const s = StyleSheet.create({
   filterRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
