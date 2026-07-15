@@ -240,6 +240,7 @@ async function createRoom(creator = null, isPrivate = false) {
     player1_answer: null,
     player2_answer: null,
     reaction: null,
+    question_reaction: null,
     is_private: isPrivate,
   };
 
@@ -782,6 +783,37 @@ wss.on("connection", (ws) => {
           break;
         }
 
+        // ── SEND QUESTION REACTION ────────────────────────────────────────
+        case "send_question_reaction": {
+          const { room_id, player_id, reaction } = message;
+          const room = await getRoom(room_id);
+          if (!room || (room.phase !== "reveal" && room.phase !== "answering")) break;
+
+          const reactor = room.players.find((p) => p.id === player_id);
+          if (!reactor) break;
+
+          room.question_reaction = reaction;
+          await saveRoom(room);
+
+          // Track reaction on the asker's profile (the one who asked the question)
+          const asker = room.players.find((p) => p.id !== room.players[room.current_turn]?.id);
+          if (asker) {
+            const askerProfile = profileStore.get(asker.id) ?? {};
+            const reactions = askerProfile.reactions ?? {};
+            reactions[reaction] = (reactions[reaction] ?? 0) + 1;
+            askerProfile.reactions = reactions;
+            profileStore.set(asker.id, askerProfile);
+            saveProfiles();
+          }
+
+          broadcastToRoom(room, {
+            type: "question_reaction",
+            reaction,
+            reactor_name: reactor.name,
+          });
+          break;
+        }
+
         // ── NEXT ROUND ───────────────────────────────────────────────────────
         case "next_round": {
           const { room_id } = message;
@@ -803,6 +835,7 @@ wss.on("connection", (ws) => {
           room.player1_answer = null;
           room.player2_answer = null;
           room.reaction = null;
+          room.question_reaction = null;
           await saveRoom(room);
 
           broadcastToRoom(room, {

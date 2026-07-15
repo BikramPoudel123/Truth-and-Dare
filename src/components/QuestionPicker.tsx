@@ -5,17 +5,18 @@
 import { QUESTIONS, QCategory, QTag, Question } from "@/data/questions";
 import { useProfile } from "@/contexts/ProfileContext";
 import { Avatar } from "@/components/Avatar";
+import { ProfileModal, ProfileModalData, DEFAULT_MODAL_DATA } from "@/components/ProfileModal";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, FlatList, Modal, PanResponder, Pressable, ScrollView, StyleSheet,
-  Text, TouchableOpacity, View, Alert, useWindowDimensions,
+  ActivityIndicator, FlatList, Modal, StyleSheet,
+  Text, TouchableOpacity, View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS as APP_COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import { CalendarDays, Crown, Eye, Flame, Gamepad2, Heart, PartyPopper, Skull, SmilePlus, Sparkles, Star, UserPlus, UserMinus, UserCheck, Users, Zap, Megaphone, X } from "lucide-react-native";
+import { Eye, Heart, Megaphone, Sparkles, UserPlus, UserCheck, X } from "lucide-react-native";
 
 import { getLevelProgress } from "@/utils/levels";
-import { getHttpBase, sendFriendRequest as sendFriendRequestApi } from "@/utils/http";
+import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi, fetchFriendIdsAndSent } from "@/utils/http";
+import { INTEREST_LABEL } from "@/constants/profile";
 
 const BG = APP_COLORS.bg;
 const CARD = "rgba(23, 19, 50, 0.7)";
@@ -23,15 +24,6 @@ const BORDER = APP_COLORS.border;
 const TEXT = APP_COLORS.text;
 const SUB = APP_COLORS.sub;
 const HINT = APP_COLORS.subAlt;
-
-const INTEREST_LABEL: Record<string, string> = {
-  "fun": "fun",
-  "life": "life",
-  "hot": "hot",
-  "connect": "connect",
-  "spicy": "spicy",
-  "deep": "deep",
-};
 
 interface CommunityPost {
   id: string;
@@ -57,37 +49,15 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
   const [tab, setTab] = useState<"bank" | "community">("bank");
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
-  const [pfModal, setPfModal] = useState<{ visible: boolean; authorId: string | null; name: string; bio: string; pic: string | null; interests: string[]; playStyle: string | null; reactions: Record<string, number>; gamesPlayed: number; level: number; playedSince: string; loading: boolean }>({ visible: false, authorId: null, name: "", bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: false });
+  const [pfModal, setPfModal] = useState<ProfileModalData>(DEFAULT_MODAL_DATA);
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
-  const { width: screenW, height: screenH } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-
-  const rCardW = Math.min(screenW * 0.92, 480);
-  const rCardMaxH = Math.min(screenH * 0.85, 600);
-  const rHozPad = Math.max(16, Math.min(24, screenW * 0.065));
-  const rBotPad = Math.max(16, insets.bottom + 12);
-  const rTopRad = screenW < 380 ? 20 : 24;
-  const rGrabMarg = Math.max(12, Math.min(20, screenW * 0.05));
-
-  const pfScrollY = useRef(0);
-  const pfPanDismiss = useCallback(() => setPfModal(prev => ({ ...prev, visible: false })), []);
-  const pfPanResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gs) => gs.dy > 10 && gs.vy > 0 && pfScrollY.current <= 1,
-    onPanResponderRelease: (_, gs) => { if (gs.dy > 100) pfPanDismiss(); },
-  })).current;
 
   useEffect(() => {
     (async () => {
-      try {
-        const res = await fetch(`${getHttpBase()}/friends/${playerId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setFriendIds(new Set(data.friends.map((f: { id: string }) => f.id)));
-          setSentIds(new Set(data.sent ?? []));
-        }
-      } catch {}
+      const { friendIds, sentIds } = await fetchFriendIdsAndSent(playerId);
+      setFriendIds(friendIds);
+      setSentIds(sentIds);
     })();
   }, []);
 
@@ -107,21 +77,14 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
 
   const openProfile = async (authorId: string | undefined, authorName: string) => {
     if (!authorId) return;
-    setPfModal({ visible: true, authorId, name: authorName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
-    try {
-      await fetch(`${getHttpBase()}/friends/${encodeURIComponent(playerId)}`).then(async r => {
-        if (r.ok) { const d = await r.json(); setFriendIds(new Set(d.friends.map((f: { id: string }) => f.id))); setSentIds(new Set(d.sent ?? [])); }
-      });
-    } catch {}
-    try {
-      const res = await fetch(`${getHttpBase()}/profile/${encodeURIComponent(authorId)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPfModal({ visible: true, authorId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
-      } else {
-        setPfModal(prev => ({ ...prev, authorId, loading: false }));
-      }
-    } catch {
+    setPfModal({ ...DEFAULT_MODAL_DATA, visible: true, authorId, name: authorName, loading: true });
+    const { friendIds: fIds, sentIds: sIds } = await fetchFriendIdsAndSent(playerId);
+    setFriendIds(fIds);
+    setSentIds(sIds);
+    const data = await fetchProfileCached(authorId);
+    if (data) {
+      setPfModal({ ...DEFAULT_MODAL_DATA, visible: true, authorId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
+    } else {
       setPfModal(prev => ({ ...prev, authorId, loading: false }));
     }
   };
@@ -138,21 +101,6 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
   );
 
   const pick = (text: string) => { onSelect(text); onClose(); };
-
-  const playStyleIcon = (style: string | null): [React.ComponentType<{size: number; color: string}>, string] => {
-    const map: Record<string, [React.ComponentType<{size: number; color: string}>, string]> = {
-      "Rising Star":      [Star, APP_COLORS.gold],
-      "Hot Player":       [Flame, APP_COLORS.orange],
-      "Funny Player":     [SmilePlus, "#facc15"],
-      "Heartthrob":       [Heart, APP_COLORS.pink],
-      "Shocking Player":  [Zap, APP_COLORS.electricBlue],
-      "Savage Player":    [Skull, "#a855f7"],
-      "Emotional Player": [Heart, "#60a5fa"],
-      "Life of the Party":[PartyPopper, "#f97316"],
-      "Respected Player": [Crown, APP_COLORS.gold],
-    };
-    return map[style ?? ""] ?? [Star, SUB];
-  };
 
   const renderAvatar = (authorId: string | undefined, name: string, pic: string | null | undefined, size: number = 32) => {
     const isSelf = authorId === playerId;
@@ -253,114 +201,20 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
         )}
       </View>
 
-      {/* Profile modal — bottom sheet */}
-      <Modal visible={pfModal.visible} transparent animationType="slide" onRequestClose={() => setPfModal(prev => ({ ...prev, visible: false }))}>
-        <Pressable style={s.pfOverlay} onPress={() => setPfModal(prev => ({ ...prev, visible: false }))}>
-          <View style={[s.pfCard, { maxWidth: rCardW, maxHeight: rCardMaxH, paddingHorizontal: rHozPad, paddingBottom: rBotPad, borderTopLeftRadius: rTopRad, borderTopRightRadius: rTopRad }]} {...pfPanResponder.panHandlers}>
-            <View style={[s.pfGrabber, { marginBottom: rGrabMarg }]} />
-            {pfModal.loading ? (
-              <ActivityIndicator size="large" color={APP_COLORS.purple} />
-            ) : (
-              <ScrollView contentContainerStyle={{ alignItems: "center", gap: 16 }} showsVerticalScrollIndicator={false} style={{ alignSelf: "stretch" }} bounces={true} onScroll={(e) => { pfScrollY.current = e.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}>
-                <Avatar uri={pfModal.pic} name={pfModal.name} size={72} borderWidth={2} borderColor={APP_COLORS.purple} />
-                <Text style={s.pfName}>{pfModal.name}{youSuffix(pfModal.name, pfModal.authorId ?? undefined)}</Text>
-
-                {pfModal.playStyle && (() => {
-                  const [Icon, color] = playStyleIcon(pfModal.playStyle);
-                  return (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: RADIUS.pill, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1, borderColor: BORDER }}>
-                      <Icon size={13} color={color} />
-                      <Text style={{ color: APP_COLORS.text, fontSize: 11, fontWeight: "700" }}>{pfModal.playStyle}</Text>
-                    </View>
-                  );
-                })()}
-
-                {/* Stats Card */}
-                <View style={s.pfStatsCard}>
-                  <View style={s.pfStatColumn}>
-                    <Crown size={18} color={APP_COLORS.gold} />
-                    <Text style={s.pfStatNumber}>{pfModal.level}</Text>
-                    <View style={{ width: "100%", height: 3, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden", marginTop: 2 }}>
-                      <View style={{ width: `${(pfModal.gamesPlayed % 10) * 10}%`, height: "100%", backgroundColor: APP_COLORS.gold, borderRadius: 2 }} />
-                    </View>
-                    <Text style={s.pfStatLabel} numberOfLines={1}>Level</Text>
-                  </View>
-                  <View style={s.pfStatDivider} />
-                  <View style={s.pfStatColumn}>
-                    <SmilePlus size={18} color={SUB} />
-                    <Text style={s.pfStatNumber}>{Object.keys(pfModal.reactions).length > 0 ? Object.values(pfModal.reactions).reduce((a, b) => a + b, 0) : 0}</Text>
-                    <Text style={s.pfStatLabel} numberOfLines={1}>Reactions</Text>
-                  </View>
-                  <View style={s.pfStatDivider} />
-                  <View style={s.pfStatColumn}>
-                    <CalendarDays size={18} color={SUB} />
-                    <Text style={s.pfStatDate} numberOfLines={1}>
-                      {pfModal.playedSince
-                        ? new Date(pfModal.playedSince).toLocaleDateString("en-US", {
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "-"}
-                    </Text>
-                    <Text style={s.pfStatLabel} numberOfLines={1}>Played Since</Text>
-                  </View>
-                </View>
-
-                {Object.keys(pfModal.reactions).length > 0 && (
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-                    {Object.entries(pfModal.reactions).map(([emoji, count]) => (
-                      <View key={emoji} style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: BORDER }}>
-                        <Text style={{ fontSize: 14 }}>{emoji}</Text>
-                        <Text style={{ color: SUB, fontSize: 11, fontWeight: "700" }}>{count}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {pfModal.bio ? <Text style={s.pfBio}>{pfModal.bio}</Text> : null}
-                {pfModal.interests.length > 0 && (
-                  <>
-                    <Text style={{ color: SUB, fontSize: 10, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" }}>Interests</Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-                      {pfModal.interests.map((i) => (
-                        <View key={i} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: `${APP_COLORS.purple}15`, borderWidth: 1, borderColor: `${APP_COLORS.purple}30` }}>
-                          <Text style={{ color: APP_COLORS.purple, fontSize: 11, fontWeight: "700" }}>{INTEREST_LABEL[i] ?? i}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </>
-                )}
-              </ScrollView>
-              )}
-              {!pfModal.loading && pfModal.authorId && pfModal.authorId !== playerId && (
-                <View style={s.pfFriendIconWrap}>
-                  {friendIds.has(pfModal.authorId) ? (
-                    <View style={s.pfFriendIcon}>
-                      <Users size={18} color={APP_COLORS.green} />
-                    </View>
-                  ) : sentIds.has(pfModal.authorId) ? (
-                    <View style={s.pfFriendIcon}>
-                      <UserCheck size={18} color={APP_COLORS.blue} />
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={s.pfFriendIcon}
-                      onPress={async () => {
-                        const result = await sendFriendRequestApi(playerId, profile.name, profile.pic, pfModal.authorId!);
-                        if (result.ok && result.status !== "already_friends" && result.status !== "already_requested") {
-                          setSentIds(prev => new Set(prev).add(pfModal.authorId!));
-                        }
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <UserPlus size={18} color={APP_COLORS.purple} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-          </View>
-        </Pressable>
-      </Modal>
+      {/* Profile modal */}
+      <ProfileModal
+        data={pfModal}
+        onClose={() => setPfModal(prev => ({ ...prev, visible: false }))}
+        actionMode="community"
+        isFriend={pfModal.authorId ? friendIds.has(pfModal.authorId) : false}
+        isSent={pfModal.authorId ? sentIds.has(pfModal.authorId) : false}
+        onSendFriendRequest={async (authorId) => {
+          const result = await sendFriendRequestApi(playerId, profile.name, profile.pic, authorId);
+          if (result.ok && result.status !== "already_friends" && result.status !== "already_requested") {
+            setSentIds(prev => new Set(prev).add(authorId));
+          }
+        }}
+      />
     </Modal>
   );
 }
@@ -398,19 +252,4 @@ const s = StyleSheet.create({
   postMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
   likeCount: { color: HINT, fontSize: 11, fontWeight: "600" },
 
-  // Profile modal (bottom sheet)
-  pfOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  pfCard: { width: "100%", backgroundColor: BG, paddingTop: 4, alignItems: "center", alignSelf: "center", ...SHADOWS.glow },
-  pfGrabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.15)", alignSelf: "center" },
-  pfAvatar: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: APP_COLORS.purple },
-  pfName: { color: TEXT, fontSize: 18, fontWeight: "800" },
-  pfBio: { color: SUB, fontSize: 13, textAlign: "center", lineHeight: 18 },
-  pfFriendIconWrap: { position: "absolute", top: 4, right: 8, zIndex: 10 },
-  pfFriendIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  pfStatsCard: { flexDirection: "row", backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: 12, padding: 16, borderWidth: 1, borderColor: BORDER, width: "100%" },
-  pfStatColumn: { flex: 1, alignItems: "center", gap: 4 },
-  pfStatNumber: { color: TEXT, fontSize: 18, fontWeight: "900" },
-  pfStatLabel: { color: SUB, fontSize: 10, fontWeight: "600" },
-  pfStatDate: { color: TEXT, fontSize: 12, fontWeight: "800" },
-  pfStatDivider: { width: 1, backgroundColor: BORDER, marginVertical: 4 },
 });

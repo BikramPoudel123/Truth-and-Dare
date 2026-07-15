@@ -6,7 +6,7 @@ import {
   RecordingPresets,
   createAudioPlayer,
 } from "expo-audio";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { Mic, MicOff, Play, Square, Check, Trash2 } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";

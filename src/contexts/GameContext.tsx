@@ -67,6 +67,7 @@ export interface GameContextType {
   currentQuestion: string | null;
   answer: string | null;
   reaction: string | null;
+  questionReaction: string | null;
   media: Media[];
   answerMediaList: Media[];
   roomId: string | null;
@@ -78,6 +79,7 @@ export interface GameContextType {
   responderName: string | null;
   createRoom: (playerName: string) => void;
   sendReaction: (reaction: string) => void;
+  sendQuestionReaction: (reaction: string) => void;
   autoJoin: (playerName: string) => void;
   joinRoom: (roomId: string, playerName: string) => void;
   chooseMode: (mode: "truth" | "dare") => void;
@@ -124,6 +126,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [askerName, setAskerName] = useState<string | null>(null);
   const [responderName, setResponderName] = useState<string | null>(null);
   const [reaction, setReaction] = useState<string | null>(null);
+  const [questionReaction, setQuestionReaction] = useState<string | null>(null);
   const [profilePic, setProfilePicState] = useState<string | null>(null);
   const [interests, setInterestsState] = useState<string[]>([]);
   const [gameMood, setGameMood] = useState<GameMood>("casual");
@@ -274,12 +277,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         soundCallbacksRef.current.pop?.();
         break;
 
+      case "question_reaction":
+        setQuestionReaction(message.reaction);
+        soundCallbacksRef.current.pop?.();
+        break;
+
       case "round_started":
         setCurrentTurn(message.current_turn);
         setCurrentMode(null);
         setCurrentQuestion(null);
         setAnswer(null);
         setReaction(null);
+        setQuestionReaction(null);
         setAnswerMediaList([]);
         setMedia([]);
         setChooserName(null);
@@ -594,6 +603,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, [sendMessage]);
 
+  const sendQuestionReaction = useCallback((emoji: string) => {
+    if (roomIdRef.current) {
+      sendMessage({
+        type: "send_question_reaction",
+        room_id: roomIdRef.current,
+        player_id: playerId.current,
+        reaction: emoji,
+      });
+    }
+  }, [sendMessage]);
+
   const nextRound = useCallback(() => {
     if (roomIdRef.current) {
       sendMessage({
@@ -655,6 +675,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     currentQuestion,
     answer,
     reaction,
+    questionReaction,
     media,
     answerMediaList,
     roomId,
@@ -672,6 +693,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     submitAnswer,
     submitMedia,
     sendReaction,
+    sendQuestionReaction,
     nextRound,
     quitGame,
     forfeit,
@@ -681,13 +703,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }), [
     ws, isConnected, playersOnline, notificationCount, profilePic,
     interests, gameMood, players, currentTurn, phase,
-    currentMode, currentQuestion, answer, reaction,
+    currentMode, currentQuestion, answer, reaction, questionReaction,
     media, answerMediaList, roomId, playerName, error,
     chooserName, askerName, responderName,
     setProfilePic, setInterests, setGameMood,
     createRoom, autoJoin, joinRoom, chooseMode,
     submitQuestion, submitAnswer, submitMedia,
-    sendReaction, nextRound, quitGame, forfeit, reset, reconnect,
+    sendReaction, sendQuestionReaction, nextRound, quitGame, forfeit, reset, reconnect,
     setSoundCallbacks,
   ]);
 

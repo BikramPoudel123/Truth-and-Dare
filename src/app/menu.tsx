@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
 import { getHttpBase } from "@/utils/http";
 import { getLevelProgress } from "@/utils/levels";
+import { PLAY_STYLE_ICON_MAP } from "@/constants/profile";
 
 import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves, Star, Skull, Heart, CalendarDays } from "lucide-react-native";
 import { ParticleBurst } from "@/components/ParticleBurst";
@@ -435,18 +436,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                 <View style={s.achievementRow}>
                   <View style={s.achievementBadge}>
                     {(() => {
-                      const iconMap: Record<string, [React.ComponentType<{size: number; color: string}>, string]> = {
-                        "Rising Star":      [Star, COLORS.gold],
-                        "Hot Player":       [Flame, COLORS.orange],
-                        "Funny Player":     [SmilePlus, "#facc15"],
-                        "Heartthrob":       [Heart, COLORS.pink],
-                        "Shocking Player":  [Zap, COLORS.electricBlue],
-                        "Savage Player":    [Skull, "#a855f7"],
-                        "Emotional Player": [Heart, "#60a5fa"],
-                        "Life of the Party":[PartyPopper, "#f97316"],
-                        "Respected Player": [Crown, COLORS.gold],
-                      };
-                      const pair = iconMap[playStyle ?? ""] ?? [Star, COLORS.sub];
+                      const pair = PLAY_STYLE_ICON_MAP[playStyle ?? ""] ?? [Star, COLORS.sub];
                       const Icon = pair[0];
                       return <Icon size={14} color={pair[1]} />;
                     })()}
@@ -480,7 +470,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                 <View style={s.statDivider} />
                 <View style={s.statColumn}>
                   <SmilePlus size={isSmall ? 16 : 20} color={COLORS.sub} />
-                  <Text style={[s.statNumber, { fontSize: isSmall ? 18 : 22 }]}>{reactions}</Text>
+                  <Text style={[s.statNumber, { fontSize: isSmall ? 18 : 22 }]}>{Object.values(reactions).reduce((a, b) => a + b, 0)}</Text>
                   <Text style={s.statLabel}>Reactions</Text>
                 </View>
                 <View style={s.statDivider} />
@@ -551,6 +541,16 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                 </View>
               </View>
 
+              {Object.keys(reactions).length > 0 && (
+                <View style={s.reactionsWrap}>
+                  {Object.entries(reactions).filter(([, c]) => c > 0).map(([emoji, count]) => (
+                    <View key={emoji} style={s.reactionTag}>
+                      <Text style={s.reactionEmoji}>{emoji}</Text>
+                      <Text style={s.reactionCount}>{count}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
 
             </View>
           )}
@@ -801,6 +801,20 @@ const s = StyleSheet.create({
   statLabel: { color: COLORS.sub, fontSize: 11, fontWeight: "600" },
   statDate: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
   statDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
+  reactionsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center", marginTop: 10 },
+  reactionTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  reactionEmoji: { fontSize: 14 },
+  reactionCount: { color: COLORS.sub, fontSize: 11, fontWeight: "700" },
 
   // Bio Card
   bioCard: {

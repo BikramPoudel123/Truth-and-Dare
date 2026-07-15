@@ -16,42 +16,17 @@ import { Avatar } from "@/components/Avatar";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
 import { useProfile } from "@/contexts/ProfileContext";
 import { fetchProfileCached, getHttpBase } from "@/utils/http";
+import { INTEREST_LABEL, PLAY_STYLE_ICON_MAP } from "@/constants/profile";
 import {
   CalendarDays,
   Crown,
-  Flame,
-  Heart,
-  PartyPopper,
-  Skull,
   SmilePlus,
   Star,
   UserCheck,
   UserMinus,
   UserPlus,
   Users,
-  Zap,
 } from "lucide-react-native";
-
-const INTEREST_LABEL: Record<string, string> = {
-  fun: "fun",
-  life: "life",
-  hot: "hot",
-  connect: "connect",
-  spicy: "spicy",
-  deep: "deep",
-};
-
-const ICON_MAP: Record<string, [React.ComponentType<{ size: number; color: string }>, string]> = {
-  "Rising Star":       [Star, COLORS.gold],
-  "Hot Player":        [Flame, COLORS.orange],
-  "Funny Player":      [SmilePlus, "#facc15"],
-  "Heartthrob":        [Heart, COLORS.pink],
-  "Shocking Player":   [Zap, COLORS.electricBlue],
-  "Savage Player":     [Skull, "#a855f7"],
-  "Emotional Player":  [Heart, "#60a5fa"],
-  "Life of the Party": [PartyPopper, "#f97316"],
-  "Respected Player":  [Crown, COLORS.gold],
-};
 
 export interface ProfileModalData {
   visible: boolean;
@@ -209,7 +184,7 @@ function ProfileModalInner({
                 {data.playStyle && (
                   <View style={s.playStyleBadge}>
                     {(() => {
-                      const pair = ICON_MAP[data.playStyle] ?? [Star, COLORS.sub];
+                      const pair = PLAY_STYLE_ICON_MAP[data.playStyle] ?? [Star, COLORS.sub];
                       const Icon = pair[0];
                       return (
                         <>

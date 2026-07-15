@@ -19,7 +19,8 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
-import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi } from "@/utils/http";
+import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi, fetchFriendIdsAndSent } from "@/utils/http";
+import { timeAgo } from "@/utils/format";
 import { Eye, Flame, Heart, Inbox } from "lucide-react-native";
 
 export interface CommunityPost {
@@ -32,14 +33,6 @@ export interface CommunityPost {
   likes: number;
   likedByMe?: boolean;
   createdAt: number;
-}
-
-function timeAgo(ts: number) {
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
 }
 
 function LikeButtonInner({ liked, count, onPress }: { liked: boolean; count: number; onPress: () => void }) {
@@ -111,14 +104,9 @@ export default function CommunityScreen() {
 
   useEffect(() => {
     (async () => {
-      try {
-        const res = await fetch(`${base}/friends/${playerId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setFriendIds(new Set(data.friends.map((f: { id: string }) => f.id)));
-          setSentIds(new Set(data.sent ?? []));
-        }
-      } catch {}
+      const { friendIds, sentIds } = await fetchFriendIdsAndSent(playerId);
+      setFriendIds(friendIds);
+      setSentIds(sentIds);
     })();
   }, []);
 
@@ -195,15 +183,13 @@ export default function CommunityScreen() {
 
   const openProfile = async (authorId: string | undefined, authorName: string) => {
     if (!authorId) return;
-    setPfModal({ visible: true, authorId, name: authorName, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
-    try {
-      await fetch(`${base}/friends/${encodeURIComponent(playerId)}`).then(async r => {
-        if (r.ok) { const d = await r.json(); setFriendIds(new Set(d.friends.map((f: { id: string }) => f.id))); setSentIds(new Set(d.sent ?? [])); }
-      });
-    } catch {}
+    setPfModal({ ...DEFAULT_MODAL_DATA, visible: true, authorId, name: authorName, loading: true });
+    const { friendIds: fIds, sentIds: sIds } = await fetchFriendIdsAndSent(playerId);
+    setFriendIds(fIds);
+    setSentIds(sIds);
     const data = await fetchProfileCached(authorId);
     if (data) {
-      setPfModal({ visible: true, authorId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
+      setPfModal({ ...DEFAULT_MODAL_DATA, visible: true, authorId, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
     } else {
       setPfModal(prev => ({ ...prev, authorId, loading: false }));
     }

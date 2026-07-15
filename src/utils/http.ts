@@ -55,3 +55,37 @@ export async function sendFriendRequest(
   } catch {}
   return { ok: false, status: "error" };
 }
+
+export async function fetchFriendIdsAndSent(
+  playerId: string,
+): Promise<{ friendIds: Set<string>; sentIds: Set<string> }> {
+  try {
+    const res = await fetch(`${getHttpBase()}/friends/${encodeURIComponent(playerId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        friendIds: new Set(data.friends.map((f: { id: string }) => f.id)),
+        sentIds: new Set(data.sent ?? []),
+      };
+    }
+  } catch {}
+  return { friendIds: new Set(), sentIds: new Set() };
+}
+
+export async function uploadMedia(
+  base64: string,
+  filename: string,
+): Promise<{ url: string } | null> {
+  try {
+    const res = await fetch(`${getHttpBase()}/upload`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base64, filename }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { url: data.url };
+    }
+  } catch {}
+  return null;
+}

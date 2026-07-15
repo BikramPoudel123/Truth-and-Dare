@@ -34,7 +34,7 @@ export interface ProfileContextType {
   toggleInterest: (i: Interest) => void;
   clearProfile: () => void;
   recordGameResult: () => void;
-  reactions: number;
+  reactions: Record<string, number>;
   playedSince: string;
   playerId: string;
 }
@@ -57,7 +57,7 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile>(DEFAULT);
   const [loaded, setLoaded] = useState(false);
-  const [reactions, setReactions] = useState(0);
+  const [reactions, setReactions] = useState<Record<string, number>>({});
   const [playedSince, setPlayedSince] = useState("");
   const playerIdRef = useRef(
     `pid-${Math.random().toString(36).slice(2)}-${Date.now()}`,
@@ -115,11 +115,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       .then((r) => r.json())
       .then((data) => {
         if (data.reactions) {
-          const total = Object.values(data.reactions).reduce(
-            (sum: number, c: any) => sum + (typeof c === "number" ? c : 0),
-            0,
-          );
-          setReactions(total);
+          setReactions(data.reactions);
         }
       })
       .catch(() => {});

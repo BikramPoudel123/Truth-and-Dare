@@ -1,7 +1,7 @@
 import { createAudioPlayer } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Image } from "expo-image";
 import {
     Dimensions,
@@ -11,7 +11,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { Play, Search, X } from "lucide-react-native";
+import { Pause, Play, Search, X } from "lucide-react-native";
 import {
     Gesture,
     GestureDetector,
@@ -43,6 +43,12 @@ const sizeDimensions = {
 // On web, create a Blob URL from base64. On native, try a temp file first.
 // If either path fails, fall back to a data URI so the UI stays usable.
 async function base64ToFileUri(data: string, ext: string): Promise<string> {
+  if (!data) return "";
+
+  if (data.startsWith("http://") || data.startsWith("https://") || data.startsWith("file://") || data.startsWith("data:")) {
+    return data;
+  }
+
   const base64 = data.includes(",") ? data.split(",")[1] : data;
   if (!base64) return "";
 
@@ -188,25 +194,57 @@ function VideoPlayer({ data, style }: { data: string; style: any }) {
   );
 }
 
-function AudioPlayer({ data, dims }: { data: string; dims: { width: number; height: number } }) {
+const WAVEFORM_BARS = 28;
+
+function seededRandom(index: number): number {
+  const x = Math.sin(index * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function formatAudioTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function AudioPlayer({ data }: { data: string }) {
   const [fileUri, setFileUri] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const playerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
+
+  const barHeights = useMemo(
+    () => Array.from({ length: WAVEFORM_BARS }, (_, i) => 0.25 + seededRandom(i) * 0.75),
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
     base64ToFileUri(data, "m4a")
-      .then((uri) => { if (!cancelled) setFileUri(uri || null); })
-      .catch(() => { if (!cancelled) setFileUri(null); });
-    return () => { cancelled = true; playerRef.current?.remove(); };
+      .then((uri) => {
+        if (!cancelled) setFileUri(uri || null);
+      })
+      .catch(() => {
+        if (!cancelled) setFileUri(null);
+      });
+    return () => {
+      cancelled = true;
+      playerRef.current?.remove();
+    };
   }, [data]);
 
   useEffect(() => {
     const player = playerRef.current;
     if (!player || !playing) return;
     const id = setInterval(() => {
-      if (!player.playing) setPlaying(false);
-    }, 200);
+      if (player.playing) {
+        setCurrentTime(player.currentTime);
+      } else {
+        setPlaying(false);
+        setCurrentTime(0);
+      }
+    }, 100);
     return () => clearInterval(id);
   }, [playing]);
 
@@ -225,14 +263,46 @@ function AudioPlayer({ data, dims }: { data: string; dims: { width: number; heig
     }
     const newPlayer = createAudioPlayer({ uri: fileUri });
     playerRef.current = newPlayer;
+    setDuration(newPlayer.duration || 0);
+    setTimeout(() => {
+      if (newPlayer.duration > 0) setDuration(newPlayer.duration);
+    }, 300);
     newPlayer.play();
     setPlaying(true);
   };
 
+  const progress = duration > 0 ? Math.min(currentTime / duration, 1) : 0;
+  const activeBarIndex = Math.floor(progress * WAVEFORM_BARS);
+
   return (
-    <TouchableOpacity onPress={togglePlay} activeOpacity={0.7} style={[dims, { alignItems: "center", justifyContent: "center", backgroundColor: "#1f2937", borderRadius: 8 }]}>
-      <Play size={24} color={playing ? "#a855f7" : "#fff"} />
-    </TouchableOpacity>
+    <View style={audioStyles.container}>
+      <TouchableOpacity onPress={togglePlay} style={audioStyles.playBtn} activeOpacity={0.7}>
+        {playing ? (
+          <Pause size={16} color="#fff" fill="#fff" />
+        ) : (
+          <Play size={16} color="#fff" fill="#fff" />
+        )}
+      </TouchableOpacity>
+
+      <View style={audioStyles.waveform}>
+        {barHeights.map((h, i) => (
+          <View
+            key={i}
+            style={[
+              audioStyles.bar,
+              {
+                height: `${h * 100}%`,
+                backgroundColor: i <= activeBarIndex ? "#a855f7" : "rgba(161, 155, 179, 0.3)",
+              },
+            ]}
+          />
+        ))}
+      </View>
+
+      <Text style={audioStyles.time}>
+        {formatAudioTime(duration > 0 ? duration - currentTime : 0)}
+      </Text>
+    </View>
   );
 }
 
@@ -303,7 +373,7 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
   }
 
   if (media.type === "audio") {
-    return <AudioPlayer data={media.data} dims={{ width: dims.width as number, height: dims.height as number }} />;
+    return <AudioPlayer data={media.data} />;
   }
 
   return null;
@@ -368,5 +438,46 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: "center",
     justifyContent: "center",
+  },
+});
+
+const audioStyles = StyleSheet.create({
+  container: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(23, 19, 50, 0.85)",
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+  },
+  playBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#8338ec",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  waveform: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    height: 32,
+  },
+  bar: {
+    width: 3,
+    borderRadius: 1.5,
+  },
+  time: {
+    color: "#a19bb3",
+    fontSize: 12,
+    fontWeight: "600",
+    minWidth: 32,
+    textAlign: "right",
   },
 });
