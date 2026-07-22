@@ -1,13 +1,27 @@
+require("dotenv").config();
 const express = require("express");
+const cors = require("cors");
+const rateLimit = require("express-rate-limit");
 const http = require("http");
 const WebSocket = require("ws");
 const { createClient } = require("redis");
 const fs = require("fs");
 const path = require("path");
+const pino = require("pino");
 
+// ─── Logger ──────────────────────────────────────────────────────────────────
+const logger = pino({
+  level: process.env.LOG_LEVEL || "info",
+  transport: process.env.NODE_ENV !== "production"
+    ? { target: "pino-pretty", options: { colorize: true } }
+    : undefined,
+});
+
+// ─── Config ──────────────────────────────────────────────────────────────────
 const HOST = process.env.SERVER_HOST || "0.0.0.0";
 const PORT = Number(process.env.SERVER_PORT || 5000);
 const SOCKET_PATH = process.env.SOCKET_PATH || "/";
+const NODE_ENV = process.env.NODE_ENV || "development";
 
 const REDIS_CONFIG = {
   host: process.env.REDIS_HOST || "127.0.0.1",
@@ -18,161 +32,135 @@ const REDIS_CONFIG = {
   tls: process.env.REDIS_TLS === "true",
 };
 
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+
+// ─── Express + HTTP + WebSocket ──────────────────────────────────────────────
 const app = express();
+app.use(cors({ origin: CORS_ORIGIN.split(",").map(s => s.trim()), credentials: true }));
 app.use(express.json({ limit: "10mb" }));
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: SOCKET_PATH });
 
-// Ping all clients every 30 seconds to keep connections alive
+// ─── Rate Limiting ──────────────────────────────────────────────────────────
+const RATE_WINDOW = Number(process.env.RATE_LIMIT_WINDOW_MS || 60000);
+const RATE_MAX = Number(process.env.RATE_LIMIT_MAX_REQUESTS || 60);
+
+const uploadLimiter = rateLimit({
+  windowMs: RATE_WINDOW,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many uploads, try again later" },
+});
+
+const apiLimiter = rateLimit({
+  windowMs: RATE_WINDOW,
+  max: RATE_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, try again later" },
+});
+
+const communityLimiter = rateLimit({
+  windowMs: RATE_WINDOW,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many posts, try again later" },
+});
+
+// ─── Heartbeat ──────────────────────────────────────────────────────────────
 const HEARTBEAT_INTERVAL = 30000;
+const HEARTBEAT_TIMEOUT = 10000;
 const heartbeatTimer = setInterval(() => {
   for (const ws of wss.clients) {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.ping();
+    if (ws.isAlive === false) {
+      logger.warn("Terminating dead WebSocket connection");
+      ws.terminate();
+      continue;
     }
+    ws.isAlive = false;
+    if (ws.readyState === WebSocket.OPEN) ws.ping();
   }
 }, HEARTBEAT_INTERVAL);
 
-// ─── Upload directory ──────────────────────────────────────────────────────────
+// ─── Uploads ────────────────────────────────────────────────────────────────
 const UPLOADS_DIR = path.join(__dirname, "uploads");
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-const PROFILE_DB_PATH = path.join(__dirname, "profiles.json");
-
-// ─── Profile persistence ─────────────────────────────────────────────────────
-function saveProfiles() {
-  try {
-    const obj = {};
-    for (const [k, v] of profileStore) {
-      obj[k] = v;
-    }
-    fs.writeFileSync(PROFILE_DB_PATH, JSON.stringify(obj, null, 2));
-  } catch (e) {
-    console.error("saveProfiles error:", e.message);
-  }
-}
-
-function loadProfiles() {
-  try {
-    if (fs.existsSync(PROFILE_DB_PATH)) {
-      const raw = fs.readFileSync(PROFILE_DB_PATH, "utf-8");
-      const obj = JSON.parse(raw);
-      for (const [k, v] of Object.entries(obj)) {
-        profileStore.set(k, v);
-      }
-      console.log(`✓ Loaded ${Object.keys(obj).length} profiles from disk`);
-    }
-  } catch (e) {
-    console.warn("loadProfiles error:", e.message);
-  }
-}
-
-// ─── Redis Client ────────────────────────────────────────────────────────────
+// ─── Redis Client ───────────────────────────────────────────────────────────
 const redisClient = createClient({
   socket: {
     host: REDIS_CONFIG.host,
     port: REDIS_CONFIG.port,
     tls: REDIS_CONFIG.tls || false,
+    reconnectStrategy: (retries) => {
+      if (retries > 10) { logger.error("Redis: max retries reached"); return new Error("Max retries"); }
+      return Math.min(retries * 200, 5000);
+    },
   },
   username: REDIS_CONFIG.username,
   password: REDIS_CONFIG.password,
   database: REDIS_CONFIG.database,
 });
 
-redisClient.on("error", (err) => console.error("Redis error:", err));
+redisClient.on("error", (err) => logger.error({ err }, "Redis error"));
+redisClient.on("reconnecting", () => logger.warn("Redis reconnecting..."));
 
 let redisReady = false;
-redisClient
-  .connect()
-  .then(() => {
-    redisReady = true;
-    console.log("✓ Redis connected");
-  })
-  .catch((err) => {
-    console.warn("⚠️ Redis connection failed:", err.message);
-  });
+redisClient.connect()
+  .then(() => { redisReady = true; logger.info("Redis connected"); })
+  .catch((err) => logger.warn({ err }, "Redis connection failed — using in-memory fallback"));
 
-console.log("Server config:", {
-  host: HOST,
-  port: PORT,
-  socketPath: SOCKET_PATH,
-  redis: { host: REDIS_CONFIG.host, port: REDIS_CONFIG.port },
-});
-
-// ─── In-memory: only WebSocket connections (cannot be stored in Redis) ───────
-const playerSockets = new Map(); // playerId → WebSocket
-const profileStore = new Map(); // playerId → { name, bio, pic, interests }
-loadProfiles();
-const friendStore = new Map(); // playerId → Set<friendId>
-const friendReqStore = new Map(); // requestId → { id, from, to, fromName, fromPic, status, createdAt }
-const notificationStore = new Map(); // playerId → Notification[]
+// ─── In-Memory Stores ──────────────────────────────────────────────────────
+const playerSockets = new Map();
 const memStore = {
-  rooms: new Map(), // roomId → JSON string
-  openRooms: new Set(), // roomId
-  communityPosts: [], // array of post objects
+  rooms: new Map(),
+  openRooms: new Set(),
+  communityPosts: [],
+  profiles: new Map(),
+  friends: new Map(),
+  friendReqs: new Map(),
+  notifications: new Map(),
 };
 
-// ─── Redis helpers ────────────────────────────────────────────────────────────
-
-function getPlayerLevel(playerId) {
-  const data = profileStore.get(playerId);
-  return data ? Math.floor((data.gamesPlayed ?? 0) / 10) + 1 : 1;
-}
-
-// Key conventions:
-//   room:<ID>        → JSON string of the full room object
-//   rooms:open       → Redis Set of room IDs that are waiting (1 player)
-
+// ─── Redis Helpers ──────────────────────────────────────────────────────────
 async function getRoom(roomId) {
   if (!redisReady) {
-    const data = memStore.rooms.get(roomId);
-    return data ? JSON.parse(data) : null;
+    const d = memStore.rooms.get(roomId);
+    return d ? JSON.parse(d) : null;
   }
-  const data = await redisClient.get(`room:${roomId}`);
-  return data ? JSON.parse(data) : null;
+  const d = await redisClient.get(`room:${roomId}`);
+  return d ? JSON.parse(d) : null;
 }
 
 async function saveRoom(room) {
   if (!redisReady) {
     memStore.rooms.set(room.room_id, JSON.stringify(room));
-    console.log(`  💾 In-memory saved room:${room.room_id}`);
     return;
   }
-  // Expire rooms after 2 hours of inactivity
-  await redisClient.set(`room:${room.room_id}`, JSON.stringify(room), {
-    EX: 7200,
-  });
-  console.log(`  💾 Redis saved room:${room.room_id}`);
+  await redisClient.set(`room:${room.room_id}`, JSON.stringify(room), { EX: 7200 });
 }
 
 async function deleteRoom(roomId) {
   if (!redisReady) {
     memStore.rooms.delete(roomId);
     memStore.openRooms.delete(roomId);
-    console.log(`  🗑  In-memory deleted room:${roomId}`);
     return;
   }
   await redisClient.del(`room:${roomId}`);
   await redisClient.sRem("rooms:open", roomId);
-  console.log(`  🗑  Redis deleted room:${roomId}`);
 }
 
 async function markRoomOpen(roomId) {
-  if (!redisReady) {
-    memStore.openRooms.add(roomId);
-    return;
-  }
+  if (!redisReady) { memStore.openRooms.add(roomId); return; }
   await redisClient.sAdd("rooms:open", roomId);
 }
 
 async function markRoomClosed(roomId) {
-  if (!redisReady) {
-    memStore.openRooms.delete(roomId);
-    return;
-  }
+  if (!redisReady) { memStore.openRooms.delete(roomId); return; }
   await redisClient.sRem("rooms:open", roomId);
 }
 
@@ -181,53 +169,242 @@ async function findAvailableRoom(interests = []) {
     ? Array.from(memStore.openRooms)
     : await redisClient.sMembers("rooms:open");
 
-  // Separate into interest-matched and unmatched
-  let matched = [];
-  let unmatched = [];
-
+  let matched = [], unmatched = [];
   for (const id of openIds) {
     const room = await getRoom(id);
-    if (!room) {
-      await markRoomClosed(id);
-      continue;
-    }
-    if (room.is_private) {
-      continue;
-    }
-    if (room.players.length >= 2 || room.phase !== "waiting") {
+    if (!room || room.is_private || room.players.length >= 2 || room.phase !== "waiting") {
       await markRoomClosed(id);
       continue;
     }
     const creator = room.players[0];
-    const creatorInterests = creator.interests ?? [];
-    const hasMatch = interests.length > 0 && creatorInterests.length > 0 &&
-      interests.some(i => creatorInterests.includes(i));
-    if (hasMatch) matched.push(room);
-    else unmatched.push(room);
+    const ci = creator.interests ?? [];
+    const hasMatch = interests.length > 0 && ci.length > 0 && interests.some(i => ci.includes(i));
+    if (hasMatch) matched.push(room); else unmatched.push(room);
   }
+  return matched[0] || unmatched[0] || null;
+}
 
-  // Prefer interest-matched rooms first
-  if (matched.length > 0) return matched[0];
-  if (unmatched.length > 0) return unmatched[0];
+// ─── Profile Helpers (Redis-backed) ─────────────────────────────────────────
+async function getProfile(playerId) {
+  if (!redisReady) return memStore.profiles.get(playerId) || null;
+  const d = await redisClient.get(`profile:${playerId}`);
+  return d ? JSON.parse(d) : null;
+}
+
+async function saveProfile(playerId, data) {
+  if (!redisReady) { memStore.profiles.set(playerId, data); return; }
+  await redisClient.set(`profile:${playerId}`, JSON.stringify(data));
+}
+
+// ─── Friend Helpers (Redis-backed) ──────────────────────────────────────────
+async function getFriendIds(playerId) {
+  if (!redisReady) return memStore.friends.get(playerId) || new Set();
+  const ids = await redisClient.sMembers(`friends:${playerId}`);
+  return new Set(ids);
+}
+
+async function addFriendPair(a, b) {
+  if (!redisReady) {
+    if (!memStore.friends.has(a)) memStore.friends.set(a, new Set());
+    if (!memStore.friends.has(b)) memStore.friends.set(b, new Set());
+    memStore.friends.get(a).add(b);
+    memStore.friends.get(b).add(a);
+    return;
+  }
+  await redisClient.sAdd(`friends:${a}`, b);
+  await redisClient.sAdd(`friends:${b}`, a);
+}
+
+async function removeFriendPair(a, b) {
+  if (!redisReady) {
+    memStore.friends.get(a)?.delete(b);
+    memStore.friends.get(b)?.delete(a);
+    return;
+  }
+  await redisClient.sRem(`friends:${a}`, b);
+  await redisClient.sRem(`friends:${b}`, a);
+}
+
+async function areFriends(a, b) {
+  const fa = await getFriendIds(a);
+  return fa.has(b);
+}
+
+// ─── Friend Request Helpers (Redis-backed) ──────────────────────────────────
+async function saveFriendReq(requestId, data) {
+  if (!redisReady) { memStore.friendReqs.set(requestId, data); return; }
+  await redisClient.hSet(`friendreq:${requestId}`, Object.fromEntries(
+    Object.entries(data).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v ?? "")])
+  ));
+}
+
+async function getFriendReq(requestId) {
+  if (!redisReady) return memStore.friendReqs.get(requestId) || null;
+  const d = await redisClient.hGetAll(`friendreq:${requestId}`);
+  if (!d || !d.id) return null;
+  return { ...d, createdAt: Number(d.createdAt || 0) };
+}
+
+async function updateFriendReq(requestId, updates) {
+  if (!redisReady) {
+    const r = memStore.friendReqs.get(requestId);
+    if (r) Object.assign(r, updates);
+    return;
+  }
+  const entries = Object.entries(updates).map(([k, v]) => [k, String(v ?? "")]);
+  await redisClient.hSet(`friendreq:${requestId}`, entries);
+}
+
+async function findFriendReq(fromId, toId) {
+  if (!redisReady) {
+    for (const [, r] of memStore.friendReqs) {
+      if (r.from === fromId && r.to === toId && r.status === "pending") return r;
+    }
+    return null;
+  }
+  let cursor = "0";
+  do {
+    const result = await redisClient.scan(cursor, { MATCH: "friendreq:*", COUNT: 100 });
+    cursor = String(result.cursor);
+    for (const key of result.keys) {
+      const d = await redisClient.hGetAll(key);
+      if (d.from === fromId && d.to === toId && d.status === "pending") {
+        return { ...d, createdAt: Number(d.createdAt || 0) };
+      }
+    }
+  } while (cursor !== "0");
   return null;
 }
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
+async function findMutualFriendReq(fromId, toId) {
+  if (!redisReady) {
+    for (const [, r] of memStore.friendReqs) {
+      if (r.from === toId && r.to === fromId && r.status === "pending") return r;
+    }
+    return null;
+  }
+  let cursor = "0";
+  do {
+    const result = await redisClient.scan(cursor, { MATCH: "friendreq:*", COUNT: 100 });
+    cursor = String(result.cursor);
+    for (const key of result.keys) {
+      const d = await redisClient.hGetAll(key);
+      if (d.from === toId && d.to === fromId && d.status === "pending") {
+        return { ...d, createdAt: Number(d.createdAt || 0) };
+      }
+    }
+  } while (cursor !== "0");
+  return null;
+}
 
+async function getFriendReqsForPlayer(playerId) {
+  const results = [];
+  if (!redisReady) {
+    for (const [, r] of memStore.friendReqs) {
+      if (r.status === "pending" && r.to === playerId) results.push(r);
+    }
+    return results;
+  }
+  let cursor = "0";
+  do {
+    const result = await redisClient.scan(cursor, { MATCH: "friendreq:*", COUNT: 100 });
+    cursor = String(result.cursor);
+    for (const key of result.keys) {
+      const d = await redisClient.hGetAll(key);
+      if (d.status === "pending" && d.to === playerId) {
+        results.push({ ...d, createdAt: Number(d.createdAt || 0) });
+      }
+    }
+  } while (cursor !== "0");
+  return results;
+}
+
+async function getSentFriendReqs(playerId) {
+  const results = [];
+  if (!redisReady) {
+    for (const [, r] of memStore.friendReqs) {
+      if (r.status === "pending" && r.from === playerId) results.push(r.to);
+    }
+    return results;
+  }
+  let cursor = "0";
+  do {
+    const result = await redisClient.scan(cursor, { MATCH: "friendreq:*", COUNT: 100 });
+    cursor = String(result.cursor);
+    for (const key of result.keys) {
+      const d = await redisClient.hGetAll(key);
+      if (d.status === "pending" && d.from === playerId) results.push(d.to);
+    }
+  } while (cursor !== "0");
+  return results;
+}
+
+// ─── Notification Helpers (Redis-backed) ────────────────────────────────────
+async function pushNotification(playerId, notification) {
+  const notifJson = JSON.stringify(notification);
+  if (!redisReady) {
+    const list = memStore.notifications.get(playerId) || [];
+    list.unshift(notification);
+    memStore.notifications.set(playerId, list);
+  } else {
+    await redisClient.lPush(`notif:${playerId}`, notifJson);
+    await redisClient.lTrim(`notif:${playerId}`, 0, 99);
+  }
+  const ws = playerSockets.get(playerId);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "new_notification", notification }));
+  }
+}
+
+async function getNotifications(playerId) {
+  if (!redisReady) return memStore.notifications.get(playerId) || [];
+  const list = await redisClient.lRange(`notif:${playerId}`, 0, -1);
+  return list.map(j => JSON.parse(j));
+}
+
+async function markNotificationsRead(playerId) {
+  if (!redisReady) {
+    const list = memStore.notifications.get(playerId);
+    if (list) list.forEach(n => { n.read = true; });
+    return;
+  }
+  const list = await redisClient.lRange(`notif:${playerId}`, 0, -1);
+  const pipeline = redisClient.multi();
+  await redisClient.del(`notif:${playerId}`);
+  for (const j of list) {
+    const n = JSON.parse(j);
+    n.read = true;
+    await redisClient.lPush(`notif:${playerId}`, JSON.stringify(n));
+  }
+}
+
+function createNotification(toId, fromId, fromName, fromPic, type, message) {
+  pushNotification(toId, {
+    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    type, from: fromId, fromName, fromPic: fromPic ?? null,
+    message, read: false, createdAt: Date.now(),
+  });
+}
+
+// ─── Utilities ──────────────────────────────────────────────────────────────
 function generateRoomId() {
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   let id = "";
-  for (let i = 0; i < 3; i++) {
-    id += letters.charAt(Math.floor(Math.random() * letters.length));
-  }
+  for (let i = 0; i < 4; i++) id += letters.charAt(Math.floor(Math.random() * letters.length));
   return id;
 }
 
 async function createRoom(creator = null, isPrivate = false) {
+  const MAX_RETRIES = 20;
   let roomId = generateRoomId();
-  // Ensure unique (check Redis)
-  while (await redisClient.exists(`room:${roomId}`)) {
+  let retries = 0;
+  while (await getRoom(roomId) && retries < MAX_RETRIES) {
     roomId = generateRoomId();
+    retries++;
+  }
+  if (retries >= MAX_RETRIES) {
+    logger.error("Failed to generate unique room ID after max retries");
+    return null;
   }
 
   const gameState = {
@@ -245,38 +422,30 @@ async function createRoom(creator = null, isPrivate = false) {
   };
 
   await saveRoom(gameState);
-  if (!isPrivate) {
-    await markRoomOpen(roomId);
-  }
+  if (!isPrivate) await markRoomOpen(roomId);
 
-  const total = await redisClient.dbSize();
-  console.log(`✓ Room Created: ${roomId} | Redis keys: ${total}${isPrivate ? " [private]" : ""}`);
+  logger.info({ roomId, private: isPrivate }, "Room created");
   return roomId;
 }
 
 function broadcastToRoom(room, message) {
+  const msg = JSON.stringify(message);
   room.players.forEach((player) => {
     const ws = playerSockets.get(player.id);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(message));
-    }
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(msg);
   });
 }
 
 function sendToPlayer(playerId, message) {
   const ws = playerSockets.get(playerId);
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(message));
-  }
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
 }
 
 function broadcastOnlineCount() {
   const count = playerSockets.size;
-  const message = JSON.stringify({ type: "players_online", count });
+  const msg = JSON.stringify({ type: "players_online", count });
   for (const ws of playerSockets.values()) {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(message);
-    }
+    if (ws.readyState === WebSocket.OPEN) ws.send(msg);
   }
 }
 
@@ -287,547 +456,559 @@ function normalizeMediaData(mediaData) {
 }
 
 function normalizeMediaList(mediaList = []) {
-  return mediaList.map((item) => ({
-    ...item,
-    media_data: normalizeMediaData(item.media_data),
-  }));
+  return mediaList.map((item) => ({ ...item, media_data: normalizeMediaData(item.media_data) }));
 }
 
-// ─── Notifications & Friends helpers ──────────────────────────────────────────
-
-function pushNotification(playerId, notification) {
-  const list = notificationStore.get(playerId) || [];
-  list.unshift(notification);
-  notificationStore.set(playerId, list);
-  const ws = playerSockets.get(playerId);
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "new_notification", notification }));
-  }
+function getPlayStyle(reactions = {}) {
+  const entries = Object.entries(reactions).filter(([, c]) => c > 0);
+  if (entries.length === 0) return "Rising Star";
+  const top = entries.sort(([, a], [, b]) => b - a)[0][0];
+  const map = { "🔥": "Hot Player", "😂": "Funny Player", "😍": "Heartthrob", "😮": "Shocking Player", "💀": "Savage Player", "😢": "Emotional Player", "🎉": "Life of the Party", "👏": "Respected Player" };
+  return map[top] ?? "Rising Star";
 }
 
-function createNotification(toId, fromId, fromName, fromPic, type, message) {
-  pushNotification(toId, {
-    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    type,
-    from: fromId,
-    fromName,
-    fromPic: fromPic ?? null,
-    message,
-    read: false,
-    createdAt: Date.now(),
+function sanitizeString(val, maxLen) {
+  return String(val || "").slice(0, maxLen);
+}
+
+// ─── Health Check ───────────────────────────────────────────────────────────
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    redis: redisReady ? "connected" : "disconnected",
+    playersOnline: playerSockets.size,
+    env: NODE_ENV,
   });
+});
+
+// ─── HTTP API ───────────────────────────────────────────────────────────────
+
+app.post("/profile/update", apiLimiter, async (req, res) => {
+  try {
+    const { player_id, name } = req.body;
+    if (!player_id || !name) return res.status(400).json({ error: "Missing player_id or name" });
+    const cleanName = sanitizeString(name, 30);
+    const posts = await getCommunityPosts();
+    let updated = false;
+    const newPosts = posts.map(p => {
+      if (p.author_id === player_id && p.author !== cleanName) { updated = true; return { ...p, author: cleanName }; }
+      return p;
+    });
+    if (updated) await saveCommunityPosts(newPosts);
+    res.json({ ok: true });
+  } catch (e) {
+    logger.error({ err: e }, "POST /profile/update error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/profile/sync", apiLimiter, async (req, res) => {
+  try {
+    const { player_id, name, bio, pic, interests, played_since, gamesPlayed } = req.body;
+    if (!player_id) return res.status(400).json({ error: "Missing player_id" });
+    const existing = (await getProfile(player_id)) || {};
+    if (name !== undefined) existing.name = sanitizeString(name, 30);
+    if (bio !== undefined) existing.bio = sanitizeString(bio, 80);
+    if (pic !== undefined) existing.pic = pic;
+    if (interests !== undefined) existing.interests = interests;
+    if (played_since !== undefined) existing.played_since = played_since;
+    if (gamesPlayed !== undefined) existing.gamesPlayed = gamesPlayed;
+    await saveProfile(player_id, existing);
+    const reactionCount = existing.reactions ? Object.values(existing.reactions).reduce((s, c) => s + c, 0) : 0;
+    res.json({ ok: true, reactions: existing.reactions ?? {}, reactionCount, played_since: existing.played_since ?? null, gamesPlayed: existing.gamesPlayed ?? 0 });
+  } catch (e) {
+    logger.error({ err: e }, "POST /profile/sync error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/profile/:player_id", apiLimiter, async (req, res) => {
+  try {
+    const { player_id } = req.params;
+    const data = await getProfile(player_id);
+    if (!data) return res.status(404).json({ error: "Profile not found" });
+    const reactions = data.reactions ?? {};
+    const reactionCount = Object.values(reactions).reduce((s, c) => s + c, 0);
+    const gamesPlayed = data.gamesPlayed ?? 0;
+    res.json({
+      name: data.name ?? "Unknown", bio: data.bio ?? "", pic: data.pic ?? null,
+      interests: data.interests ?? [], reactions, reactionCount,
+      played_since: data.played_since ?? null, playStyle: getPlayStyle(data.reactions),
+      gamesPlayed, level: Math.max(1, Math.floor(gamesPlayed / 10) + 1),
+    });
+  } catch (e) {
+    logger.error({ err: e }, "GET /profile/:player_id error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/upload", uploadLimiter, (req, res) => {
+  try {
+    const { base64, filename } = req.body;
+    if (!base64 || !filename) return res.status(400).json({ error: "Missing base64 or filename" });
+
+    let ext = "jpg", buffer;
+    if (base64.startsWith("data:")) {
+      const matches = base64.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+      if (!matches) return res.status(400).json({ error: "Invalid base64 image" });
+      ext = matches[1] === "jpeg" ? "jpg" : matches[1];
+      buffer = Buffer.from(matches[2], "base64");
+    } else {
+      buffer = Buffer.from(base64, "base64");
+    }
+
+    if (buffer.length > 10 * 1024 * 1024) return res.status(413).json({ error: "File too large (max 10MB)" });
+
+    const safeName = `${filename.replace(/[^a-zA-Z0-9_-]/g, "")}-${Date.now()}.${ext}`;
+    fs.writeFile(path.join(UPLOADS_DIR, safeName), buffer, (err) => {
+      if (err) { logger.error({ err }, "Upload write error"); return res.status(500).json({ error: "Failed to save file" }); }
+      res.json({ url: `/uploads/${safeName}` });
+    });
+  } catch (e) {
+    logger.error({ err: e }, "POST /upload error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Community ──────────────────────────────────────────────────────────────
+const POSTS_KEY = "community:posts";
+const POSTS_MAX = 200;
+
+async function getCommunityPosts() {
+  if (!redisReady) return memStore.communityPosts;
+  const d = await redisClient.get(POSTS_KEY);
+  return d ? JSON.parse(d) : [];
 }
 
-function getFriendIds(playerId) {
-  return friendStore.get(playerId) || new Set();
+async function saveCommunityPosts(posts) {
+  if (!redisReady) { memStore.communityPosts = posts; return; }
+  await redisClient.set(POSTS_KEY, JSON.stringify(posts));
 }
 
-function areFriends(a, b) {
-  return getFriendIds(a).has(b) && getFriendIds(b).has(a);
-}
+app.get("/community/posts", apiLimiter, async (req, res) => {
+  try {
+    const { player_id } = req.query;
+    const posts = await getCommunityPosts();
+    const mapped = [];
+    for (const p of posts) {
+      const authorProfile = await getProfile(p.author_id);
+      mapped.push({ ...p, likedByMe: player_id ? (p.liked_by || []).includes(player_id) : false, profilePic: authorProfile?.pic ?? null });
+    }
+    res.json({ posts: mapped });
+  } catch (e) {
+    logger.error({ err: e }, "GET /community/posts error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
-function addFriendPair(a, b) {
-  if (!friendStore.has(a)) friendStore.set(a, new Set());
-  if (!friendStore.has(b)) friendStore.set(b, new Set());
-  friendStore.get(a).add(b);
-  friendStore.get(b).add(a);
-}
+app.post("/community/posts", communityLimiter, async (req, res) => {
+  try {
+    const { author, type, text, author_id } = req.body;
+    if (!author || !text || !["truth", "dare"].includes(type)) return res.status(400).json({ error: "Invalid post data" });
+    const authorProfile = await getProfile(author_id);
+    const post = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      author: sanitizeString(author, 30),
+      author_id: sanitizeString(author_id, 40),
+      type, text: sanitizeString(text, 300),
+      likes: 0, liked_by: [], createdAt: Date.now(),
+      profilePic: authorProfile?.pic ?? null,
+    };
+    const posts = await getCommunityPosts();
+    posts.unshift(post);
+    if (posts.length > POSTS_MAX) posts.length = POSTS_MAX;
+    await saveCommunityPosts(posts);
+    res.json({ post });
+  } catch (e) {
+    logger.error({ err: e }, "POST /community/posts error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
-// ─── WebSocket handler ────────────────────────────────────────────────────────
+app.post("/community/posts/:id/like", apiLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { player_id } = req.body;
+    if (!player_id) return res.status(400).json({ error: "Missing player_id" });
+    const posts = await getCommunityPosts();
+    const post = posts.find(p => p.id === id);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    if (!post.liked_by) post.liked_by = [];
+    const idx = post.liked_by.indexOf(player_id);
+    if (idx === -1) { post.liked_by.push(player_id); post.likes = (post.likes ?? 0) + 1; }
+    else { post.liked_by.splice(idx, 1); post.likes = Math.max(0, (post.likes ?? 0) - 1); }
+    await saveCommunityPosts(posts);
+    res.json({ likes: post.likes, likedByMe: idx === -1 });
+  } catch (e) {
+    logger.error({ err: e }, "POST /community/posts/:id/like error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
+// ─── Players Search ─────────────────────────────────────────────────────────
+app.get("/players/search", apiLimiter, async (req, res) => {
+  try {
+    const { query, player_id } = req.query;
+    if (!query || !player_id) return res.status(400).json({ error: "Missing required params" });
+    const q = query.toLowerCase();
+    const myFriends = await getFriendIds(player_id);
+    const mySent = await getSentFriendReqs(player_id);
+    const results = [];
+
+    if (!redisReady) {
+      for (const [pid, p] of memStore.profiles) {
+        if (pid === player_id || !p?.name?.toLowerCase().includes(q)) continue;
+        results.push({ id: pid, name: p.name, pic: p.pic ?? null, isFriend: myFriends.has(pid), requestSent: mySent.includes(pid) });
+        if (results.length >= 20) break;
+      }
+    } else {
+      let cursor = "0";
+      do {
+        const r = await redisClient.scan(cursor, { MATCH: "profile:*", COUNT: 100 });
+        cursor = String(r.cursor);
+        for (const key of r.keys) {
+          const pid = key.replace("profile:", "");
+          if (pid === player_id) continue;
+          const p = JSON.parse(await redisClient.get(key));
+          if (!p?.name?.toLowerCase().includes(q)) continue;
+          results.push({ id: pid, name: p.name, pic: p.pic ?? null, isFriend: myFriends.has(pid), requestSent: mySent.includes(pid) });
+          if (results.length >= 20) break;
+        }
+      } while (cursor !== "0" && results.length < 20);
+    }
+    res.json({ results });
+  } catch (e) {
+    logger.error({ err: e }, "GET /players/search error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Friends ────────────────────────────────────────────────────────────────
+app.post("/friends/request", apiLimiter, async (req, res) => {
+  try {
+    const { from_id, from_name, from_pic, to_id } = req.body;
+    if (!from_id || !to_id || !from_name) return res.status(400).json({ error: "Missing required fields" });
+    if (from_id === to_id) return res.status(400).json({ error: "Cannot friend yourself" });
+    if (await areFriends(from_id, to_id)) return res.json({ ok: true, status: "already_friends" });
+
+    const existing = await findFriendReq(from_id, to_id);
+    if (existing) return res.json({ ok: true, status: "already_requested" });
+
+    const mutual = await findMutualFriendReq(from_id, to_id);
+    if (mutual) {
+      await updateFriendReq(mutual.id, { status: "accepted" });
+      await addFriendPair(from_id, to_id);
+      const toProfile = await getProfile(to_id);
+      createNotification(from_id, to_id, toProfile?.name ?? from_name, from_pic, "friend_request_accepted", `${toProfile?.name ?? from_name} accepted your friend request`);
+      createNotification(to_id, from_id, from_name, from_pic, "friend_request_accepted", `${from_name} accepted your friend request`);
+      return res.json({ ok: true, status: "mutual" });
+    }
+
+    const requestId = `freq-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    await saveFriendReq(requestId, { id: requestId, from: from_id, to: to_id, fromName: from_name, fromPic: from_pic ?? null, status: "pending", createdAt: Date.now() });
+    createNotification(to_id, from_id, from_name, from_pic, "friend_request", `${from_name} sent you a friend request`);
+    res.json({ ok: true, status: "sent" });
+  } catch (e) {
+    logger.error({ err: e }, "POST /friends/request error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/friends/accept", apiLimiter, async (req, res) => {
+  try {
+    const { request_id, actor_id } = req.body;
+    const request = await getFriendReq(request_id);
+    if (!request || request.to !== actor_id || request.status !== "pending") return res.status(400).json({ error: "Invalid request" });
+    await updateFriendReq(request_id, { status: "accepted" });
+    await addFriendPair(request.from, request.to);
+    const requesterProfile = await getProfile(request.from);
+    createNotification(request.from, request.to, requesterProfile?.name ?? request.fromName, null, "friend_request_accepted", `${requesterProfile?.name ?? request.fromName} accepted your friend request`);
+    res.json({ ok: true });
+  } catch (e) {
+    logger.error({ err: e }, "POST /friends/accept error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/friends/reject", apiLimiter, async (req, res) => {
+  try {
+    const { request_id, actor_id } = req.body;
+    const request = await getFriendReq(request_id);
+    if (!request || request.to !== actor_id || request.status !== "pending") return res.status(400).json({ error: "Invalid request" });
+    await updateFriendReq(request_id, { status: "rejected" });
+    createNotification(request.from, request.to, request.fromName, null, "friend_request_rejected", `${request.fromName} declined your friend request`);
+    res.json({ ok: true });
+  } catch (e) {
+    logger.error({ err: e }, "POST /friends/reject error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/friends/remove", apiLimiter, async (req, res) => {
+  try {
+    const { player_id, friend_id } = req.body;
+    if (!player_id || !friend_id) return res.status(400).json({ error: "Missing required fields" });
+    await removeFriendPair(player_id, friend_id);
+    res.json({ ok: true });
+  } catch (e) {
+    logger.error({ err: e }, "POST /friends/remove error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/friends/:player_id", apiLimiter, async (req, res) => {
+  try {
+    const { player_id } = req.params;
+    const friendIds = await getFriendIds(player_id);
+    const friends = [];
+    for (const fid of friendIds) {
+      const p = await getProfile(fid);
+      friends.push({ id: fid, name: p?.name ?? "Unknown", pic: p?.pic ?? null });
+    }
+    const requests = await getFriendReqsForPlayer(player_id);
+    const enriched = [];
+    for (const r of requests) {
+      const p = await getProfile(r.from);
+      enriched.push({ id: r.id, from: r.from, fromName: p?.name ?? r.fromName, fromPic: p?.pic ?? r.fromPic, createdAt: r.createdAt });
+    }
+    const sent = await getSentFriendReqs(player_id);
+    res.json({ friends, requests: enriched, sent });
+  } catch (e) {
+    logger.error({ err: e }, "GET /friends/:player_id error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── Notifications ──────────────────────────────────────────────────────────
+app.get("/notifications/:player_id", apiLimiter, async (req, res) => {
+  try {
+    const { player_id } = req.params;
+    const list = await getNotifications(player_id);
+    res.json({ notifications: list });
+  } catch (e) {
+    logger.error({ err: e }, "GET /notifications/:player_id error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/notifications/read", apiLimiter, async (req, res) => {
+  try {
+    const { player_id } = req.body;
+    if (player_id) await markNotificationsRead(player_id);
+    res.json({ ok: true });
+  } catch (e) {
+    logger.error({ err: e }, "POST /notifications/read error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ─── WebSocket Handler ──────────────────────────────────────────────────────
 wss.on("connection", (ws) => {
-  console.log("✓ Client Connected");
+  logger.info("Client connected");
+  ws.send(JSON.stringify({ type: "players_online", count: playerSockets.size }));
 
-  // Send current online count immediately
-  const count = playerSockets.size;
-  ws.send(JSON.stringify({ type: "players_online", count }));
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
 
   ws.on("message", async (data) => {
     try {
       const message = JSON.parse(data);
-      console.log("\n📨 Event:", message.type);
-
-      // Guard: all handlers need Redis
-      if (!redisReady) {
-        console.warn("  ⚠️ Redis not ready yet");
+      if (!redisReady && !["register"].includes(message.type)) {
+        logger.warn("Redis not ready, rejecting:", message.type);
         return;
       }
 
       switch (message.type) {
-        // ── REGISTER (just mark as online) ────────────────────────────────────
         case "register": {
           const { player_id } = message;
-          if (player_id) {
-            playerSockets.set(player_id, ws);
-            broadcastOnlineCount();
-          }
+          if (player_id) { playerSockets.set(player_id, ws); broadcastOnlineCount(); }
           break;
         }
 
-        // ── CREATE ROOM ──────────────────────────────────────────────────────
         case "create_room": {
           const { player_id, player_name, profile_pic } = message;
           playerSockets.set(player_id, ws);
           broadcastOnlineCount();
-          if (!player_name) {
-            sendToPlayer(player_id, {
-              type: "error",
-              message: "Player name is required",
-            });
-            break;
-          }
-
-          const roomId = await createRoom({
-            id: player_id,
-            name: player_name,
-            profile_pic: profile_pic ?? null,
-          }, true);
-          console.log(`  → Private Room ${roomId} created for ${player_name}`);
-
+          if (!player_name) { sendToPlayer(player_id, { type: "error", message: "Player name is required" }); break; }
+          const roomId = await createRoom({ id: player_id, name: sanitizeString(player_name, 30), profile_pic: profile_pic ?? null }, true);
+          if (!roomId) { sendToPlayer(player_id, { type: "error", message: "Failed to create room" }); break; }
+          const level = (await getProfile(player_id))?.gamesPlayed ?? 0;
           sendToPlayer(player_id, { type: "room_created", room_id: roomId });
-          sendToPlayer(player_id, {
-            type: "player_joined",
-            players: [
-              {
-                id: player_id,
-                name: player_name,
-                profile_pic: profile_pic ?? null,
-                level: getPlayerLevel(player_id),
-              },
-            ],
-          });
+          sendToPlayer(player_id, { type: "player_joined", players: [{ id: player_id, name: sanitizeString(player_name, 30), profile_pic: profile_pic ?? null, level: Math.floor(level / 10) + 1 }] });
           break;
         }
 
-        // ── AUTO JOIN ────────────────────────────────────────────────────────
         case "auto_join": {
           const { player_id, player_name, profile_pic, interests } = message;
           playerSockets.set(player_id, ws);
           broadcastOnlineCount();
-          if (!player_name) {
-            sendToPlayer(player_id, {
-              type: "error",
-              message: "Player name is required",
-            });
-            break;
-          }
+          if (!player_name) { sendToPlayer(player_id, { type: "error", message: "Player name is required" }); break; }
 
           const availableRoom = await findAvailableRoom(interests ?? []);
-          if (availableRoom) {
-            if (availableRoom.is_private) {
-              console.log(`  ✗ auto_join skipped private room ${availableRoom.room_id}`);
-              await markRoomClosed(availableRoom.room_id);
-            } else {
-              if (availableRoom.players.some((p) => p.id === player_id)) {
-                sendToPlayer(player_id, {
-                  type: "error",
-                  message: "You are already in the room",
-                });
-                break;
-              }
-
-              const player = {
-                id: player_id,
-                name: player_name,
-                profile_pic: profile_pic ?? null,
-                interests: interests ?? [],
-              };
-              availableRoom.players.push(player);
-
-              if (availableRoom.players.length === 2) {
-                availableRoom.phase = "choosing";
-                availableRoom.current_turn = 0;
-                await markRoomClosed(availableRoom.room_id);
-              }
-              await saveRoom(availableRoom);
-
-              console.log(
-                `  ✓ ${player_name} auto-joined ${availableRoom.room_id}`,
-              );
-              sendToPlayer(player_id, {
-                type: "room_joined",
-                room_id: availableRoom.room_id,
-              });
-              broadcastToRoom(availableRoom, {
-                type: "player_joined",
-                players: availableRoom.players.map((p) => ({
-                  id: p.id,
-                  name: p.name,
-                  profile_pic: p.profile_pic ?? null,
-                  level: getPlayerLevel(p.id),
-                })),
-              });
-
-              if (availableRoom.players.length === 2) {
-                console.log(`  🎮 Game Started: ${availableRoom.room_id}`);
-                broadcastToRoom(availableRoom, {
-                  type: "game_started",
-                  current_turn: 0,
-                });
-              }
-              break;
+          if (availableRoom && !availableRoom.is_private) {
+            if (availableRoom.players.some(p => p.id === player_id)) {
+              sendToPlayer(player_id, { type: "error", message: "You are already in the room" }); break;
             }
+            const player = { id: player_id, name: sanitizeString(player_name, 30), profile_pic: profile_pic ?? null, interests: interests ?? [] };
+            availableRoom.players.push(player);
+            if (availableRoom.players.length === 2) { availableRoom.phase = "choosing"; availableRoom.current_turn = 0; await markRoomClosed(availableRoom.room_id); }
+            await saveRoom(availableRoom);
+            sendToPlayer(player_id, { type: "room_joined", room_id: availableRoom.room_id });
+            const pProfile = await getProfile(player_id);
+            broadcastToRoom(availableRoom, { type: "player_joined", players: availableRoom.players.map(p => ({ id: p.id, name: p.name, profile_pic: p.profile_pic ?? null, level: Math.floor((pProfile?.gamesPlayed ?? 0) / 10) + 1 })) });
+            if (availableRoom.players.length === 2) broadcastToRoom(availableRoom, { type: "game_started", current_turn: 0 });
+            break;
           }
 
-          const roomId = await createRoom({
-            id: player_id,
-            name: player_name,
-            profile_pic: profile_pic ?? null,
-            interests: interests ?? [],
-          });
-          console.log(`  → No open room. Created ${roomId} for ${player_name}`);
+          const roomId = await createRoom({ id: player_id, name: sanitizeString(player_name, 30), profile_pic: profile_pic ?? null, interests: interests ?? [] });
+          if (!roomId) { sendToPlayer(player_id, { type: "error", message: "Failed to create room" }); break; }
           sendToPlayer(player_id, { type: "room_created", room_id: roomId });
-          sendToPlayer(player_id, {
-            type: "player_joined",
-            players: [
-              {
-                id: player_id,
-                name: player_name,
-                profile_pic: profile_pic ?? null,
-              },
-            ],
-          });
+          sendToPlayer(player_id, { type: "player_joined", players: [{ id: player_id, name: sanitizeString(player_name, 30), profile_pic: profile_pic ?? null }] });
           break;
         }
 
-        // ── JOIN ROOM ────────────────────────────────────────────────────────
         case "join_room": {
           const { room_id, player_id, player_name, profile_pic } = message;
-          console.log(
-            `  → Join Request: Room=${room_id} Player=${player_name}`,
-          );
           playerSockets.set(player_id, ws);
           broadcastOnlineCount();
-
           const room = await getRoom(room_id);
-
-          if (!room) {
-            console.log(`  ✗ Room not found: ${room_id}`);
-            sendToPlayer(player_id, {
-              type: "error",
-              message: "Room not found",
-            });
-            break;
-          }
-          if (room.players.length >= 2) {
-            console.log(`  ✗ Room full: ${room_id}`);
-            sendToPlayer(player_id, { type: "error", message: "Room is full" });
-            break;
-          }
-          if (room.players.some((p) => p.id === player_id)) {
-            sendToPlayer(player_id, {
-              type: "error",
-              message: "You are already in the room",
-            });
-            break;
-          }
-
-          room.players.push({
-            id: player_id,
-            name: player_name,
-            profile_pic: profile_pic ?? null,
-          });
-
-          if (room.players.length === 2) {
-            room.phase = "choosing";
-            room.current_turn = 0;
-            await markRoomClosed(room_id);
-          }
+          if (!room) { sendToPlayer(player_id, { type: "error", message: "Room not found" }); break; }
+          if (room.players.length >= 2) { sendToPlayer(player_id, { type: "error", message: "Room is full" }); break; }
+          if (room.players.some(p => p.id === player_id)) { sendToPlayer(player_id, { type: "error", message: "You are already in the room" }); break; }
+          room.players.push({ id: player_id, name: sanitizeString(player_name, 30), profile_pic: profile_pic ?? null });
+          if (room.players.length === 2) { room.phase = "choosing"; room.current_turn = 0; await markRoomClosed(room_id); }
           await saveRoom(room);
-
-          console.log(
-            `  ✓ ${player_name} joined ${room_id} (${room.players.length}/2)`,
-          );
-
-          broadcastToRoom(room, {
-            type: "player_joined",
-            players: room.players.map((p) => ({
-              id: p.id,
-              name: p.name,
-              profile_pic: p.profile_pic ?? null,
-            })),
-          });
-
-          if (room.players.length === 2) {
-            console.log(`  🎮 Game Started: ${room_id}`);
-            broadcastToRoom(room, { type: "game_started", current_turn: 0 });
-          }
+          broadcastToRoom(room, { type: "player_joined", players: room.players.map(p => ({ id: p.id, name: p.name, profile_pic: p.profile_pic ?? null })) });
+          if (room.players.length === 2) broadcastToRoom(room, { type: "game_started", current_turn: 0 });
           break;
         }
 
-        // ── CHOOSE MODE ──────────────────────────────────────────────────────
         case "choose_mode": {
           const { room_id, player_id, mode } = message;
           const room = await getRoom(room_id);
-          if (!room) break;
-
-          // BUG 6 fix: guard against stale/replayed choose_mode in wrong phase
-          if (room.phase !== "choosing") {
-            console.log(
-              `  ✗ choose_mode rejected — phase is '${room.phase}', not 'choosing'`,
-            );
-            break;
-          }
-
-          const chooser = room.players.find((p) => p.id === player_id);
-          if (!chooser || room.players[room.current_turn].id !== player_id)
-            break;
-
+          if (!room || room.phase !== "choosing") break;
+          if (room.players[room.current_turn]?.id !== player_id) break;
           room.current_mode = mode;
           room.phase = "question_set";
           await saveRoom(room);
-
-          console.log(`  → Mode: ${mode} by ${chooser.name}`);
-          broadcastToRoom(room, {
-            type: "mode_chosen",
-            chooser_name: chooser.name,
-            mode,
-            asker_name: room.players[1 - room.current_turn].name,
-          });
+          broadcastToRoom(room, { type: "mode_chosen", chooser_name: room.players.find(p => p.id === player_id)?.name, mode, asker_name: room.players[1 - room.current_turn].name });
           break;
         }
 
-        // ── SUBMIT QUESTION ──────────────────────────────────────────────────
         case "submit_question": {
           const { room_id, player_id, question } = message;
           const room = await getRoom(room_id);
           if (!room) break;
-
-          // BUG 4 fix: only the asker (non-chooser) can submit a question
           const asker = room.players[1 - room.current_turn];
-          if (!asker || asker.id !== player_id) {
-            console.log(
-              `  ✗ submit_question rejected — player is not the asker`,
-            );
-            break;
-          }
-
-          room.current_question = question;
+          if (!asker || asker.id !== player_id) break;
+          room.current_question = sanitizeString(question, 500);
           room.phase = "answering";
           await saveRoom(room);
-
-          const chooser = room.players[room.current_turn];
-          broadcastToRoom(room, {
-            type: "question_ready",
-            question,
-            asker_name: asker.name,
-            responder_name: chooser.name,
-          });
+          broadcastToRoom(room, { type: "question_ready", question: room.current_question, asker_name: asker.name, responder_name: room.players[room.current_turn].name });
           break;
         }
 
-        // ── SUBMIT ANSWER ────────────────────────────────────────────────────
         case "submit_answer": {
           const { room_id, player_id, answer } = message;
           const room = await getRoom(room_id);
           if (!room) break;
-
-          // Only the chooser (responder) answers — reveal immediately
-          const isChooser = room.players[room.current_turn].id === player_id;
-          if (!isChooser) {
-            console.log("  ✗ Only the chooser can submit an answer");
-            break;
-          }
-
-          room.player1_answer = answer;
+          if (room.players[room.current_turn]?.id !== player_id) break;
+          room.player1_answer = sanitizeString(answer, 2000);
           room.phase = "reveal";
           await saveRoom(room);
-
-          console.log(
-            `  ✓ Answer submitted by ${room.players[room.current_turn].name}`,
-          );
-          broadcastToRoom(room, {
-            type: "both_answered",
-            answer: room.player1_answer,
-            responder_name: room.players[room.current_turn].name,
-          });
+          broadcastToRoom(room, { type: "both_answered", answer: room.player1_answer, responder_name: room.players[room.current_turn].name });
           break;
         }
 
-        // ── SUBMIT ANSWER WITH MEDIA (MULTIPLE) ───────────────────────────
         case "submit_answer_with_media_multiple": {
           const { room_id, player_id, answer, media_list } = message;
           const room = await getRoom(room_id);
-          if (!room) break;
-
-          const isChooser = room.players[room.current_turn].id === player_id;
-          if (!isChooser) break;
-
-          room.player1_answer = answer;
+          if (!room || room.players[room.current_turn]?.id !== player_id) break;
+          room.player1_answer = sanitizeString(answer, 2000);
           room.phase = "reveal";
           await saveRoom(room);
-
           const responder = room.players[room.current_turn];
-          const normalizedMediaList = normalizeMediaList(media_list);
-          console.log(
-            `  ✓ Answer with ${normalizedMediaList.length} media by ${responder.name}`,
-          );
-          broadcastToRoom(room, {
-            type: "answer_with_media_multiple",
-            answer: room.player1_answer,
-            media_list: normalizedMediaList,
-            player_name: responder.name,
-            player_id: responder.id,
-          });
+          broadcastToRoom(room, { type: "answer_with_media_multiple", answer: room.player1_answer, media_list: normalizeMediaList(media_list), player_name: responder.name, player_id: responder.id });
           break;
         }
 
-        // ── SUBMIT ANSWER WITH MEDIA ────────────────────────────────────────
         case "submit_answer_with_media": {
-          const { room_id, player_id, answer, media_type, media_data } =
-            message;
+          const { room_id, player_id, answer, media_type, media_data } = message;
           const room = await getRoom(room_id);
-          if (!room) break;
-
-          const isChooser = room.players[room.current_turn].id === player_id;
-          if (!isChooser) {
-            console.log("  ✗ Only the chooser can submit an answer");
-            break;
-          }
-
-          room.player1_answer = answer;
+          if (!room || room.players[room.current_turn]?.id !== player_id) break;
+          room.player1_answer = sanitizeString(answer, 2000);
           room.phase = "reveal";
           await saveRoom(room);
-
           const responder = room.players[room.current_turn];
-          const normalizedMediaData = normalizeMediaData(media_data);
-          console.log(
-            `  ✓ Answer with ${media_type} submitted by ${responder.name}`,
-          );
-          broadcastToRoom(room, {
-            type: "answer_with_media",
-            answer: room.player1_answer,
-            media_type,
-            media_data: normalizedMediaData,
-            player_name: responder.name,
-            player_id: responder.id,
-          });
+          broadcastToRoom(room, { type: "answer_with_media", answer: room.player1_answer, media_type, media_data: normalizeMediaData(media_data), player_name: responder.name, player_id: responder.id });
           break;
         }
 
-        // ── SEND MEDIA ───────────────────────────────────────────────────────
         case "send_media": {
-          const { room_id, player_id, player_name, media_type, media_data } =
-            message;
+          const { room_id, player_id, player_name, media_type, media_data } = message;
           const room = await getRoom(room_id);
-          if (!room) break;
-
-          // Allow media during question_set, answering, and reveal phases
-          if (!["question_set", "answering", "reveal"].includes(room.phase)) {
-            console.log(`  ✗ send_media rejected — phase is '${room.phase}'`);
-            break;
-          }
-
-          const normalizedMediaData = normalizeMediaData(media_data);
-          console.log(`  📸 Media (${media_type}) from ${player_name}`);
-          broadcastToRoom(room, {
-            type: "media_received",
-            player_id,
-            player_name,
-            media_type,
-            media_data: normalizedMediaData,
-          });
+          if (!room || !["question_set", "answering", "reveal"].includes(room.phase)) break;
+          broadcastToRoom(room, { type: "media_received", player_id, player_name, media_type, media_data: normalizeMediaData(media_data) });
           break;
         }
 
-        // ── FORFEIT ──────────────────────────────────────────────────────────
         case "forfeit": {
           const { room_id, player_id } = message;
           const room = await getRoom(room_id);
           if (!room) break;
-
-          const forfeiter = room.players.find((p) => p.id === player_id);
+          const forfeiter = room.players.find(p => p.id === player_id);
           if (!forfeiter) break;
-
           room.phase = "reveal";
           await saveRoom(room);
-
-          console.log(`  🏳 Forfeit by ${forfeiter.name}`);
-          broadcastToRoom(room, {
-            type: "forfeit",
-            forfeiter_name: forfeiter.name,
-            answer: null,
-            responder_name: forfeiter.name,
-          });
+          broadcastToRoom(room, { type: "forfeit", forfeiter_name: forfeiter.name, answer: null, responder_name: forfeiter.name });
           break;
         }
 
-        // ── SEND REACTION ─────────────────────────────────────────────────────
         case "send_reaction": {
           const { room_id, player_id, reaction } = message;
           const room = await getRoom(room_id);
           if (!room || room.phase !== "reveal") break;
-
-          const reactor = room.players.find((p) => p.id === player_id);
+          const reactor = room.players.find(p => p.id === player_id);
           if (!reactor) break;
-
           room.reaction = reaction;
           await saveRoom(room);
-
-          // Track reaction on the responder's profile (the one who answered)
           const responder = room.players[room.current_turn];
           if (responder) {
-            const respProfile = profileStore.get(responder.id) ?? {};
-            const reactions = respProfile.reactions ?? {};
+            const rp = (await getProfile(responder.id)) || {};
+            const reactions = rp.reactions ?? {};
             reactions[reaction] = (reactions[reaction] ?? 0) + 1;
-            respProfile.reactions = reactions;
-            profileStore.set(responder.id, respProfile);
-            saveProfiles();
+            rp.reactions = reactions;
+            await saveProfile(responder.id, rp);
           }
-
-          broadcastToRoom(room, {
-            type: "reaction",
-            reaction,
-            reactor_name: reactor.name,
-          });
+          broadcastToRoom(room, { type: "reaction", reaction, reactor_name: reactor.name });
           break;
         }
 
-        // ── SEND QUESTION REACTION ────────────────────────────────────────
         case "send_question_reaction": {
           const { room_id, player_id, reaction } = message;
           const room = await getRoom(room_id);
           if (!room || (room.phase !== "reveal" && room.phase !== "answering")) break;
-
-          const reactor = room.players.find((p) => p.id === player_id);
+          const reactor = room.players.find(p => p.id === player_id);
           if (!reactor) break;
-
           room.question_reaction = reaction;
           await saveRoom(room);
-
-          // Track reaction on the asker's profile (the one who asked the question)
-          const asker = room.players.find((p) => p.id !== room.players[room.current_turn]?.id);
+          const asker = room.players.find(p => p.id !== room.players[room.current_turn]?.id);
           if (asker) {
-            const askerProfile = profileStore.get(asker.id) ?? {};
-            const reactions = askerProfile.reactions ?? {};
+            const ap = (await getProfile(asker.id)) || {};
+            const reactions = ap.reactions ?? {};
             reactions[reaction] = (reactions[reaction] ?? 0) + 1;
-            askerProfile.reactions = reactions;
-            profileStore.set(asker.id, askerProfile);
-            saveProfiles();
+            ap.reactions = reactions;
+            await saveProfile(asker.id, ap);
           }
-
-          broadcastToRoom(room, {
-            type: "question_reaction",
-            reaction,
-            reactor_name: reactor.name,
-          });
+          broadcastToRoom(room, { type: "question_reaction", reaction, reactor_name: reactor.name });
           break;
         }
 
-        // ── NEXT ROUND ───────────────────────────────────────────────────────
         case "next_round": {
           const { room_id } = message;
           const room = await getRoom(room_id);
-          if (!room) break;
-
-          // BUG 5 fix: only process next_round once — reject if already moved on
-          if (room.phase !== "reveal") {
-            console.log(
-              `  ✗ next_round rejected — phase is '${room.phase}', not 'reveal'`,
-            );
-            break;
-          }
-
+          if (!room || room.phase !== "reveal") break;
           room.current_turn = 1 - room.current_turn;
           room.phase = "choosing";
           room.current_mode = null;
@@ -837,584 +1018,113 @@ wss.on("connection", (ws) => {
           room.reaction = null;
           room.question_reaction = null;
           await saveRoom(room);
-
-          broadcastToRoom(room, {
-            type: "round_started",
-            current_turn: room.current_turn,
-          });
+          broadcastToRoom(room, { type: "round_started", current_turn: room.current_turn });
           break;
         }
 
-        // ── QUIT GAME ────────────────────────────────────────────────────────
         case "quit_game": {
           const { room_id, player_id } = message;
           const room = await getRoom(room_id);
           if (!room) break;
-
-          room.players = room.players.filter((p) => p.id !== player_id);
+          room.players = room.players.filter(p => p.id !== player_id);
           playerSockets.delete(player_id);
-
-          if (room.players.length > 0) {
-            await saveRoom(room);
-            broadcastToRoom(room, {
-              type: "player_quit",
-              message: "Other player quit",
-            });
-          } else {
-            await deleteRoom(room_id);
-          }
+          broadcastOnlineCount();
+          if (room.players.length > 0) { await saveRoom(room); broadcastToRoom(room, { type: "player_quit", message: "Other player quit" }); }
+          else await deleteRoom(room_id);
           break;
         }
 
-        // ── RECONNECT ────────────────────────────────────────────────────────
-        // BUG 7 fix: allow a player to re-attach their socket to an existing room
         case "reconnect": {
           const { room_id, player_id } = message;
           const room = await getRoom(room_id);
-          if (!room) {
-            sendToPlayer(player_id, {
-              type: "error",
-              message: "Room no longer exists",
-            });
-            break;
-          }
-
-          const playerInRoom = room.players.find((p) => p.id === player_id);
-          if (!playerInRoom) {
-            sendToPlayer(player_id, {
-              type: "error",
-              message: "You are not in this room",
-            });
-            break;
-          }
-
-          // Re-register the new socket
+          if (!room) { sendToPlayer(player_id, { type: "error", message: "Room no longer exists" }); break; }
+          const playerInRoom = room.players.find(p => p.id === player_id);
+          if (!playerInRoom) { sendToPlayer(player_id, { type: "error", message: "You are not in this room" }); break; }
           playerSockets.set(player_id, ws);
           broadcastOnlineCount();
-          console.log(`  🔄 ${playerInRoom.name} reconnected to ${room_id}`);
-
-          // Re-send full game state so the client can restore the correct screen
           sendToPlayer(player_id, {
-            type: "game_state",
-            room_id: room.room_id,
-            phase: room.phase,
-            current_turn: room.current_turn,
-            current_mode: room.current_mode,
-            current_question: room.current_question,
-            players: room.players.map((p) => ({ id: p.id, name: p.name })),
+            type: "game_state", room_id: room.room_id, phase: room.phase,
+            current_turn: room.current_turn, current_mode: room.current_mode,
+            current_question: room.current_question, players: room.players.map(p => ({ id: p.id, name: p.name })),
             answer: room.player1_answer,
           });
           break;
         }
       }
     } catch (error) {
-      console.error("Handler error:", error);
+      logger.error({ err: error }, "WebSocket handler error");
     }
   });
-
-  // Mark connection alive for heartbeat tracking
-  (ws).isAlive = true;
-  ws.on("pong", () => { (ws).isAlive = true; });
 
   ws.on("close", async () => {
-    console.log("✗ Client Disconnected");
+    logger.info("Client disconnected");
     try {
       for (const [playerId, socket] of playerSockets.entries()) {
-        if (socket === ws) {
-          playerSockets.delete(playerId);
-          broadcastOnlineCount();
+        if (socket !== ws) continue;
+        playerSockets.delete(playerId);
+        broadcastOnlineCount();
 
-          if (!redisReady) {
-            for (const [roomId, data] of memStore.rooms.entries()) {
-              const room = JSON.parse(data);
-              if (room.players.some((p) => p.id === playerId)) {
-                room.players = room.players.filter((p) => p.id !== playerId);
-                if (room.players.length > 0) {
-                  await saveRoom(room);
-                  broadcastToRoom(room, {
-                    type: "player_quit",
-                    message: "Other player disconnected",
-                  });
-                } else {
-                  await deleteRoom(room.room_id);
-                }
-              }
-            }
-          } else {
-            // Scan Redis for any room containing this player
-            let cursor = "0";
-            do {
-              const result = await redisClient.scan(cursor, {
-                MATCH: "room:*",
-                COUNT: 100,
-              });
-              cursor = String(result.cursor);
-              for (const key of result.keys) {
-                const data = await redisClient.get(key);
-                if (!data) continue;
-                const room = JSON.parse(data);
-                if (room.players.some((p) => p.id === playerId)) {
-                  room.players = room.players.filter((p) => p.id !== playerId);
-                  if (room.players.length > 0) {
-                    await saveRoom(room);
-                    broadcastToRoom(room, {
-                      type: "player_quit",
-                      message: "Other player disconnected",
-                    });
-                  } else {
-                    await deleteRoom(room.room_id);
-                  }
-                }
-              }
-            } while (cursor !== "0");
+        if (!redisReady) {
+          for (const [roomId, data] of memStore.rooms.entries()) {
+            const room = JSON.parse(data);
+            if (!room.players.some(p => p.id === playerId)) continue;
+            room.players = room.players.filter(p => p.id !== playerId);
+            if (room.players.length > 0) { await saveRoom(room); broadcastToRoom(room, { type: "player_quit", message: "Other player disconnected" }); }
+            else await deleteRoom(room.room_id);
           }
-          break;
+        } else {
+          let cursor = "0";
+          do {
+            const result = await redisClient.scan(cursor, { MATCH: "room:*", COUNT: 100 });
+            cursor = String(result.cursor);
+            for (const key of result.keys) {
+              const data = await redisClient.get(key);
+              if (!data) continue;
+              const room = JSON.parse(data);
+              if (!room.players.some(p => p.id === playerId)) continue;
+              room.players = room.players.filter(p => p.id !== playerId);
+              if (room.players.length > 0) { await saveRoom(room); broadcastToRoom(room, { type: "player_quit", message: "Other player disconnected" }); }
+              else await deleteRoom(room.room_id);
+            }
+          } while (cursor !== "0");
         }
+        break;
       }
     } catch (err) {
-      console.error("Disconnect cleanup error:", err);
+      logger.error({ err }, "Disconnect cleanup error");
     }
   });
 
-  ws.on("error", (error) => console.error("WebSocket error:", error));
+  ws.on("error", (error) => logger.error({ err: error }, "WebSocket error"));
 });
 
+// ─── Graceful Shutdown ──────────────────────────────────────────────────────
+async function shutdown(signal) {
+  logger.info(`${signal} received, shutting down gracefully...`);
+  clearInterval(heartbeatTimer);
 
+  for (const ws of wss.clients) ws.close(1001, "Server shutting down");
 
-// POST /profile/update
-app.post("/profile/update", async (req, res) => {
-  try {
-    const { player_id, name } = req.body;
-    if (!player_id || !name) {
-      return res.status(400).json({ error: "Missing player_id or name" });
-    }
-    const cleanName = String(name).slice(0, 30);
-    const posts = await getCommunityPosts();
-    let updated = false;
-    const newPosts = posts.map(p => {
-      if (p.author_id === player_id && p.author !== cleanName) {
-        updated = true;
-        return { ...p, author: cleanName };
-      }
-      return p;
-    });
-    if (updated) {
-      await saveCommunityPosts(newPosts);
-      console.log(`✏️ Updated author name to "${cleanName}" for player ${player_id}`);
-    }
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
+  wss.close(() => {
+    logger.info("WebSocket server closed");
+  });
+
+  server.close(() => {
+    logger.info("HTTP server closed");
+  });
+
+  if (redisReady) {
+    await redisClient.quit();
+    logger.info("Redis connection closed");
   }
-});
 
-// POST /profile/sync
-app.post("/profile/sync", (req, res) => {
-  try {
-    const { player_id, name, bio, pic, interests, played_since, gamesPlayed } = req.body;
-    if (!player_id) return res.status(400).json({ error: "Missing player_id" });
-
-    const existing = profileStore.get(player_id) ?? {};
-    if (name !== undefined) existing.name = String(name).slice(0, 30);
-    if (bio !== undefined) existing.bio = String(bio).slice(0, 80);
-    if (pic !== undefined) existing.pic = pic;
-    if (interests !== undefined) existing.interests = interests;
-    if (played_since !== undefined) existing.played_since = played_since;
-    if (gamesPlayed !== undefined) existing.gamesPlayed = gamesPlayed;
-    profileStore.set(player_id, existing);
-    saveProfiles();
-
-    const reactionCount = existing.reactions
-      ? Object.values(existing.reactions).reduce((sum, c) => sum + c, 0)
-      : 0;
-
-    res.json({
-      ok: true,
-      reactions: existing.reactions ?? {},
-      reactionCount,
-      played_since: existing.played_since ?? null,
-      gamesPlayed: existing.gamesPlayed ?? 0,
-    });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-function getPlayStyle(reactions = {}) {
-  const entries = Object.entries(reactions).filter(([, c]) => c > 0);
-  if (entries.length === 0) return "Rising Star";
-  const top = entries.sort(([, a], [, b]) => b - a)[0][0];
-  const map = {
-    "🔥": "Hot Player",
-    "😂": "Funny Player",
-    "😍": "Heartthrob",
-    "😮": "Shocking Player",
-    "💀": "Savage Player",
-    "😢": "Emotional Player",
-    "🎉": "Life of the Party",
-    "👏": "Respected Player",
-  };
-  return map[top] ?? "Rising Star";
+  process.exit(0);
 }
 
-// GET /profile/:player_id
-app.get("/profile/:player_id", (req, res) => {
-  try {
-    const { player_id } = req.params;
-    const data = profileStore.get(player_id);
-    if (!data) return res.status(404).json({ error: "Profile not found" });
-    const reactions = data.reactions ?? {};
-    const reactionCount = Object.values(reactions).reduce(
-      (sum, c) => sum + c,
-      0,
-    );
-    const gamesPlayed = data.gamesPlayed ?? 0;
-    const level = Math.max(1, Math.floor(gamesPlayed / 10) + 1);
-    res.json({
-      name: data.name ?? "Unknown",
-      bio: data.bio ?? "",
-      pic: data.pic ?? null,
-      interests: data.interests ?? [],
-      reactions,
-      reactionCount,
-      played_since: data.played_since ?? null,
-      playStyle: getPlayStyle(data.reactions),
-      gamesPlayed,
-      level,
-    });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
-// ─── Upload endpoint ──────────────────────────────────────────────────────────
-
-app.post("/upload", (req, res) => {
-  try {
-    const { base64, filename } = req.body;
-    if (!base64 || !filename) {
-      return res.status(400).json({ error: "Missing base64 or filename" });
-    }
-
-    let ext = "jpg";
-    let buffer;
-    if (base64.startsWith("data:")) {
-      const matches = base64.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
-      if (!matches) {
-        return res.status(400).json({ error: "Invalid base64 image" });
-      }
-      ext = matches[1] === "jpeg" ? "jpg" : matches[1];
-      buffer = Buffer.from(matches[2], "base64");
-    } else {
-      buffer = Buffer.from(base64, "base64");
-    }
-
-    const safeName = `${filename.replace(/[^a-zA-Z0-9_-]/g, "")}-${Date.now()}.${ext}`;
-    const filePath = path.join(UPLOADS_DIR, safeName);
-    fs.writeFile(filePath, buffer, (err) => {
-      if (err) {
-        console.error("Upload write error:", err);
-        return res.status(500).json({ error: "Failed to save file" });
-      }
-      console.log(`  📤 Uploaded: ${safeName}`);
-      res.json({ url: `/uploads/${safeName}` });
-    });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// ─── Community REST API ───────────────────────────────────────────────────────
-
-const POSTS_KEY = "community:posts";
-const POSTS_MAX = 200; // keep last 200 posts
-
-async function getCommunityPosts() {
-  if (!redisReady) {
-    return memStore.communityPosts;
-  }
-  const data = await redisClient.get(POSTS_KEY);
-  return data ? JSON.parse(data) : [];
-}
-
-async function saveCommunityPosts(posts) {
-  if (!redisReady) {
-    memStore.communityPosts = posts;
-    return;
-  }
-  await redisClient.set(POSTS_KEY, JSON.stringify(posts));
-}
-
-// GET /community/posts
-app.get("/community/posts", async (req, res) => {
-  try {
-    const { player_id } = req.query;
-    const posts = await getCommunityPosts();
-    const mappedPosts = posts.map((p) => {
-      const likedBy = p.liked_by || [];
-      const authorProfile = profileStore.get(p.author_id);
-      return {
-        ...p,
-        likedByMe: player_id ? likedBy.includes(player_id) : false,
-        profilePic: authorProfile?.pic ?? null,
-      };
-    });
-    res.json({ posts: mappedPosts });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// POST /community/posts
-app.post("/community/posts", async (req, res) => {
-  try {
-    const { author, type, text, author_id } = req.body;
-    if (!author || !text || !["truth", "dare"].includes(type)) {
-      return res.status(400).json({ error: "Invalid post data" });
-    }
-    const authorProfile = profileStore.get(author_id);
-    const post = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      author: String(author).slice(0, 30),
-      author_id: String(author_id ?? "").slice(0, 40),
-      type,
-      text: String(text).slice(0, 300),
-      likes: 0,
-      liked_by: [],
-      createdAt: Date.now(),
-      profilePic: authorProfile?.pic ?? null,
-    };
-    const posts = await getCommunityPosts();
-    posts.unshift(post);
-    if (posts.length > POSTS_MAX) posts.length = POSTS_MAX;
-    await saveCommunityPosts(posts);
-    console.log(`📣 Community post by ${author}: "${post.text.slice(0, 40)}"`);
-    res.json({ post });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// POST /community/posts/:id/like
-app.post("/community/posts/:id/like", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { player_id } = req.body;
-    if (!player_id) {
-      return res.status(400).json({ error: "Missing player_id" });
-    }
-    const posts = await getCommunityPosts();
-    const idx = posts.findIndex(p => p.id === id);
-    if (idx === -1) return res.status(404).json({ error: "Post not found" });
-
-    const post = posts[idx];
-    if (!post.liked_by) {
-      post.liked_by = [];
-    }
-
-    const likedIdx = post.liked_by.indexOf(player_id);
-    let likedByMe = false;
-
-    if (likedIdx === -1) {
-      post.liked_by.push(player_id);
-      post.likes = (post.likes ?? 0) + 1;
-      likedByMe = true;
-    } else {
-      post.liked_by.splice(likedIdx, 1);
-      post.likes = Math.max(0, (post.likes ?? 0) - 1);
-      likedByMe = false;
-    }
-
-    await saveCommunityPosts(posts);
-    res.json({ likes: post.likes, likedByMe });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// ─── Players search ───────────────────────────────────────────────────────────
-
-// GET /players/search?query=...&player_id=... — search players by name
-app.get("/players/search", (req, res) => {
-  try {
-    const { query, player_id } = req.query;
-    if (!query || !player_id) {
-      return res.status(400).json({ error: "Missing required params" });
-    }
-    const q = query.toLowerCase();
-    const myFriends = getFriendIds(player_id);
-    const mySent = [];
-    for (const [, r] of friendReqStore) {
-      if (r.from === player_id && r.status === "pending") mySent.push(r.to);
-    }
-    const results = [];
-    for (const [pid, p] of profileStore) {
-      if (pid === player_id) continue;
-      if (!p?.name?.toLowerCase().includes(q)) continue;
-      results.push({
-        id: pid,
-        name: p.name,
-        pic: p.pic ?? null,
-        isFriend: myFriends.has(pid),
-        requestSent: mySent.includes(pid),
-      });
-      if (results.length >= 20) break;
-    }
-    res.json({ results });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// ─── Friends & Notifications REST endpoints ───────────────────────────────────
-
-// POST /friends/request — send a friend request
-app.post("/friends/request", (req, res) => {
-  try {
-    const { from_id, from_name, from_pic, to_id } = req.body;
-    if (!from_id || !to_id || !from_name) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-    if (from_id === to_id) {
-      return res.status(400).json({ error: "Cannot friend yourself" });
-    }
-    if (areFriends(from_id, to_id)) {
-      return res.json({ ok: true, status: "already_friends" });
-    }
-    // Check for existing pending request
-    for (const [reqId, r] of friendReqStore) {
-      if (r.from === from_id && r.to === to_id && r.status === "pending") {
-        return res.json({ ok: true, status: "already_requested" });
-      }
-      if (r.from === to_id && r.to === from_id && r.status === "pending") {
-        // Mutual — auto-accept
-        r.status = "accepted";
-        addFriendPair(from_id, to_id);
-        createNotification(from_id, to_id, from_name, from_pic, "friend_request_accepted", `${from_name} accepted your friend request`);
-        createNotification(to_id, from_id, from_name, from_pic, "friend_request_accepted", `${from_name} accepted your friend request`);
-        return res.json({ ok: true, status: "mutual" });
-      }
-    }
-    const requestId = `freq-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const request = { id: requestId, from: from_id, to: to_id, fromName: from_name, fromPic: from_pic ?? null, status: "pending", createdAt: Date.now() };
-    friendReqStore.set(requestId, request);
-
-    // Notify the receiver
-    createNotification(to_id, from_id, from_name, from_pic, "friend_request", `${from_name} sent you a friend request`);
-    res.json({ ok: true, status: "sent" });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// POST /friends/accept — accept a friend request
-app.post("/friends/accept", (req, res) => {
-  try {
-    const { request_id, actor_id } = req.body;
-    const request = friendReqStore.get(request_id);
-    if (!request || request.to !== actor_id || request.status !== "pending") {
-      return res.status(400).json({ error: "Invalid request" });
-    }
-    request.status = "accepted";
-    addFriendPair(request.from, request.to);
-
-    // Notify the requester
-    const requesterName = profileStore.get(request.from)?.name ?? request.fromName;
-    createNotification(request.from, request.to, requesterName, null, "friend_request_accepted", `${requesterName} accepted your friend request`);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// POST /friends/reject — reject a friend request
-app.post("/friends/reject", (req, res) => {
-  try {
-    const { request_id, actor_id } = req.body;
-    const request = friendReqStore.get(request_id);
-    if (!request || request.to !== actor_id || request.status !== "pending") {
-      return res.status(400).json({ error: "Invalid request" });
-    }
-    request.status = "rejected";
-
-    // Notify the requester that their request was rejected
-    createNotification(request.from, request.to, request.fromName, null, "friend_request_rejected", `${request.fromName} declined your friend request`);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// POST /friends/remove — remove a friend
-app.post("/friends/remove", (req, res) => {
-  try {
-    const { player_id, friend_id } = req.body;
-    if (!player_id || !friend_id) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-    const setA = friendStore.get(player_id);
-    const setB = friendStore.get(friend_id);
-    if (setA) setA.delete(friend_id);
-    if (setB) setB.delete(player_id);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// GET /friends/:player_id — get friends list and pending requests
-app.get("/friends/:player_id", (req, res) => {
-  try {
-    const { player_id } = req.params;
-    const friendIds = getFriendIds(player_id);
-    const friends = [];
-    for (const fid of friendIds) {
-      const p = profileStore.get(fid);
-      friends.push({ id: fid, name: p?.name ?? "Unknown", pic: p?.pic ?? null });
-    }
-    const requests = [];
-    const sent = [];
-    for (const [, r] of friendReqStore) {
-      if (r.status !== "pending") continue;
-      if (r.to === player_id) {
-        const p = profileStore.get(r.from);
-        requests.push({ id: r.id, from: r.from, fromName: p?.name ?? r.fromName, fromPic: p?.pic ?? r.fromPic, createdAt: r.createdAt });
-      }
-      if (r.from === player_id) {
-        sent.push(r.to);
-      }
-    }
-    res.json({ friends, requests, sent });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// GET /notifications/:player_id — get notifications
-app.get("/notifications/:player_id", (req, res) => {
-  try {
-    const { player_id } = req.params;
-    const list = notificationStore.get(player_id) || [];
-    res.json({ notifications: list });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// POST /notifications/read — mark all as read
-app.post("/notifications/read", (req, res) => {
-  try {
-    const { player_id } = req.body;
-    const list = notificationStore.get(player_id);
-    if (list) {
-      list.forEach(n => { n.read = true; });
-    }
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
+// ─── Start ──────────────────────────────────────────────────────────────────
 server.listen(PORT, HOST, () => {
-  console.log(`\n✓ Server running on ws://${HOST}:${PORT}${SOCKET_PATH}\n`);
+  logger.info({ host: HOST, port: PORT, env: NODE_ENV }, `Server running on ws://${HOST}:${PORT}${SOCKET_PATH}`);
 });

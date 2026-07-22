@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -13,14 +14,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   truth: {
-    backgroundColor: 'rgba(30, 58, 138, 0.5)',
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
     borderWidth: 1,
-    borderColor: '#4f46e5',
+    borderColor: '#3b82f6',
   },
   dare: {
-    backgroundColor: 'rgba(127, 29, 29, 0.5)',
+    backgroundColor: 'rgba(220, 38, 38, 0.2)',
     borderWidth: 1,
-    borderColor: '#ef4444',
+    borderColor: '#dc2626',
   },
   info: {
     backgroundColor: '#1f2937',
@@ -48,11 +49,12 @@ const styles = StyleSheet.create({
 });
 
 export function Badge({ children, variant = 'info', style }: BadgeProps) {
+  const { colors } = useTheme();
   const badgeStyle = variant === 'truth' ? styles.truth : variant === 'dare' ? styles.dare : styles.info;
   const textStyle = variant === 'truth' ? styles.truthText : variant === 'dare' ? styles.dareText : styles.infoText;
 
   return (
-    <View style={[styles.badge, badgeStyle, style]}>
+    <View style={[styles.badge, badgeStyle, variant === 'info' && { backgroundColor: colors.card, borderColor: colors.border }, style]}>
       <Text style={textStyle}>{children}</Text>
     </View>
   );

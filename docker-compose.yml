@@ -7,7 +7,14 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
-    command: redis-server --save "" --appendonly no
+    command: redis-server --appendonly yes --save 60 1000 --requirepass truthdare_dev_redis
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "truthdare_dev_redis", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   server:
     build:
@@ -17,10 +24,21 @@ services:
     ports:
       - "5000:5000"
     environment:
+      - NODE_ENV=development
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=truthdare_dev_redis
       - SERVER_PORT=5000
       - SERVER_HOST=0.0.0.0
+      - CORS_ORIGIN=*
+      - RATE_LIMIT_MAX_REQUESTS=120
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    volumes:
+      - uploads_data:/app/uploads
+
+volumes:
+  redis_data:
+  uploads_data:

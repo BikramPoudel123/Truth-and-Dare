@@ -1,6 +1,7 @@
 import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
 import { GameProvider, useGame } from "@/contexts/GameContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
+import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { useCallback, useRef, useState } from "react";
 import MenuScreen from "./menu";
 import GameScreen from "./game";
@@ -10,13 +11,13 @@ import CommunityScreen from "./community";
 import FriendsScreen from "./friends";
 import NotificationsScreen from "./notifications";
 import SettingsScreen from "./settings";
-import { COLORS } from "@/constants/design-system";
 import BottomNav from "@/components/BottomNav";
 
 type AppScreen = "menu" | "questions" | "community" | "friends" | "notifications" | "settings";
 
 function AppContent() {
   const { phase, isConnected } = useGame();
+  const { colors } = useTheme();
   const [screen, setScreen] = useState<AppScreen>("menu");
   const [menuTab, setMenuTab] = useState("home");
   const [friendsInitialTab, setFriendsInitialTab] = useState<"friends" | "requests">("friends");
@@ -67,8 +68,8 @@ function AppContent() {
 
   if (!isConnected && phase === "connecting") {
     return (
-      <View style={{ flex: 1, backgroundColor: COLORS.bg, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" color={COLORS.purple} />
+      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" color={colors.purple} />
       </View>
     );
   }
@@ -86,7 +87,7 @@ function AppContent() {
   const isBackScreen = screen === "friends" || screen === "notifications" || screen === "settings";
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {!isBackScreen && (
         <View style={{ flex: 1, position: "relative" }}>
           <Animated.View style={[s.screenAbs, { opacity: menuOpacity }]} pointerEvents={isActive("menu") ? "auto" : "none"}>
@@ -123,10 +124,12 @@ const s = StyleSheet.create({
 
 export default function App() {
   return (
-    <ProfileProvider>
-      <GameProvider>
-        <AppContent />
-      </GameProvider>
-    </ProfileProvider>
+    <ThemeProvider>
+      <ProfileProvider>
+        <GameProvider>
+          <AppContent />
+        </GameProvider>
+      </ProfileProvider>
+    </ThemeProvider>
   );
 }

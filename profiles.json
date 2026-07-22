@@ -51,7 +51,30 @@
   "pid-f9m0h6q5fva-1784103284498": {
     "name": "Ram",
     "played_since": "2026-07-15T08:14:44.498Z",
-    "gamesPlayed": 0,
-    "pic": "http://192.168.1.111:5000/uploads/prof-pid-f9m0h6q5fva-1784103284498-1784107166564.jpg"
+    "gamesPlayed": 2,
+    "pic": "http://192.168.1.111:5000/uploads/prof-pid-f9m0h6q5fva-1784103284498-1784107166564.jpg",
+    "reactions": {
+      "😍": 1,
+      "💀": 1
+    },
+    "interests": [
+      "fun",
+      "life"
+    ],
+    "bio": "You are a cute boy man , cute boy"
+  },
+  "pid-wi4vs9jai8d-1784103284661": {
+    "name": "Bro do it",
+    "played_since": "2026-07-15T08:14:44.661Z",
+    "gamesPlayed": 2,
+    "pic": "http://192.168.1.111:5000/uploads/prof-pid-wi4vs9jai8d-1784103284661-1784107859158.jpg",
+    "interests": [
+      "fun",
+      "life",
+      "hot"
+    ],
+    "reactions": {
+      "😍": 1
+    }
   }
 }

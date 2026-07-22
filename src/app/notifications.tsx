@@ -11,7 +11,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { RADIUS } from "@/constants/design-system";
+import { useTheme } from "@/contexts/ThemeContext";
 import { getHttpBase } from "@/utils/http";
 import { timeAgo } from "@/utils/format";
 import { ArrowLeft, Bell, CheckCheck, Heart, UserPlus, UserX } from "lucide-react-native";
@@ -54,6 +55,7 @@ const AnimatedNotificationItem = memo(AnimatedNotificationItemInner);
 
 export default function NotificationsScreen({ onBack, onNavigateFriends }: { onBack?: () => void; onNavigateFriends?: () => void }) {
   const { playerId } = useProfile();
+  const { colors, shadows } = useTheme();
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,15 +95,15 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
     const isFriendRequest = n.type === "friend_request";
     const card = (
       <AnimatedNotificationItem>
-      <View style={[s.card, !n.read && s.unread]}>
-        <View style={[s.iconWrap, { backgroundColor: !n.read ? `${COLORS.purple}20` : "rgba(255,255,255,0.04)" }]}>
-          <Icon size={18} color={!n.read ? COLORS.purple : COLORS.sub} />
+      <View style={[s.card, { backgroundColor: colors.glassBg, borderColor: colors.border, ...shadows.subtle }, !n.read && { borderColor: `${colors.purple}40`, backgroundColor: `${colors.purple}08` }]}>
+        <View style={[s.iconWrap, { backgroundColor: !n.read ? `${colors.purple}20` : "rgba(255,255,255,0.04)" }]}>
+          <Icon size={18} color={!n.read ? colors.purple : colors.sub} />
         </View>
         <View style={s.cardBody}>
-          <Text style={[s.msg, !n.read && s.msgUnread]}>{n.message}</Text>
-          <Text style={s.time}>{timeAgo(n.createdAt)}</Text>
+          <Text style={[s.msg, { color: colors.sub }, !n.read && [s.msgUnread, { color: colors.text }]]}>{n.message}</Text>
+          <Text style={[s.time, { color: colors.subAlt }]}>{timeAgo(n.createdAt)}</Text>
         </View>
-        {!n.read && <View style={s.dot} />}
+        {!n.read && <View style={[s.dot, { backgroundColor: colors.purple }]} />}
       </View>
       </AnimatedNotificationItem>
     );
@@ -113,35 +115,35 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
       );
     }
     return card;
-  }, [onNavigateFriends]);
+  }, [onNavigateFriends, colors]);
 
   const ListEmpty = () => (
     <View style={s.emptyState}>
-      <Bell size={48} color={COLORS.sub} />
-      <Text style={s.emptyText}>No notifications yet</Text>
+      <Bell size={48} color={colors.sub} />
+      <Text style={[s.emptyText, { color: colors.sub }]}>No notifications yet</Text>
     </View>
   );
 
   return (
-    <SafeAreaView style={s.safe}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={onBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={18} color={COLORS.text} />
+    <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
+      <View style={[s.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={onBack} style={[s.backBtn, { backgroundColor: colors.glassBg, borderColor: colors.border }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <ArrowLeft size={18} color={colors.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>Notifications</Text>
-          <Text style={s.subtitle}>{unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}</Text>
+          <Text style={[s.title, { color: colors.text }]}>Notifications</Text>
+          <Text style={[s.subtitle, { color: colors.sub }]}>{unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}</Text>
         </View>
         {unreadCount > 0 ? (
-          <TouchableOpacity onPress={markRead} style={s.markBtn} activeOpacity={0.8}>
-            <CheckCheck size={16} color={COLORS.purple} />
+          <TouchableOpacity onPress={markRead} style={[s.markBtn, { backgroundColor: `${colors.purple}15`, borderColor: `${colors.purple}30` }]} activeOpacity={0.8}>
+            <CheckCheck size={16} color={colors.purple} />
           </TouchableOpacity>
         ) : <View style={{ width: 36 }} />}
       </View>
 
       <View style={{ flex: 1 }}>
         {loading ? (
-          <View style={s.center}><ActivityIndicator size="large" color={COLORS.purple} /></View>
+          <View style={s.center}><ActivityIndicator size="large" color={colors.purple} /></View>
         ) : (
           <FlatList
             data={notifs}
@@ -164,7 +166,7 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
+  safe: { flex: 1, backgroundColor: "#0b081c" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -172,22 +174,22 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: "rgba(255, 255, 255, 0.08)",
   },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
-  title: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
-  subtitle: { color: COLORS.sub, fontSize: 12, marginTop: 1 },
-  markBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: `${COLORS.purple}15`, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: `${COLORS.purple}30` },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
+  title: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
+  subtitle: { color: "#a19bb3", fontSize: 12, marginTop: 1 },
+  markBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(59, 130, 246, 0.15)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(59, 130, 246, 0.30)" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
   emptyState: { alignItems: "center", paddingTop: 80, gap: 12 },
-  emptyText: { color: COLORS.sub, fontSize: 14, textAlign: "center" },
+  emptyText: { color: "#a19bb3", fontSize: 14, textAlign: "center" },
   list: { padding: 16, gap: 8, flexGrow: 1 },
-  card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.subtle },
-  unread: { borderColor: `${COLORS.purple}40`, backgroundColor: `${COLORS.purple}08` },
+  card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
+  unread: { borderColor: "rgba(59, 130, 246, 0.40)", backgroundColor: "rgba(59, 130, 246, 0.08)" },
   iconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   cardBody: { flex: 1, gap: 2 },
-  msg: { color: COLORS.sub, fontSize: 13, fontWeight: "500", lineHeight: 18 },
-  msgUnread: { color: COLORS.text, fontWeight: "700" },
-  time: { color: COLORS.subAlt, fontSize: 11, fontWeight: "600" },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.purple },
+  msg: { color: "#a19bb3", fontSize: 13, fontWeight: "500", lineHeight: 18 },
+  msgUnread: { color: "#ffffff", fontWeight: "700" },
+  time: { color: "#7c7890", fontSize: 11, fontWeight: "600" },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#3b82f6" },
 });

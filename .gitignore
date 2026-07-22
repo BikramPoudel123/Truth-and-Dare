@@ -41,3 +41,14 @@ example
 # generated native folders
 /ios
 /android
+
+# server data
+profiles.json
+uploads/
+
+# production env
+.env.production
+.env*.local
+
+# certbot
+certbot/

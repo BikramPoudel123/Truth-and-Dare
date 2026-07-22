@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Image } from "expo-image";
 import { ImageStyle, StyleProp, Text, TouchableOpacity, View, ViewStyle } from "react-native";
-import { COLORS } from "@/constants/design-system";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Props {
   uri?: string | null;
@@ -16,10 +16,11 @@ interface Props {
 }
 
 export function Avatar({
-  uri, name, size = 36, borderWidth = 1.5, borderColor = COLORS.border,
-  initialsBgColor, initialsTextColor = COLORS.purple,
+  uri, name, size = 36, borderWidth = 1.5, borderColor,
+  initialsBgColor, initialsTextColor,
   style, onPress,
 }: Props) {
+  const { colors } = useTheme();
   const [failed, setFailed] = useState(false);
   const showInitials = !uri || failed;
 
@@ -29,26 +30,26 @@ export function Avatar({
     width: size,
     height: size,
     borderRadius: size / 2,
-    backgroundColor: initialsBgColor ?? `${COLORS.purple}25`,
+    backgroundColor: initialsBgColor ?? `${colors.purple}25`,
     alignItems: "center",
     justifyContent: "center",
     borderWidth,
-    borderColor,
-  }), [size, initialsBgColor, borderWidth, borderColor]);
+    borderColor: borderColor ?? colors.border,
+  }), [size, initialsBgColor, borderWidth, borderColor, colors.purple, colors.border]);
 
   const imageStyle: ImageStyle = useMemo(() => ({
     width: size,
     height: size,
     borderRadius: size / 2,
     borderWidth,
-    borderColor,
-  }) as ImageStyle, [size, borderWidth, borderColor]);
+    borderColor: borderColor ?? colors.border,
+  }) as ImageStyle, [size, borderWidth, borderColor, colors.border]);
 
   const initialsTextStyle = useMemo(() => ({
-    color: initialsTextColor,
+    color: initialsTextColor ?? colors.purple,
     fontSize: size * 0.4,
     fontWeight: "800" as const,
-  }), [initialsTextColor, size]);
+  }), [initialsTextColor, size, colors.purple]);
 
   if (showInitials) {
     const inner = (

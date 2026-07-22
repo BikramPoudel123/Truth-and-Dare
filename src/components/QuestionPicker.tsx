@@ -4,6 +4,7 @@
  */
 import { QUESTIONS, QCategory, QTag, Question } from "@/data/questions";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import { ProfileModal, ProfileModalData, DEFAULT_MODAL_DATA } from "@/components/ProfileModal";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,19 +12,12 @@ import {
   ActivityIndicator, FlatList, Modal, StyleSheet,
   Text, TouchableOpacity, View,
 } from "react-native";
-import { COLORS as APP_COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
 import { Eye, Heart, Megaphone, Sparkles, UserPlus, UserCheck, X } from "lucide-react-native";
 
 import { getLevelProgress } from "@/utils/levels";
 import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi, fetchFriendIdsAndSent } from "@/utils/http";
 import { INTEREST_LABEL } from "@/constants/profile";
-
-const BG = APP_COLORS.bg;
-const CARD = "rgba(23, 19, 50, 0.7)";
-const BORDER = APP_COLORS.border;
-const TEXT = APP_COLORS.text;
-const SUB = APP_COLORS.sub;
-const HINT = APP_COLORS.subAlt;
 
 interface CommunityPost {
   id: string;
@@ -45,6 +39,7 @@ interface Props {
 
 export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: Props) {
   const { playerId, profile } = useProfile();
+  const { colors } = useTheme();
   const youSuffix = (name: string, authorId?: string) => (authorId === playerId || name === profile.name) ? " (you)" : "";
   const [tab, setTab] = useState<"bank" | "community">("bank");
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
@@ -104,7 +99,7 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
 
   const renderAvatar = (authorId: string | undefined, name: string, pic: string | null | undefined, size: number = 32) => {
     const isSelf = authorId === playerId;
-    const avatar = <Avatar uri={pic} name={name} size={size} borderWidth={1.5} borderColor={BORDER} />;
+    const avatar = <Avatar uri={pic} name={name} size={size} borderWidth={1.5} borderColor={colors.border} />;
     if (isSelf) return avatar;
     return (
       <TouchableOpacity onPress={() => openProfile(authorId, name)} activeOpacity={0.7}>
@@ -115,27 +110,27 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={s.container}>
+      <View style={[s.container, { backgroundColor: colors.bg }]}>
         {/* Header */}
-        <View style={s.header}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <View style={{ flex: 1 }}>
-            <Text style={s.title}>Pick a Question</Text>
-            <Text style={s.subtitle}>{mode ? (mode === "truth" ? "Truth questions" : "Dare challenges") : "All"}</Text>
+            <Text style={[s.title, { color: colors.text }]}>Pick a Question</Text>
+            <Text style={[s.subtitle, { color: colors.sub }]}>{mode ? (mode === "truth" ? "Truth questions" : "Dare challenges") : "All"}</Text>
           </View>
-          <TouchableOpacity onPress={onClose} style={s.closeBtn}>
-            <X size={16} color={SUB} />
+          <TouchableOpacity onPress={onClose} style={[s.closeBtn, { backgroundColor: colors.bg }]}>
+            <X size={16} color={colors.sub} />
           </TouchableOpacity>
         </View>
 
         {/* Tabs */}
-        <View style={s.tabs}>
+        <View style={[s.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <TouchableOpacity style={[s.tab, tab === "bank" && s.tabActive]} onPress={() => setTab("bank")} activeOpacity={0.8}>
-            <Sparkles size={14} color={tab === "bank" ? APP_COLORS.purple : HINT} />
-            <Text style={[s.tabText, tab === "bank" && s.tabTextActive]}> Question Bank</Text>
+            <Sparkles size={14} color={tab === "bank" ? colors.purple : colors.subAlt} />
+            <Text style={[s.tabText, { color: colors.subAlt }, tab === "bank" && s.tabTextActive]}> Question Bank</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.tab, tab === "community" && s.tabActive]} onPress={() => setTab("community")} activeOpacity={0.8}>
-            <Megaphone size={14} color={tab === "community" ? APP_COLORS.purple : HINT} />
-            <Text style={[s.tabText, tab === "community" && s.tabTextActive]}> Community</Text>
+            <Megaphone size={14} color={tab === "community" ? colors.purple : colors.subAlt} />
+            <Text style={[s.tabText, { color: colors.subAlt }, tab === "community" && s.tabTextActive]}> Community</Text>
           </TouchableOpacity>
         </View>
 
@@ -150,9 +145,9 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
             maxToRenderPerBatch={10}
             removeClippedSubviews
             renderItem={({ item }) => (
-              <TouchableOpacity style={[s.qCard, item.type === "truth" ? s.qTruth : s.qDare]} onPress={() => pick(item.text)} activeOpacity={0.8}>
-                <View style={[s.typeDot, { backgroundColor: item.type === "truth" ? APP_COLORS.purple : APP_COLORS.red }]} />
-                <Text style={s.qText}>{item.text}</Text>
+              <TouchableOpacity style={[s.qCard, { backgroundColor: colors.surface, borderColor: colors.border }, item.type === "truth" ? s.qTruth : s.qDare]} onPress={() => pick(item.text)} activeOpacity={0.8}>
+                <View style={[s.typeDot, { backgroundColor: item.type === "truth" ? colors.purple : colors.red }]} />
+                <Text style={[s.qText, { color: colors.text }]}>{item.text}</Text>
               </TouchableOpacity>
             )}
           />
@@ -162,7 +157,7 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
         {tab === "community" && (
           loadingCommunity ? (
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-              <ActivityIndicator color={APP_COLORS.purple} size="large" />
+              <ActivityIndicator color={colors.purple} size="large" />
             </View>
           ) : (
             <FlatList
@@ -170,28 +165,28 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
               keyExtractor={i => i.id}
               contentContainerStyle={s.list}
               showsVerticalScrollIndicator={false}
-              ListEmptyComponent={<Text style={s.empty}>No community posts yet for this type.</Text>}
+              ListEmptyComponent={<Text style={[s.empty, { color: colors.subAlt }]}>No community posts yet for this type.</Text>}
               windowSize={5}
               maxToRenderPerBatch={10}
               removeClippedSubviews
               renderItem={({ item }) => (
-                <TouchableOpacity style={[s.postCard, item.type === "truth" ? s.postTruth : s.postDare]} onPress={() => pick(item.text)} activeOpacity={0.8}>
+                <TouchableOpacity style={[s.postCard, { backgroundColor: colors.surface, borderColor: colors.border }, item.type === "truth" ? s.postTruth : s.postDare]} onPress={() => pick(item.text)} activeOpacity={0.8}>
                   <View style={s.postLeft}>
                     {renderAvatar(item.author_id, item.author, item.profilePic, 36)}
                   </View>
                   <View style={s.postRight}>
                     <View style={s.postTop}>
-                      <Text style={s.postAuthor}>{item.author}</Text>
-                      <View style={[s.typeBadge, { backgroundColor: item.type === "truth" ? `${APP_COLORS.purple}20` : `${APP_COLORS.red}20` }]}>
-                        <Text style={[s.typeBadgeTxt, { color: item.type === "truth" ? APP_COLORS.purple : APP_COLORS.red }]}>
+                      <Text style={[s.postAuthor, { color: colors.text }]}>{item.author}</Text>
+                      <View style={[s.typeBadge, { backgroundColor: item.type === "truth" ? `${colors.purple}20` : `${colors.red}20` }]}>
+                        <Text style={[s.typeBadgeTxt, { color: item.type === "truth" ? colors.purple : colors.red }]}>
                           {item.type === "truth" ? "Truth" : "Dare"}
                         </Text>
                       </View>
                     </View>
-                    <Text style={s.postText}>{item.text}</Text>
+                    <Text style={[s.postText, { color: colors.sub }]}>{item.text}</Text>
                     <View style={s.postMeta}>
-                      <Heart size={12} color={HINT} />
-                      <Text style={s.likeCount}>{item.likes}</Text>
+                      <Heart size={12} color={colors.subAlt} />
+                      <Text style={[s.likeCount, { color: colors.subAlt }]}>{item.likes}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -220,36 +215,35 @@ export function QuestionPicker({ visible, mode, moodTags, onSelect, onClose }: P
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
-  header: { flexDirection: "row", alignItems: "center", padding: 20, backgroundColor: CARD, borderBottomWidth: 1, borderBottomColor: BORDER },
-  title: { color: TEXT, fontSize: 18, fontWeight: "900" },
-  subtitle: { color: SUB, fontSize: 12, marginTop: 2 },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: BG, alignItems: "center", justifyContent: "center" },
-  tabs: { flexDirection: "row", backgroundColor: CARD, borderBottomWidth: 1, borderBottomColor: BORDER, gap: 0 },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  header: { flexDirection: "row", alignItems: "center", padding: 20, borderBottomWidth: 1 },
+  title: { fontSize: 18, fontWeight: "900" },
+  subtitle: { fontSize: 12, marginTop: 2 },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  tabs: { flexDirection: "row", borderBottomWidth: 1, gap: 0 },
   tab: { flex: 1, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center" },
-  tabActive: { borderBottomWidth: 2.5, borderBottomColor: APP_COLORS.purple },
-  tabText: { fontSize: 13, fontWeight: "700", color: HINT },
-  tabTextActive: { color: APP_COLORS.purple },
+  tabActive: { borderBottomWidth: 2.5, borderBottomColor: COLORS.purple },
+  tabText: { fontSize: 13, fontWeight: "700" },
+  tabTextActive: { color: COLORS.purple },
   list: { padding: 16, gap: 10 },
-  qCard: { backgroundColor: CARD, borderRadius: 14, padding: 14, borderWidth: 1.5, borderColor: BORDER, flexDirection: "row", alignItems: "flex-start", gap: 10, ...SHADOWS.subtle },
-  qTruth: { borderLeftWidth: 4, borderLeftColor: APP_COLORS.purple },
-  qDare:  { borderLeftWidth: 4, borderLeftColor: APP_COLORS.red },
+  qCard: { borderRadius: 14, padding: 14, borderWidth: 1.5, flexDirection: "row", alignItems: "flex-start", gap: 10, ...SHADOWS.subtle },
+  qTruth: { borderLeftWidth: 4, borderLeftColor: COLORS.purple },
+  qDare:  { borderLeftWidth: 4, borderLeftColor: COLORS.red },
   typeDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6, flexShrink: 0 },
-  qText: { color: TEXT, fontSize: 14, fontWeight: "600", lineHeight: 21, flex: 1 },
-  empty: { color: HINT, textAlign: "center", marginTop: 40, fontSize: 14 },
+  qText: { fontSize: 14, fontWeight: "600", lineHeight: 21, flex: 1 },
+  empty: { textAlign: "center", marginTop: 40, fontSize: 14 },
 
-  // Community post cards
-  postCard: { backgroundColor: CARD, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: BORDER, flexDirection: "row", gap: 10, ...SHADOWS.subtle },
+  postCard: { borderRadius: 14, padding: 12, borderWidth: 1, flexDirection: "row", gap: 10, ...SHADOWS.subtle },
   postTruth: {},
   postDare: {},
   postLeft: { paddingTop: 2 },
   postRight: { flex: 1, gap: 6 },
   postTop: { flexDirection: "row", alignItems: "center", gap: 8 },
-  postAuthor: { color: TEXT, fontSize: 13, fontWeight: "700", flex: 1 },
+  postAuthor: { fontSize: 13, fontWeight: "700", flex: 1 },
   typeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
   typeBadgeTxt: { fontSize: 10, fontWeight: "800" },
-  postText: { color: SUB, fontSize: 13, fontWeight: "500", lineHeight: 19 },
+  postText: { fontSize: 13, fontWeight: "500", lineHeight: 19 },
   postMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
-  likeCount: { color: HINT, fontSize: 11, fontWeight: "600" },
+  likeCount: { fontSize: 11, fontWeight: "600" },
 
 });

@@ -11,6 +11,7 @@ import { Mic, MicOff, Play, Square, Check, Trash2 } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { COLORS } from "@/constants/design-system";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Props {
   onRecorded: (base64: string, uri: string) => void;
@@ -27,6 +28,7 @@ function formatTime(ms: number) {
 }
 
 export function AudioRecorder({ onRecorded, accentColor = COLORS.purple }: Props) {
+  const { colors } = useTheme();
   const [state, setState] = useState<RecState>("idle");
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [durationMs, setDurationMs] = useState(0);
@@ -135,8 +137,8 @@ export function AudioRecorder({ onRecorded, accentColor = COLORS.purple }: Props
     >
       {state === "idle" && (
         <>
-          <Mic size={18} color={COLORS.sub} />
-          <Text style={{ color: COLORS.sub, fontSize: 12, flex: 1 }}>
+          <Mic size={18} color={colors.sub} />
+          <Text style={{ color: colors.sub, fontSize: 12, flex: 1 }}>
             Record voice
           </Text>
           <TouchableOpacity
@@ -146,7 +148,7 @@ export function AudioRecorder({ onRecorded, accentColor = COLORS.purple }: Props
               width: 32,
               height: 32,
               borderRadius: 16,
-              backgroundColor: COLORS.red,
+               backgroundColor: colors.red,
               alignItems: "center",
               justifyContent: "center",
             }}
@@ -163,12 +165,12 @@ export function AudioRecorder({ onRecorded, accentColor = COLORS.purple }: Props
               width: 8,
               height: 8,
               borderRadius: 4,
-              backgroundColor: COLORS.red,
+              backgroundColor: colors.red,
             }}
           />
           <Text
             style={{
-              color: COLORS.red,
+              color: colors.red,
               fontSize: 13,
               fontWeight: "700",
               flex: 1,
@@ -177,7 +179,7 @@ export function AudioRecorder({ onRecorded, accentColor = COLORS.purple }: Props
             Recording {formatTime(recorderState.durationMillis)}
           </Text>
           <TouchableOpacity onPress={stopRecording} activeOpacity={0.7}>
-            <Square size={18} color={COLORS.red} />
+            <Square size={18} color={colors.red} />
           </TouchableOpacity>
         </>
       )}
@@ -185,16 +187,16 @@ export function AudioRecorder({ onRecorded, accentColor = COLORS.purple }: Props
       {state === "recorded" && (
         <>
           <TouchableOpacity onPress={playRecording} activeOpacity={0.7}>
-            <Play size={16} color={playing ? accentColor : COLORS.text} />
+            <Play size={16} color={playing ? accentColor : colors.text} />
           </TouchableOpacity>
-          <Text style={{ color: COLORS.sub, fontSize: 12, flex: 1 }}>
+          <Text style={{ color: colors.sub, fontSize: 12, flex: 1 }}>
             Voice {formatTime(durationMs)}
           </Text>
           <TouchableOpacity onPress={confirm} activeOpacity={0.7}>
-            <Check size={18} color={COLORS.green} />
+            <Check size={18} color={colors.green} />
           </TouchableOpacity>
           <TouchableOpacity onPress={reset} activeOpacity={0.7}>
-            <Trash2 size={16} color={COLORS.sub} />
+            <Trash2 size={16} color={colors.sub} />
           </TouchableOpacity>
         </>
       )}

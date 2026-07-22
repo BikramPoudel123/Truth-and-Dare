@@ -1,4 +1,5 @@
 import { View, ViewProps, StyleSheet } from 'react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface CardProps extends ViewProps {
   children: React.ReactNode;
@@ -28,10 +29,11 @@ const styles = StyleSheet.create({
 });
 
 export function Card({ children, variant = 'default', style, ...props }: CardProps) {
+  const { colors } = useTheme();
   const variantStyles = variant === 'default' ? styles.default : variant === 'subtle' ? styles.subtle : styles.bordered;
 
   return (
-    <View style={[styles.card, variantStyles, style]} {...props}>
+    <View style={[styles.card, variantStyles, variant === 'default' && { backgroundColor: colors.card, borderColor: colors.border }, variant === 'subtle' && { backgroundColor: colors.surface, borderColor: colors.border }, style]} {...props}>
       {children}
     </View>
   );

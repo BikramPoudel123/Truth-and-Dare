@@ -100,7 +100,7 @@ export interface GameContextType {
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const { playerId: profilePlayerId, recordGameResult } = useProfile();
+  const { playerId: profilePlayerId, recordGameResult, profile } = useProfile();
   const playerId = useRef(profilePlayerId);
   // keep the ref in sync if the profile playerId changes (it shouldn't, but just in case)
   playerId.current = profilePlayerId;
@@ -158,6 +158,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
     });
   }, []);
+
+  // Sync profile pic from ProfileContext when it changes (e.g. user picks a new pic in menu)
+  useEffect(() => {
+    if (profile.pic !== profilePicRef.current) {
+      setProfilePicState(profile.pic);
+      profilePicRef.current = profile.pic;
+    }
+  }, [profile.pic]);
 
   const setProfilePic = useCallback((uri: string | null) => {
     setProfilePicState(uri);

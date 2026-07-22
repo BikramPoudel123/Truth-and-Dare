@@ -22,6 +22,7 @@ import Animated, {
     useSharedValue,
     withTiming,
 } from "react-native-reanimated";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const SCREEN = Dimensions.get("window");
 
@@ -208,6 +209,7 @@ function formatAudioTime(seconds: number): string {
 }
 
 function AudioPlayer({ data }: { data: string }) {
+  const { colors } = useTheme();
   const [fileUri, setFileUri] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -275,7 +277,7 @@ function AudioPlayer({ data }: { data: string }) {
   const activeBarIndex = Math.floor(progress * WAVEFORM_BARS);
 
   return (
-    <View style={audioStyles.container}>
+    <View style={[audioStyles.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <TouchableOpacity onPress={togglePlay} style={audioStyles.playBtn} activeOpacity={0.7}>
         {playing ? (
           <Pause size={16} color="#fff" fill="#fff" />
@@ -292,14 +294,15 @@ function AudioPlayer({ data }: { data: string }) {
               audioStyles.bar,
               {
                 height: `${h * 100}%`,
-                backgroundColor: i <= activeBarIndex ? "#a855f7" : "rgba(161, 155, 179, 0.3)",
+                backgroundColor: i <= activeBarIndex ? colors.purple : colors.sub,
+                opacity: i <= activeBarIndex ? 1 : 0.3,
               },
             ]}
           />
         ))}
       </View>
 
-      <Text style={audioStyles.time}>
+      <Text style={[audioStyles.time, { color: colors.sub }]}>
         {formatAudioTime(duration > 0 ? duration - currentTime : 0)}
       </Text>
     </View>
@@ -307,6 +310,7 @@ function AudioPlayer({ data }: { data: string }) {
 }
 
 export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
+  const { colors } = useTheme();
   const [fullscreen, setFullscreen] = useState(false);
   const dims = sizeDimensions[size];
 
@@ -316,7 +320,7 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
         <TouchableOpacity
           onPress={() => setFullscreen(true)}
           activeOpacity={0.9}
-          style={[styles.container, dims]}
+          style={[styles.container, { backgroundColor: colors.card }, dims]}
         >
           <Image
             source={{ uri: media.data }}
@@ -361,7 +365,7 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
 
   if (media.type === "video") {
     return (
-      <View style={[styles.container, dims]}>
+      <View style={[styles.container, { backgroundColor: colors.card }, dims]}>
         <VideoPlayer data={media.data} style={styles.fill} />
         {media.playerName && (
           <View style={styles.nameOverlay}>
@@ -458,7 +462,7 @@ const audioStyles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#8338ec",
+    backgroundColor: "#3b82f6",
     alignItems: "center",
     justifyContent: "center",
   },

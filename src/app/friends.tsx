@@ -1,5 +1,6 @@
 import { SERVER_URL } from "@/constants/server";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import { ProfileModal, ProfileModalData, DEFAULT_MODAL_DATA } from "@/components/ProfileModal";
 import { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
@@ -17,7 +18,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { RADIUS } from "@/constants/design-system";
 import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi } from "@/utils/http";
 import { ArrowLeft, Check, Users, UserPlus, UserMinus, UserCheck, X, User, Search, Loader2 } from "lucide-react-native";
 
@@ -55,21 +56,23 @@ const SearchResultItem = memo(function SearchResultItemInner({
   onSend: (id: string) => void;
   onViewProfile: (id: string, name: string, pic: string | null) => void;
 }) {
+  const { colors, shadows } = useTheme();
+
   const status = useMemo(() => {
-    if (item.isFriend) return { icon: Users, color: COLORS.green, disabled: true };
-    if (item.requestSent) return { icon: UserCheck, color: COLORS.blue, disabled: true };
-    return { icon: UserPlus, color: COLORS.purple, disabled: false };
-  }, [item.isFriend, item.requestSent]);
+    if (item.isFriend) return { icon: Users, color: colors.green, disabled: true };
+    if (item.requestSent) return { icon: UserCheck, color: colors.blue, disabled: true };
+    return { icon: UserPlus, color: colors.purple, disabled: false };
+  }, [item.isFriend, item.requestSent, colors.green, colors.blue, colors.purple]);
 
   const Icon = status.icon;
 
   return (
-    <View style={ss.resultCard}>
+    <View style={[ss.resultCard, { borderColor: colors.border, backgroundColor: colors.surface, ...shadows.subtle }]}>
       <TouchableOpacity onPress={() => onViewProfile(item.id, item.name, item.pic)} activeOpacity={0.7}>
-        <Avatar uri={item.pic} name={item.name} size={40} borderWidth={1.5} borderColor={COLORS.border} />
+        <Avatar uri={item.pic} name={item.name} size={40} borderWidth={1.5} borderColor={colors.border} />
       </TouchableOpacity>
       <TouchableOpacity onPress={() => onViewProfile(item.id, item.name, item.pic)} activeOpacity={0.7} style={{ flex: 1 }}>
-        <Text style={ss.resultName} numberOfLines={1}>{item.name}</Text>
+        <Text style={[ss.resultName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[ss.iconBtn, { backgroundColor: `${status.color}18`, borderColor: `${status.color}40` }, status.disabled && { opacity: 0.7 }]}
@@ -89,6 +92,7 @@ const SearchResultItem = memo(function SearchResultItemInner({
 
 export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => void; initialTab?: "friends" | "requests" }) {
   const { playerId, profile } = useProfile();
+  const { colors, shadows } = useTheme();
   const [tab, setTab] = useState<"friends" | "requests">(initialTab ?? "friends");
   const [friends, setFriends] = useState<FriendItem[]>([]);
   const [requests, setRequests] = useState<RequestItem[]>([]);
@@ -144,7 +148,7 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
     setPfModal({ visible: true, authorId: id, name, bio: "", pic: null, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
     const data = await fetchProfileCached(id);
     if (data) {
-      setPfModal({ visible: true, authorId: id, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
+      setPfModal({ visible: true, authorId: id, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.play_since ?? "", loading: false });
     } else {
       setPfModal(prev => ({ ...prev, loading: false }));
     }
@@ -152,39 +156,39 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
 
   const renderFriend = useCallback(({ item }: { item: FriendItem }) => (
     <AnimatedListItem>
-    <TouchableOpacity style={s.card} onPress={() => openProfile(item.id, item.name)} activeOpacity={0.7}>
-      <Avatar uri={item.pic} name={item.name} size={40} borderWidth={1.5} borderColor={COLORS.border} />
-      <Text style={s.cardName}>{item.name}</Text>
+    <TouchableOpacity style={[s.card, { borderColor: colors.border, backgroundColor: colors.surface, ...shadows.subtle }]} onPress={() => openProfile(item.id, item.name)} activeOpacity={0.7}>
+      <Avatar uri={item.pic} name={item.name} size={40} borderWidth={1.5} borderColor={colors.border} />
+      <Text style={[s.cardName, { color: colors.text }]}>{item.name}</Text>
     </TouchableOpacity>
     </AnimatedListItem>
-  ), [openProfile]);
+  ), [openProfile, colors.border, colors.text]);
 
   const renderRequest = useCallback(({ item }: { item: RequestItem }) => (
     <AnimatedListItem>
-    <View style={s.card}>
-      <Avatar uri={item.fromPic} name={item.fromName} size={40} borderWidth={1.5} borderColor={COLORS.border} />
-      <Text style={s.cardName}>{item.fromName}</Text>
+    <View style={[s.card, { borderColor: colors.border, backgroundColor: colors.surface, ...shadows.subtle }]}>
+      <Avatar uri={item.fromPic} name={item.fromName} size={40} borderWidth={1.5} borderColor={colors.border} />
+      <Text style={[s.cardName, { color: colors.text }]}>{item.fromName}</Text>
       <View style={s.actions}>
         <TouchableOpacity
-          style={[s.acceptBtn, accepting === item.id && { opacity: 0.5 }]}
+          style={[s.acceptBtn, { backgroundColor: colors.green }, accepting === item.id && { opacity: 0.5 }]}
           onPress={() => handleAccept(item.id)}
           disabled={accepting === item.id}
           activeOpacity={0.8}
         >
           {accepting === item.id ? <ActivityIndicator size="small" color="#fff" /> : <Check size={16} color="#fff" />}
         </TouchableOpacity>
-        <TouchableOpacity style={s.rejectBtn} onPress={() => handleReject(item.id)} activeOpacity={0.8}>
-          <X size={16} color={COLORS.red} />
+        <TouchableOpacity style={[s.rejectBtn, { backgroundColor: `${colors.red}20`, borderColor: `${colors.red}40` }]} onPress={() => handleReject(item.id)} activeOpacity={0.8}>
+          <X size={16} color={colors.red} />
         </TouchableOpacity>
       </View>
     </View>
     </AnimatedListItem>
-  ), [accepting, handleAccept, handleReject]);
+  ), [accepting, handleAccept, handleReject, colors.border, colors.text, colors.green, colors.red]);
 
   const ListEmpty = ({ icon: Icon, text }: { icon: React.ComponentType<{size: number; color: string}>; text: string }) => (
     <View style={s.emptyState}>
-      <Icon size={48} color={COLORS.sub} />
-      <Text style={s.emptyText}>{text}</Text>
+      <Icon size={48} color={colors.sub} />
+      <Text style={[s.emptyText, { color: colors.sub }]}>{text}</Text>
     </View>
   );
 
@@ -251,7 +255,7 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
     setPfModal({ visible: true, authorId: id, name, bio: "", pic, interests: [], playStyle: null, reactions: {}, gamesPlayed: 0, level: 1, playedSince: "", loading: true });
     const data = await fetchProfileCached(id);
     if (data) {
-      setPfModal({ visible: true, authorId: id, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.played_since ?? "", loading: false });
+      setPfModal({ visible: true, authorId: id, name: data.name, bio: data.bio, pic: data.pic, interests: data.interests, playStyle: data.playStyle, reactions: data.reactions ?? {}, gamesPlayed: data.gamesPlayed ?? 0, level: data.level ?? 1, playedSince: data.play_since ?? "", loading: false });
     } else {
       setPfModal(prev => ({ ...prev, loading: false }));
     }
@@ -264,45 +268,45 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
   const searchKeyExtractor = useCallback((item: SearchResult) => item.id, []);
 
   return (
-    <SafeAreaView style={s.safe}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={onBack} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={18} color={COLORS.text} />
+    <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
+      <View style={[s.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={onBack} style={[s.backBtn, { borderColor: colors.border, backgroundColor: colors.glassBg }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <ArrowLeft size={18} color={colors.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>Friends</Text>
-          <Text style={s.subtitle}>Manage your friends</Text>
+          <Text style={[s.title, { color: colors.text }]}>Friends</Text>
+          <Text style={[s.subtitle, { color: colors.sub }]}>Manage your friends</Text>
         </View>
-        <TouchableOpacity style={s.searchBtn} onPress={openSearch} activeOpacity={0.7}>
-          <UserPlus size={18} color={COLORS.purple} />
+        <TouchableOpacity style={[s.searchBtn, { backgroundColor: `${colors.purple}18`, borderColor: `${colors.purple}40` }]} onPress={openSearch} activeOpacity={0.7}>
+          <UserPlus size={18} color={colors.purple} />
         </TouchableOpacity>
         {tab === "requests" && requests.length > 0 && (
-          <View style={s.badge}>
+          <View style={[s.badge, { backgroundColor: colors.purple }]}>
             <Text style={s.badgeTxt}>{requests.length}</Text>
           </View>
         )}
       </View>
 
-      <View style={s.tabs}>
-        <TouchableOpacity style={[s.tab, tab === "friends" && s.tabActive]} onPress={() => setTab("friends")} activeOpacity={0.8}>
+      <View style={[s.tabs, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
+        <TouchableOpacity style={[s.tab, tab === "friends" && [s.tabActive, { borderBottomColor: colors.purple }]]} onPress={() => setTab("friends")} activeOpacity={0.8}>
           <View style={{flexDirection: "row", alignItems: "center", gap: 6}}>
-            <Users size={14} color={tab === "friends" ? COLORS.purple : COLORS.sub} />
-            <Text style={[s.tabTxt, tab === "friends" && s.tabTxtActive]}>Friends</Text>
+            <Users size={14} color={tab === "friends" ? colors.purple : colors.sub} />
+            <Text style={[s.tabTxt, { color: colors.sub }, tab === "friends" && [s.tabTxtActive, { color: colors.purple }]]}>Friends</Text>
           </View>
-          {friends.length > 0 && <Text style={[s.tabCount, tab === "friends" && {color: COLORS.purple}]}>{friends.length}</Text>}
+          {friends.length > 0 && <Text style={[s.tabCount, { color: colors.subAlt, backgroundColor: colors.glassBg }, tab === "friends" && {color: colors.purple}]}>{friends.length}</Text>}
         </TouchableOpacity>
-        <TouchableOpacity style={[s.tab, tab === "requests" && s.tabActive]} onPress={() => setTab("requests")} activeOpacity={0.8}>
+        <TouchableOpacity style={[s.tab, tab === "requests" && [s.tabActive, { borderBottomColor: colors.purple }]]} onPress={() => setTab("requests")} activeOpacity={0.8}>
           <View style={{flexDirection: "row", alignItems: "center", gap: 6}}>
-            <UserPlus size={14} color={tab === "requests" ? COLORS.purple : COLORS.sub} />
-            <Text style={[s.tabTxt, tab === "requests" && s.tabTxtActive]}>Requests</Text>
+            <UserPlus size={14} color={tab === "requests" ? colors.purple : colors.sub} />
+            <Text style={[s.tabTxt, { color: colors.sub }, tab === "requests" && [s.tabTxtActive, { color: colors.purple }]]}>Requests</Text>
           </View>
-          {requests.length > 0 && <Text style={[s.tabCount, tab === "requests" && {color: COLORS.purple}]}>{requests.length}</Text>}
+          {requests.length > 0 && <Text style={[s.tabCount, { color: colors.subAlt, backgroundColor: colors.glassBg }, tab === "requests" && {color: colors.purple}]}>{requests.length}</Text>}
         </TouchableOpacity>
       </View>
 
       <View style={{ flex: 1 }}>
         {loading ? (
-          <View style={s.center}><ActivityIndicator size="large" color={COLORS.purple} /></View>
+          <View style={s.center}><ActivityIndicator size="large" color={colors.purple} /></View>
         ) : (
           <FlatList
             data={tab === "friends" ? (friends as any) : (requests as any)}
@@ -343,18 +347,18 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
 
       {/* ─── Search overlay ────────────────────────────────────────────── */}
       <Modal visible={searchVisible} animationType="slide" onRequestClose={closeSearch}>
-        <SafeAreaView style={ss.safe}>
-          <View style={ss.header}>
-            <TouchableOpacity onPress={closeSearch} style={ss.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <ArrowLeft size={18} color={COLORS.text} />
+        <SafeAreaView style={[ss.safe, { backgroundColor: colors.bg }]}>
+          <View style={[ss.header, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={closeSearch} style={[ss.backBtn, { borderColor: colors.border, backgroundColor: colors.glassBg }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <ArrowLeft size={18} color={colors.text} />
             </TouchableOpacity>
-            <View style={ss.inputWrap}>
-              <Search size={16} color={COLORS.sub} />
+            <View style={[ss.inputWrap, { borderColor: colors.border, backgroundColor: colors.glassBg }]}>
+              <Search size={16} color={colors.sub} />
               <TextInput
                 ref={searchInputRef}
-                style={ss.input}
+                style={[ss.input, { color: colors.text }]}
                 placeholder="Search players by name..."
-                placeholderTextColor={COLORS.subAlt}
+                placeholderTextColor={colors.subAlt}
                 value={searchQuery}
                 onChangeText={onSearchChange}
                 returnKeyType="search"
@@ -363,23 +367,23 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                  <X size={16} color={COLORS.sub} />
+                  <X size={16} color={colors.sub} />
                 </TouchableOpacity>
               )}
             </View>
           </View>
 
           {searchLoading ? (
-            <View style={ss.center}><ActivityIndicator size="large" color={COLORS.purple} /></View>
+            <View style={ss.center}><ActivityIndicator size="large" color={colors.purple} /></View>
           ) : searchQuery.trim().length === 0 ? (
             <View style={ss.center}>
-              <Search size={48} color={COLORS.subAlt} />
-              <Text style={ss.emptyTxt}>Search for players by name</Text>
+              <Search size={48} color={colors.subAlt} />
+              <Text style={[ss.emptyTxt, { color: colors.sub }]}>Search for players by name</Text>
             </View>
           ) : searchResults.length === 0 ? (
             <View style={ss.center}>
-              <User size={48} color={COLORS.subAlt} />
-              <Text style={ss.emptyTxt}>No players found</Text>
+              <User size={48} color={colors.subAlt} />
+              <Text style={[ss.emptyTxt, { color: colors.sub }]}>No players found</Text>
             </View>
           ) : (
             <FlatList
@@ -416,7 +420,7 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
+  safe: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -424,34 +428,33 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
-  title: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
-  subtitle: { color: COLORS.sub, fontSize: 12, marginTop: 1 },
-  searchBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: `${COLORS.purple}18`, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: `${COLORS.purple}40` },
-  badge: { backgroundColor: COLORS.purple, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, minWidth: 24, alignItems: "center" },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  title: { fontSize: 18, fontWeight: "900" },
+  subtitle: { fontSize: 12, marginTop: 1 },
+  searchBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  badge: { borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, minWidth: 24, alignItems: "center" },
   badgeTxt: { color: "#fff", fontSize: 11, fontWeight: "800" },
-  tabs: { flexDirection: "row", backgroundColor: "rgba(23, 19, 50, 0.7)", borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  tabs: { flexDirection: "row", backgroundColor: "rgba(23, 19, 50, 0.7)", borderBottomWidth: 1 },
   tab: { flex: 1, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  tabActive: { borderBottomWidth: 2.5, borderBottomColor: COLORS.purple },
-  tabTxt: { fontSize: 13, fontWeight: "700", color: COLORS.sub },
-  tabTxtActive: { color: COLORS.purple },
-  tabCount: { fontSize: 11, fontWeight: "800", color: COLORS.subAlt, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: "hidden" },
+  tabActive: { borderBottomWidth: 2.5 },
+  tabTxt: { fontSize: 13, fontWeight: "700" },
+  tabTxtActive: {},
+  tabCount: { fontSize: 11, fontWeight: "800", backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: "hidden" },
   content: { flex: 1, justifyContent: "flex-start" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
   emptyState: { alignItems: "center", paddingTop: 80, gap: 12 },
-  emptyText: { color: COLORS.sub, fontSize: 14, textAlign: "center", lineHeight: 22 },
+  emptyText: { fontSize: 14, textAlign: "center", lineHeight: 22 },
   list: { padding: 16, gap: 10, flexGrow: 1 },
-  card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.subtle },
-  cardName: { color: COLORS.text, fontSize: 14, fontWeight: "700", flex: 1 },
+  card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1 },
+  cardName: { fontSize: 14, fontWeight: "700", flex: 1 },
   actions: { flexDirection: "row", gap: 8 },
-  acceptBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.green, alignItems: "center", justifyContent: "center" },
-  rejectBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: `${COLORS.red}20`, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: `${COLORS.red}40` },
+  acceptBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  rejectBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 1 },
 });
 
 const ss = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
+  safe: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -459,9 +462,8 @@ const ss = StyleSheet.create({
     paddingVertical: 12,
     gap: 10,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1 },
   inputWrap: {
     flex: 1,
     flexDirection: "row",
@@ -472,11 +474,10 @@ const ss = StyleSheet.create({
     paddingHorizontal: 14,
     height: 42,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
-  input: { flex: 1, color: COLORS.text, fontSize: 15, fontWeight: "600", paddingVertical: 0 },
+  input: { flex: 1, fontSize: 15, fontWeight: "600", paddingVertical: 0 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
-  emptyTxt: { color: COLORS.sub, fontSize: 14, textAlign: "center" },
+  emptyTxt: { fontSize: 14, textAlign: "center" },
   list: { padding: 16, gap: 10, flexGrow: 1 },
   resultCard: {
     flexDirection: "row",
@@ -486,10 +487,8 @@ const ss = StyleSheet.create({
     borderRadius: RADIUS.cardSm,
     padding: 14,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.subtle,
   },
-  resultName: { color: COLORS.text, fontSize: 14, fontWeight: "700", flex: 1 },
+  resultName: { fontSize: 14, fontWeight: "700", flex: 1 },
   iconBtn: {
     width: 36,
     height: 36,

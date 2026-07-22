@@ -1,4 +1,5 @@
 import { TouchableOpacity, TouchableOpacityProps, Text, StyleSheet } from 'react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface ButtonProps extends TouchableOpacityProps {
   children: React.ReactNode;
@@ -14,7 +15,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primary: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: '#3b82f6',
   },
   secondary: {
     backgroundColor: '#1f2937',
@@ -56,6 +57,7 @@ export function Button({
   style,
   ...props
 }: ButtonProps) {
+  const { colors } = useTheme();
   const variantStyle = variant === 'primary' ? styles.primary : variant === 'secondary' ? styles.secondary : variant === 'danger' ? styles.danger : styles.success;
   const sizeStyle = size === 'sm' ? styles.sm : size === 'md' ? styles.md : styles.lg;
 
@@ -66,6 +68,7 @@ export function Button({
         variantStyle,
         sizeStyle,
         fullWidth && styles.fullWidth,
+        variant === 'secondary' && { backgroundColor: colors.card, borderColor: colors.border },
         style,
       ]}
       {...props}

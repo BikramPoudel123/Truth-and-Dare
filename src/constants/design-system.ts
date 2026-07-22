@@ -1,50 +1,100 @@
-export const COLORS = {
+export const DARK_COLORS = {
   bg: "#0b081c",
   bgTop: "#0A0B1F",
   bgMid: "#171332",
   bgBottom: "#090912",
   card: "rgba(23, 19, 50, 0.85)",
   cardDark: "rgba(23, 19, 50, 0.95)",
+  surface: "rgba(23, 19, 50, 0.7)",
+  surfaceLight: "rgba(23, 19, 50, 0.6)",
+  surfaceDark: "rgba(11, 8, 28, 0.9)",
+  input: "rgba(23, 19, 50, 0.5)",
   border: "rgba(255, 255, 255, 0.08)",
   borderLight: "rgba(255, 255, 255, 0.15)",
   text: "#ffffff",
+  textOnDark: "#ffffff",
   sub: "#a19bb3",
   subAlt: "#7c7890",
-  purple: "#8338ec",
-  purpleLight: "rgba(131, 56, 236, 0.15)",
-  purpleGlow: "rgba(131, 56, 236, 0.4)",
-  pink: "#ff006e",
-  pinkLight: "rgba(255, 0, 110, 0.15)",
-  pinkGlow: "rgba(255, 0, 110, 0.4)",
+  purple: "#3b82f6",
+  purpleLight: "rgba(59, 130, 246, 0.15)",
+  purpleGlow: "rgba(59, 130, 246, 0.4)",
+  pink: "#dc2626",
+  pinkLight: "rgba(220, 38, 38, 0.15)",
+  pinkGlow: "rgba(220, 38, 38, 0.4)",
   magenta: "#c026d3",
   blue: "#3b82f6",
   electricBlue: "#06b6d4",
-  orange: "#f97316",
+  orange: "#dc2626",
   gold: "#f59e0b",
   green: "#10b981",
-  red: "#ef4444",
+  red: "#dc2626",
   softWhite: "rgba(255, 255, 255, 0.9)",
   glassBg: "rgba(23, 19, 50, 0.6)",
   glassBorder: "rgba(255, 255, 255, 0.12)",
-};
+  levelBarBg: "rgba(255,255,255,0.08)",
+  navBg: "#060411",
+  navActiveBg: "rgb(131, 56, 236)",
+} as const;
 
-export const SHADOWS = {
+export const LIGHT_COLORS = {
+  bg: "#ffffff",
+  bgTop: "#f8f8f8",
+  bgMid: "#f0f0f0",
+  bgBottom: "#ffffff",
+  card: "#ffffff",
+  cardDark: "#f5f5f5",
+  surface: "#f5f5f5",
+  surfaceLight: "#f0f0f0",
+  surfaceDark: "#e8e8e8",
+  input: "#f5f5f5",
+  border: "rgba(0, 0, 0, 0.1)",
+  borderLight: "rgba(0, 0, 0, 0.15)",
+  text: "#000000",
+  textOnDark: "#000000",
+  sub: "#555555",
+  subAlt: "#888888",
+  purple: "#3b82f6",
+  purpleLight: "rgba(59, 130, 246, 0.1)",
+  purpleGlow: "rgba(59, 130, 246, 0.3)",
+  pink: "#dc2626",
+  pinkLight: "rgba(220, 38, 38, 0.1)",
+  pinkGlow: "rgba(220, 38, 38, 0.3)",
+  magenta: "#c026d3",
+  blue: "#3b82f6",
+  electricBlue: "#06b6d4",
+  orange: "#dc2626",
+  gold: "#d97706",
+  green: "#059669",
+  red: "#dc2626",
+  softWhite: "#000000",
+  glassBg: "#f0f0f0",
+  glassBorder: "rgba(0, 0, 0, 0.1)",
+  levelBarBg: "rgba(0,0,0,0.08)",
+  navBg: "#ffffff",
+  navActiveBg: "#3b82f6",
+} as const;
+
+export type ThemeColors = typeof DARK_COLORS;
+
+export const COLORS = DARK_COLORS;
+
+export const DARK_SHADOWS = {
   card: {
-    shadowColor: COLORS.purple,
+    shadowColor: "#3b82f6",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
   },
   glow: {
-    shadowColor: COLORS.purple,
+    shadowColor: "#3b82f6",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 20,
     elevation: 10,
   },
   pinkGlow: {
-    shadowColor: COLORS.pink,
+    shadowColor: "#dc2626",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 15,
@@ -59,11 +109,44 @@ export const SHADOWS = {
   },
 };
 
+export const LIGHT_SHADOWS = {
+  card: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  glow: {
+    shadowColor: "#3b82f6",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  pinkGlow: {
+    shadowColor: "#dc2626",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  subtle: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+};
+
+export const SHADOWS = DARK_SHADOWS;
+
 export const GRADIENTS = {
-  hero: { start: "#171332", end: "#ff006e" },
-  quickMatch: { start: "#1a1040", end: "#2d1b69" },
+  hero: { start: "#0f172a", end: "#dc2626" },
+  quickMatch: { start: "#0c1a3d", end: "#1e3a5f" },
   privateGame: { start: "#1a0a12", end: "#2d1540" },
-  primary: { start: COLORS.purple, end: COLORS.pink },
+  primary: { start: "#3b82f6", end: "#dc2626" },
 };
 
 export const RADIUS = {

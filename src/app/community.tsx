@@ -1,6 +1,7 @@
 import { Avatar } from "@/components/Avatar";
 import { ProfileModal, ProfileModalData, DEFAULT_MODAL_DATA } from "@/components/ProfileModal";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import {
   ActivityIndicator,
@@ -18,7 +19,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { RADIUS } from "@/constants/design-system";
 import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi, fetchFriendIdsAndSent } from "@/utils/http";
 import { timeAgo } from "@/utils/format";
 import { Eye, Flame, Heart, Inbox } from "lucide-react-native";
@@ -36,6 +37,7 @@ export interface CommunityPost {
 }
 
 function LikeButtonInner({ liked, count, onPress }: { liked: boolean; count: number; onPress: () => void }) {
+  const { colors } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
@@ -48,13 +50,13 @@ function LikeButtonInner({ liked, count, onPress }: { liked: boolean; count: num
 
   return (
     <TouchableOpacity
-      style={[s.likeBtn, liked && s.likeBtnActive]}
+      style={[s.likeBtn, { backgroundColor: colors.glassBg, borderColor: colors.border }, liked && { backgroundColor: `${colors.red}20`, borderColor: `${colors.red}40` }]}
       onPress={handlePress}
       activeOpacity={0.8}
     >
       <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-          <Heart size={18} color={liked ? COLORS.pink : COLORS.sub} fill={liked ? COLORS.pink : "transparent"} />
-        <Text style={s.likeBtnText}>{count}</Text>
+          <Heart size={18} color={liked ? colors.red : colors.sub} fill={liked ? colors.red : "transparent"} />
+        <Text style={[s.likeBtnText, { color: colors.text }]}>{count}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -81,6 +83,7 @@ function AnimatedPostCardInner({ children, index }: { children: React.ReactNode;
 const AnimatedPostCard = memo(AnimatedPostCardInner);
 
 export default function CommunityScreen() {
+  const { colors, shadows } = useTheme();
   const { profile, playerId } = useProfile();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,31 +221,34 @@ export default function CommunityScreen() {
 
   const renderPost = useCallback(({ item, index }: { item: CommunityPost; index: number }) => (
     <AnimatedPostCard index={index}>
-    <View style={s.postCard}>
+    <View style={[s.postCard, { backgroundColor: colors.surface, borderColor: colors.border, ...shadows.subtle }]}>
       <View style={s.postTop}>
         {item.author_id && item.author_id !== playerId ? (
           <TouchableOpacity onPress={() => openProfile(item.author_id, item.author)} activeOpacity={0.7}>
-            <Avatar uri={item.profilePic} name={item.author} size={36} borderWidth={1.5} borderColor={COLORS.border} />
+            <Avatar uri={item.profilePic} name={item.author} size={36} borderWidth={1.5} borderColor={colors.border} />
           </TouchableOpacity>
         ) : (
-          <Avatar uri={item.profilePic} name={item.author} size={36} borderWidth={1.5} borderColor={COLORS.border} />
+          <Avatar uri={item.profilePic} name={item.author} size={36} borderWidth={1.5} borderColor={colors.border} />
         )}
         <View style={{ flex: 1 }}>
-          <Text style={s.postAuthor}>{item.author}{item.author_id === playerId ? " (you)" : ""}</Text>
-          <Text style={s.postTime}>{timeAgo(item.createdAt)}</Text>
+          <Text style={[s.postAuthor, { color: colors.text }]}>{item.author}{item.author_id === playerId ? " (you)" : ""}</Text>
+          <Text style={[s.postTime, { color: colors.subAlt }]}>{timeAgo(item.createdAt)}</Text>
         </View>
         <View
           style={[
             s.postTypeBadge,
             item.type === "truth" ? s.postTypeTruth : s.postTypeDare,
+            item.type === "truth"
+              ? { backgroundColor: `${colors.purple}15`, borderColor: `${colors.purple}30` }
+              : { backgroundColor: `${colors.red}15`, borderColor: `${colors.red}30` },
           ]}
         >
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-            {item.type === "truth" ? <Eye size={12} color={COLORS.purple} /> : <Flame size={12} color={COLORS.orange} />}
+            {item.type === "truth" ? <Eye size={12} color={colors.purple} /> : <Flame size={12} color={colors.red} />}
             <Text
               style={[
                 s.postTypeText,
-                { color: item.type === "truth" ? COLORS.purple : COLORS.orange },
+                { color: item.type === "truth" ? colors.purple : colors.red },
               ]}
             >
               {item.type === "truth" ? "TRUTH" : "DARE"}
@@ -250,24 +256,24 @@ export default function CommunityScreen() {
           </View>
         </View>
       </View>
-      <Text style={s.postText}>{item.text}</Text>
+      <Text style={[s.postText, { color: colors.text }]}>{item.text}</Text>
       <View style={s.postActions}>
         <LikeButton liked={!!item.likedByMe} count={item.likes} onPress={() => likePost(item.id)} />
       </View>
       </View>
     </AnimatedPostCard>
-  ), [playerId, likePost, openProfile]);
+  ), [playerId, likePost, openProfile, colors, shadows]);
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView edges={["top"]} style={[s.safe, { backgroundColor: colors.bg }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <View style={s.header}>
           <View style={{ flex: 1 }}>
-            <Text style={s.title}>Community</Text>
-            <Text style={s.subtitle}>Share & discover questions</Text>
+            <Text style={[s.title, { color: colors.text }]}>Community</Text>
+            <Text style={[s.subtitle, { color: colors.sub }]}>Share & discover questions</Text>
           </View>
         </View>
 
@@ -278,17 +284,19 @@ export default function CommunityScreen() {
                 key={t}
                 style={[
                   s.composeTypeBtn,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
                   postType === t &&
-                    { backgroundColor: t === "truth" ? COLORS.purple : COLORS.orange, borderColor: t === "truth" ? COLORS.purple : COLORS.orange },
+                    { backgroundColor: t === "truth" ? colors.purple : colors.red, borderColor: t === "truth" ? colors.purple : colors.red },
                 ]}
                 onPress={() => setPostType(t)}
                 activeOpacity={0.8}
               >
                 <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-                  {t === "truth" ? <Eye size={14} color={postType === t ? "#fff" : COLORS.sub} /> : <Flame size={14} color={postType === t ? "#fff" : COLORS.sub} />}
+                  {t === "truth" ? <Eye size={14} color={postType === t ? "#fff" : colors.sub} /> : <Flame size={14} color={postType === t ? "#fff" : colors.sub} />}
                   <Text
                     style={[
                       s.composeTypeTxt,
+                      { color: colors.sub },
                       postType === t && { color: "#fff" },
                     ]}
                   >
@@ -300,20 +308,20 @@ export default function CommunityScreen() {
           </View>
           <View style={s.composeRow}>
             <TextInput
-              style={s.composeInput}
+              style={[s.composeInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
               placeholder={
                 postType === "truth"
                   ? "Share a truth question..."
                   : "Share a dare..."
               }
-              placeholderTextColor={COLORS.subAlt}
+              placeholderTextColor={colors.subAlt}
               value={postText}
               onChangeText={setPostText}
               multiline
               maxLength={200}
             />
             <TouchableOpacity
-              style={[s.composeBtn, !postText.trim() && s.composeBtnDisabled]}
+              style={[s.composeBtn, { backgroundColor: colors.purple }, !postText.trim() && s.composeBtnDisabled]}
               onPress={submitPost}
               disabled={!postText.trim() || submitting}
               activeOpacity={0.85}
@@ -328,15 +336,15 @@ export default function CommunityScreen() {
         </View>
 
         <View style={s.filterRow}>
-          <Text style={s.postCount}>{filtered.length} {postType} posts</Text>
+          <Text style={[s.postCount, { color: colors.subAlt }]}>{filtered.length} {postType} posts</Text>
         </View>
 
         {loading ? (
           <View
             style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
           >
-            <ActivityIndicator size="large" color={COLORS.purple} />
-            <Text style={{ color: COLORS.sub, marginTop: 12 }}>Loading posts...</Text>
+            <ActivityIndicator size="large" color={colors.purple} />
+            <Text style={{ color: colors.sub, marginTop: 12 }}>Loading posts...</Text>
           </View>
         ) : (
           <FlatList
@@ -352,8 +360,8 @@ export default function CommunityScreen() {
             removeClippedSubviews
             ListEmptyComponent={
               <View style={s.empty}>
-                <Inbox size={48} color={COLORS.sub} />
-                <Text style={s.emptyText}>
+                <Inbox size={48} color={colors.sub} />
+                <Text style={[s.emptyText, { color: colors.sub }]}>
                   No posts yet. Be the first to share!
                 </Text>
               </View>
@@ -380,7 +388,7 @@ export default function CommunityScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
+  safe: { flex: 1, backgroundColor: "#0b081c" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -388,8 +396,8 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  title: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
-  subtitle: { color: COLORS.sub, fontSize: 12, marginTop: 1 },
+  title: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
+  subtitle: { color: "#a19bb3", fontSize: 12, marginTop: 1 },
   compose: {
     padding: 14,
     gap: 8,
@@ -402,25 +410,25 @@ const s = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(23, 19, 50, 0.6)",
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  composeTypeTxt: { fontSize: 13, fontWeight: "700", color: COLORS.sub },
+  composeTypeTxt: { fontSize: 13, fontWeight: "700", color: "#a19bb3" },
   composeRow: { flexDirection: "row", gap: 8, alignItems: "flex-end" },
   composeInput: {
     flex: 1,
     backgroundColor: "rgba(23, 19, 50, 0.5)",
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: "rgba(255, 255, 255, 0.08)",
     borderRadius: RADIUS.small,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: COLORS.text,
+    color: "#ffffff",
     fontSize: 14,
     minHeight: 44,
     textAlignVertical: "top",
   },
   composeBtn: {
-    backgroundColor: COLORS.purple,
+    backgroundColor: "#3b82f6",
     borderRadius: RADIUS.small,
     paddingHorizontal: 18,
     paddingVertical: 13,
@@ -443,26 +451,25 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.small,
     backgroundColor: "rgba(23, 19, 50, 0.6)",
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  filterBtnTxt: { fontSize: 12, fontWeight: "700", color: COLORS.sub },
-  postCount: { color: COLORS.subAlt, fontSize: 11, fontWeight: "700" },
+  filterBtnTxt: { fontSize: 12, fontWeight: "700", color: "#a19bb3" },
+  postCount: { color: "#7c7890", fontSize: 11, fontWeight: "700" },
   list: { padding: 16, gap: 12 },
   postCard: {
     backgroundColor: "rgba(23, 19, 50, 0.7)",
     borderRadius: RADIUS.cardSm,
     padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: "rgba(255, 255, 255, 0.08)",
     gap: 10,
-    ...SHADOWS.subtle,
   },
   postTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   postAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: `${COLORS.purple}20`,
+    backgroundColor: "#3b82f620",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -471,24 +478,24 @@ const s = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  postAvatarTxt: { color: COLORS.purple, fontSize: 13, fontWeight: "800" },
-  postAuthor: { color: COLORS.text, fontSize: 13, fontWeight: "700" },
-  postTime: { color: COLORS.subAlt, fontSize: 11 },
+  postAvatarTxt: { color: "#3b82f6", fontSize: 13, fontWeight: "800" },
+  postAuthor: { color: "#ffffff", fontSize: 13, fontWeight: "700" },
+  postTime: { color: "#7c7890", fontSize: 11 },
   postTypeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   postTypeTruth: {
-    backgroundColor: `${COLORS.purple}15`,
+    backgroundColor: "#3b82f615",
     borderWidth: 1,
-    borderColor: `${COLORS.purple}30`,
+    borderColor: "#3b82f630",
   },
   postTypeDare: {
-    backgroundColor: `${COLORS.orange}15`,
+    backgroundColor: "#dc262615",
     borderWidth: 1,
-    borderColor: `${COLORS.orange}30`,
+    borderColor: "#dc262630",
   },
   postTypeText: { fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  postText: { color: COLORS.text, fontSize: 14, lineHeight: 21, fontWeight: "500" },
+  postText: { color: "#ffffff", fontSize: 14, lineHeight: 21, fontWeight: "500" },
   postActions: { flexDirection: "row", alignItems: "center" },
   likeBtn: {
     flexDirection: "row",
@@ -499,10 +506,10 @@ const s = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  likeBtnActive: { backgroundColor: `${COLORS.pink}20`, borderColor: `${COLORS.pink}40` },
-  likeBtnText: { fontSize: 13, fontWeight: "700", color: COLORS.text },
+  likeBtnActive: { backgroundColor: "#dc262620", borderColor: "#dc262640" },
+  likeBtnText: { fontSize: 13, fontWeight: "700", color: "#ffffff" },
   empty: { alignItems: "center", paddingTop: 60, gap: 10 },
-  emptyText: { color: COLORS.sub, fontSize: 14, textAlign: "center" },
+  emptyText: { color: "#a19bb3", fontSize: 14, textAlign: "center" },
 });

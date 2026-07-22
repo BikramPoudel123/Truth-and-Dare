@@ -14,6 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/Avatar";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import { fetchProfileCached, getHttpBase } from "@/utils/http";
 import { INTEREST_LABEL, PLAY_STYLE_ICON_MAP } from "@/constants/profile";
@@ -81,6 +82,7 @@ function ProfileModalInner({
   isSent = false,
 }: ProfileModalProps) {
   const { playerId } = useProfile();
+  const { colors } = useTheme();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -134,11 +136,11 @@ function ProfileModalInner({
     data.authorId !== playerId;
 
   const friendActionIcon = useMemo(() => {
-    if (actionMode === "friends") return { icon: UserMinus, color: COLORS.red };
-    if (isFriend) return { icon: Users, color: COLORS.green };
-    if (isSent) return { icon: UserCheck, color: COLORS.blue };
-    return { icon: UserPlus, color: COLORS.purple };
-  }, [actionMode, isFriend, isSent]);
+    if (actionMode === "friends") return { icon: UserMinus, color: colors.red };
+    if (isFriend) return { icon: Users, color: colors.green };
+    if (isSent) return { icon: UserCheck, color: colors.electricBlue };
+    return { icon: UserPlus, color: colors.purple };
+  }, [actionMode, isFriend, isSent, colors]);
 
   return (
     <Modal
@@ -151,6 +153,7 @@ function ProfileModalInner({
         <View
           style={[
             s.card,
+            { backgroundColor: colors.bg },
             {
               maxWidth: rCardW,
               maxHeight: rCardMaxH,
@@ -162,10 +165,10 @@ function ProfileModalInner({
           ]}
           {...pfPanResponder.panHandlers}
         >
-          <View style={[s.grabber, { marginBottom: rGrabMarg }]} />
+          <View style={[s.grabber, { marginBottom: rGrabMarg, backgroundColor: colors.borderLight }]} />
 
           {data.loading ? (
-            <ActivityIndicator size="large" color={COLORS.purple} />
+            <ActivityIndicator size="large" color={colors.purple} />
           ) : (
             <>
               <ScrollView
@@ -178,67 +181,67 @@ function ProfileModalInner({
                 }}
                 scrollEventThrottle={16}
               >
-                <Avatar uri={data.pic} name={data.name} size={72} borderWidth={2} borderColor={COLORS.purple} />
-                <Text style={s.name}>{data.name}</Text>
+                <Avatar uri={data.pic} name={data.name} size={72} borderWidth={2} borderColor={colors.purple} />
+                <Text style={[s.name, { color: colors.text }]}>{data.name}</Text>
 
                 {data.playStyle && (
-                  <View style={s.playStyleBadge}>
+                  <View style={[s.playStyleBadge, { borderColor: colors.border, backgroundColor: colors.glassBg }]}>
                     {(() => {
-                      const pair = PLAY_STYLE_ICON_MAP[data.playStyle] ?? [Star, COLORS.sub];
+                      const pair = PLAY_STYLE_ICON_MAP[data.playStyle] ?? [Star, colors.sub];
                       const Icon = pair[0];
                       return (
                         <>
                           <Icon size={13} color={pair[1]} />
-                          <Text style={s.playStyleText}>{data.playStyle}</Text>
+                          <Text style={[s.playStyleText, { color: colors.text }]}>{data.playStyle}</Text>
                         </>
                       );
                     })()}
                   </View>
                 )}
 
-                <View style={s.statsCard}>
+                <View style={[s.statsCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
                   <View style={s.statCol}>
-                    <Crown size={18} color={COLORS.gold} />
-                    <Text style={s.statNum}>{data.level}</Text>
-                    <View style={s.levelBarOuter}>
-                      <View style={[s.levelBarInner, { width: `${levelProgress}%` }]} />
+                    <Crown size={18} color={colors.gold} />
+                    <Text style={[s.statNum, { color: colors.text }]}>{data.level}</Text>
+                    <View style={[s.levelBarOuter, { backgroundColor: colors.levelBarBg }]}>
+                      <View style={[s.levelBarInner, { width: `${levelProgress}%`, backgroundColor: colors.gold }]} />
                     </View>
-                    <Text style={s.statLabel} numberOfLines={1}>Level</Text>
+                    <Text style={[s.statLabel, { color: colors.sub }]} numberOfLines={1}>Level</Text>
                   </View>
-                  <View style={s.statDivider} />
+                  <View style={[s.statDivider, { backgroundColor: colors.border }]} />
                   <View style={s.statCol}>
-                    <SmilePlus size={18} color={COLORS.sub} />
-                    <Text style={s.statNum}>{totalReactions}</Text>
-                    <Text style={s.statLabel} numberOfLines={1}>Reactions</Text>
+                    <SmilePlus size={18} color={colors.sub} />
+                    <Text style={[s.statNum, { color: colors.text }]}>{totalReactions}</Text>
+                    <Text style={[s.statLabel, { color: colors.sub }]} numberOfLines={1}>Reactions</Text>
                   </View>
-                  <View style={s.statDivider} />
+                  <View style={[s.statDivider, { backgroundColor: colors.border }]} />
                   <View style={s.statCol}>
-                    <CalendarDays size={18} color={COLORS.sub} />
-                    <Text style={s.statDate} numberOfLines={1}>{playedSinceFormatted}</Text>
-                    <Text style={s.statLabel} numberOfLines={1}>Played Since</Text>
+                    <CalendarDays size={18} color={colors.sub} />
+                    <Text style={[s.statDate, { color: colors.text }]} numberOfLines={1}>{playedSinceFormatted}</Text>
+                    <Text style={[s.statLabel, { color: colors.sub }]} numberOfLines={1}>Played Since</Text>
                   </View>
                 </View>
 
                 {totalReactions > 0 && (
                   <View style={s.reactionsWrap}>
                     {Object.entries(data.reactions).map(([emoji, count]) => (
-                      <View key={emoji} style={s.reactionTag}>
+                      <View key={emoji} style={[s.reactionTag, { borderColor: colors.border, backgroundColor: colors.glassBg }]}>
                         <Text style={s.reactionEmoji}>{emoji}</Text>
-                        <Text style={s.reactionCount}>{count}</Text>
+                        <Text style={[s.reactionCount, { color: colors.sub }]}>{count}</Text>
                       </View>
                     ))}
                   </View>
                 )}
 
-                {data.bio ? <Text style={s.bio}>{data.bio}</Text> : null}
+                {data.bio ? <Text style={[s.bio, { color: colors.sub }]}>{data.bio}</Text> : null}
 
                 {data.interests.length > 0 && (
                   <>
-                    <Text style={s.interestsLabel}>Interests</Text>
+                    <Text style={[s.interestsLabel, { color: colors.sub }]}>Interests</Text>
                     <View style={s.interestsWrap}>
                       {data.interests.map((i) => (
-                        <View key={i} style={s.interestTag}>
-                          <Text style={s.interestTxt}>{INTEREST_LABEL[i] ?? i}</Text>
+                        <View key={i} style={[s.interestTag, { backgroundColor: `${colors.purple}15`, borderColor: `${colors.purple}30` }]}>
+                          <Text style={[s.interestTxt, { color: colors.purple }]}>{INTEREST_LABEL[i] ?? i}</Text>
                         </View>
                       ))}
                     </View>
@@ -249,14 +252,14 @@ function ProfileModalInner({
               {showFriendAction && (
                 <View style={s.friendIconWrap}>
                   {actionMode === "friends" ? (
-                    <TouchableOpacity style={s.friendIcon} onPress={handleFriendPress} activeOpacity={0.7}>
+                    <TouchableOpacity style={[s.friendIcon, { backgroundColor: colors.glassBg }]} onPress={handleFriendPress} activeOpacity={0.7}>
                       {(() => {
                         const { icon: Icon, color } = friendActionIcon;
                         return <Icon size={18} color={color} />;
                       })()}
                     </TouchableOpacity>
                   ) : isFriend || isSent ? (
-                    <View style={s.friendIcon}>
+                    <View style={[s.friendIcon, { backgroundColor: colors.glassBg }]}>
                       {(() => {
                         const { icon: Icon, color } = friendActionIcon;
                         return <Icon size={18} color={color} />;
@@ -264,11 +267,11 @@ function ProfileModalInner({
                     </View>
                   ) : (
                     <TouchableOpacity
-                      style={s.friendIcon}
+                      style={[s.friendIcon, { backgroundColor: colors.glassBg }]}
                       onPress={handleFriendPress}
                       activeOpacity={0.7}
                     >
-                      <UserPlus size={18} color={COLORS.purple} />
+                      <UserPlus size={18} color={colors.purple} />
                     </TouchableOpacity>
                   )}
                 </View>
