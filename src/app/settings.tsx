@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RADIUS } from "@/constants/design-system";
 import { useTheme } from "@/contexts/ThemeContext";
+import { FlameBackground } from "@/components/FlameBackground";
 import { ArrowLeft, Bell, Moon, Volume2, Info } from "lucide-react-native";
 
 function Toggle({ value, onChange, disabled }: { value: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
@@ -44,6 +45,7 @@ export default function SettingsScreen({ onBack }: { onBack?: () => void }) {
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: c.bg }]}>
+      <FlameBackground />
       <View style={[s.header, { borderBottomColor: c.border }]}>
         <TouchableOpacity onPress={onBack} style={[s.backBtn, { backgroundColor: c.glassBg, borderColor: c.border }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <ArrowLeft size={18} color={c.text} />
@@ -138,7 +140,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   toggleTrackOn: {
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#fd267a",
   },
   toggleDisabled: {
     opacity: 0.5,

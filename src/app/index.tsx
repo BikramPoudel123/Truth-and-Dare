@@ -1,4 +1,5 @@
 import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { GameProvider, useGame } from "@/contexts/GameContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
@@ -124,12 +125,14 @@ const s = StyleSheet.create({
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <ProfileProvider>
-        <GameProvider>
-          <AppContent />
-        </GameProvider>
-      </ProfileProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <ProfileProvider>
+          <GameProvider>
+            <AppContent />
+          </GameProvider>
+        </ProfileProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

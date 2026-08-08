@@ -51,7 +51,7 @@ export default function ErrorScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0b081c" },
+  safe: { flex: 1, backgroundColor: "#0d0d10" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 16 },
   iconWrap: {
     width: 88, height: 88, borderRadius: 44,

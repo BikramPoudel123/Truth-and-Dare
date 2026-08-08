@@ -27,7 +27,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RADIUS } from "@/constants/design-system";
 import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi, fetchFriendIdsAndSent } from "@/utils/http";
-import { ArrowLeft, CalendarDays, Crown, Eye, Flame, Gamepad2, Heart, Mic, PartyPopper, Skull, SmilePlus, Sparkles, Star, Timer as TimerIcon, Paperclip, Send, Target, Camera, Check, X, Flag, UserPlus, UserMinus, UserCheck, Users, Zap } from "lucide-react-native";
+import { ArrowLeft, CalendarDays, Crown, Eye, Flame, Heart, Mic, PartyPopper, Skull, SmilePlus, Sparkles, Star, Timer as TimerIcon, Paperclip, Send, Camera, Check, X, Flag, UserPlus, UserMinus, UserCheck, Users, Zap, Target } from "lucide-react-native";
+import { BrandGradient } from "@/components/BrandGradient";
+import { FlameBackground } from "@/components/FlameBackground";
 import { ParticleBurst } from "@/components/ParticleBurst";
 
 const PlayerAvatarItem = memo(function PlayerAvatarItem({
@@ -45,7 +47,7 @@ const PlayerAvatarItem = memo(function PlayerAvatarItem({
   const isMe = player.name === playerName;
   const pic = isMe ? profilePic : player.profilePic;
   const glowStyle = useMemo(() => active && pic ? { ...shadows.glow } : undefined, [active, pic]);
-  const content = (
+  const avatar = (
     <Avatar
       uri={pic}
       name={player.name}
@@ -54,9 +56,14 @@ const PlayerAvatarItem = memo(function PlayerAvatarItem({
       borderColor={pic ? moodColor : colors.border}
       initialsBgColor={active ? moodColor : colors.glassBg}
       initialsTextColor={active ? "#fff" : colors.sub}
-      style={[glowStyle, { marginBottom: 2 }]}
+      style={{ marginBottom: 2 }}
     />
   );
+  const content = active && pic ? (
+    <BrandGradient variant="primary" style={[glowStyle, { padding: 3, borderRadius: 25, marginBottom: 2, alignSelf: "flex-start" }]}>
+      {avatar}
+    </BrandGradient>
+  ) : avatar;
   if (isMe) return content;
   return (
     <TouchableOpacity onPress={() => onAvatarPress?.(playerId, player.name)} activeOpacity={0.7}>
@@ -78,8 +85,8 @@ const PlayerBar = memo(function PlayerBar({ players, currentTurn, playerName, se
   const { gameMood, currentMode } = useGame();
   const { colors } = useTheme();
   let moodCfg = getMoodConfig(gameMood);
-  if (currentMode === "truth") moodCfg = { ...moodCfg, color: colors.purple, accentColor: colors.purple };
-  if (currentMode === "dare") moodCfg = { ...moodCfg, color: colors.red, accentColor: colors.red };
+  if (currentMode === "truth") moodCfg = { ...moodCfg, color: colors.truth, accentColor: colors.truth };
+  if (currentMode === "dare") moodCfg = { ...moodCfg, color: colors.dare, accentColor: colors.dare };
   if (players.length < 2) return null;
 
   const meIdx = players.findIndex(p => p.id === selfId);
@@ -97,7 +104,7 @@ const PlayerBar = memo(function PlayerBar({ players, currentTurn, playerName, se
           <Text style={[pb.name, { color: colors.subAlt }, activeMe && pb.nameOn, activeMe && { color: colors.text }]} numberOfLines={1}>
             {me.name} (you)
           </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: "rgba(245,158,11,0.15)", borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: "rgba(255,177,0,0.15)", borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 }}>
             <Crown size={9} color={colors.gold} />
             <Text style={{ color: colors.gold, fontSize: 9, fontWeight: "900" }}>{playerLevels?.[me.id] ?? selfLevel?.level}</Text>
           </View>
@@ -105,9 +112,9 @@ const PlayerBar = memo(function PlayerBar({ players, currentTurn, playerName, se
         {activeMe && <Text style={[pb.turnTag, { color: moodCfg.color }]}>● TURN</Text>}
       </View>
 
-      <View style={[pb.vsWrap, { backgroundColor: `${moodCfg.color}20`, borderColor: `${moodCfg.color}40` }]}>
-        <Text style={[pb.vsText, { color: moodCfg.color }]}>VS</Text>
-      </View>
+      <BrandGradient colors={[moodCfg.color, moodCfg.accentColor]} style={[pb.vsWrap, { borderColor: `${moodCfg.color}60` }]}>
+        <Text style={[pb.vsText, { color: "#fff" }]}>VS</Text>
+      </BrandGradient>
 
       <View style={[pb.slot, { alignItems: "flex-end" }]}>
         <PlayerAvatarItem player={opponent} active={activeOpp} playerId={opponent.id} playerName={playerName} profilePic={profilePic} onAvatarPress={onAvatarPress} moodColor={moodCfg.color} />
@@ -115,7 +122,7 @@ const PlayerBar = memo(function PlayerBar({ players, currentTurn, playerName, se
           <Text style={[pb.name, { color: colors.subAlt }, activeOpp && pb.nameOn, activeOpp && { color: colors.text }]} numberOfLines={1}>
             {opponent.name}
           </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: "rgba(245,158,11,0.15)", borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 2, backgroundColor: "rgba(255,177,0,0.15)", borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 }}>
             <Crown size={9} color={colors.gold} />
             <Text style={{ color: colors.gold, fontSize: 9, fontWeight: "900" }}>{playerLevels?.[opponent.id] ?? "?"}</Text>
           </View>
@@ -138,7 +145,7 @@ const pb = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.08)",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    backgroundColor: "rgba(28, 28, 34, 0.7)",
   },
   slot: { flex: 1, gap: 2 },
   avatar: {
@@ -152,7 +159,7 @@ const pb = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.08)",
   },
   avatarTxt: { fontSize: 12, fontWeight: "800" },
-  name: { fontSize: 11, fontWeight: "700", color: "#7c7890", maxWidth: 80 },
+  name: { fontSize: 11, fontWeight: "700", color: "#6e6e7a", maxWidth: 80 },
   nameOn: { color: "#ffffff" },
   turnTag: { fontSize: 8, fontWeight: "800", letterSpacing: 0.8 },
   vsWrap: {
@@ -217,7 +224,7 @@ const tib = StyleSheet.create({
 
 function ModeCard({ icon, label, sub, color, onPress, burstColors }: { icon: React.ReactNode; label: string; sub: string; color: string; onPress: () => void; burstColors?: string[] }) {
   const { colors } = useTheme();
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useMemo(() => new Animated.Value(1), []);
   const [burst, setBurst] = useState(false);
 
   const onPressIn = () => Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, friction: 6, tension: 200 }).start();
@@ -250,7 +257,7 @@ function ModeCard({ icon, label, sub, color, onPress, burstColors }: { icon: Rea
 }
 
 function ActionButton({ children, onPress, disabled, style }: { children: React.ReactNode; onPress: () => void; disabled?: boolean; style?: any }) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useMemo(() => new Animated.Value(1), []);
 
   const onPressIn = () => { if (!disabled) Animated.spring(scale, { toValue: 0.93, useNativeDriver: true, friction: 6, tension: 200 }).start(); };
   const onPressOut = () => { if (!disabled) Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 150 }).start(); };
@@ -283,8 +290,8 @@ export default function GameScreen() {
   const selfLevel = getLevelProgress(profile.stats.gamesPlayed);
   const [playerLevels, setPlayerLevels] = useState<Record<string, number>>({});
   let moodCfg = getMoodConfig(gameMood);
-  if (currentMode === "truth") moodCfg = { ...moodCfg, color: colors.purple, accentColor: colors.purple };
-  if (currentMode === "dare") moodCfg = { ...moodCfg, color: colors.red, accentColor: colors.red };
+  if (currentMode === "truth") moodCfg = { ...moodCfg, color: colors.truth, accentColor: colors.truth };
+  if (currentMode === "dare") moodCfg = { ...moodCfg, color: colors.dare, accentColor: colors.dare };
   const answerInputRef = useRef<TextInput>(null);
 
   const [inputQ, setInputQ]       = useState("");
@@ -491,13 +498,25 @@ export default function GameScreen() {
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
+      <FlameBackground />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={s.flex}>
 
         <View style={[s.topBar, { borderBottomColor: `${moodCfg.color}20` }]}>
           <TouchableOpacity onPress={handleQuit} style={[s.topBtn, { backgroundColor: colors.glassBg, borderColor: colors.border }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <ArrowLeft size={18} color={moodCfg.color} />
           </TouchableOpacity>
-          <Text style={[s.topTitle, { color: colors.text }]}>Truth or Dare</Text>
+          <View style={s.topTitleWrap}>
+            <View style={s.logoRow}>
+              <View style={s.maskRow}>
+                <Text style={s.maskBlue}>🎭</Text>
+              </View>
+              <View style={s.logoTextCol}>
+                <Text style={[s.logoTruth, { color: colors.truth }]}>Truth</Text>
+                <Text style={[s.logoDare, { color: colors.dare }]}>Dare</Text>
+                <Text style={[s.logoOr, { color: colors.text }]}>or</Text>
+              </View>
+            </View>
+          </View>
           <View style={{ width: 36 }} />
         </View>
 
@@ -512,7 +531,7 @@ export default function GameScreen() {
 
           {phase === "choosing" && isMyTurn && (
             <View style={s.chooseWrap}>
-              <Text style={[s.chooseLabel, { color: colors.sub }]}>Your turn — pick one</Text>
+              <Text style={[s.chooseLabel, { color: colors.sub }]}>Your turn — pick a mode</Text>
               <View style={[s.choiceTimer, timer <= 3 && s.choiceTimerUrgent, timer <= 3 && { backgroundColor: `${colors.red}10` }]}>
                 <TimerIcon size={12} color={timer <= 3 ? colors.red : colors.sub} />
                 <Text style={[s.choiceTimerTxt, { color: colors.sub }, timer <= 3 && { color: colors.red }]}>
@@ -522,22 +541,23 @@ export default function GameScreen() {
                   <View style={[s.choiceFill, { width: `${(timer / 7) * 100}%` as any, backgroundColor: timer <= 3 ? colors.red : moodCfg.color }]} />
                 </View>
               </View>
+
               <View style={s.modeRow}>
                 <ModeCard
-                  icon={<Eye size={36} color={moodCfg.color} />}
+                  icon={<Eye size={36} color={colors.truth} />}
                   label="TRUTH"
                   sub="Answer honestly"
-                  color={moodCfg.color}
+                  color={colors.truth}
                   onPress={() => { playModeSelect(); chooseMode("truth"); }}
-                  burstColors={[colors.purple, "#60a5fa", "#93c5fd"]}
+                  burstColors={[colors.truth, "#fd267a", "#fd267a"]}
                 />
                 <ModeCard
-                  icon={<Flame size={36} color={moodCfg.accentColor} />}
+                  icon={<Flame size={36} color={colors.dare} />}
                   label="DARE"
                   sub="Accept challenge"
-                  color={moodCfg.accentColor}
+                  color={colors.dare}
                   onPress={() => { playModeSelect(); chooseMode("dare"); }}
-                  burstColors={[colors.red, "#f87171", "#fca5a5"]}
+                  burstColors={[colors.dare, "#ff9b6b", "#ff9b6b"]}
                 />
               </View>
             </View>
@@ -751,11 +771,11 @@ export default function GameScreen() {
                 disabled={!isMyQ}
                 style={[{ borderRadius: RADIUS.button }, !isMyQ && s.nextBtnDisabled]}
               >
-                <View style={[s.nextBtn, { backgroundColor: moodCfg.color }]}>
+                <BrandGradient variant="primary" style={s.nextBtnGrad}>
                   <Text style={s.nextBtnTxt}>
                     {isMyQ ? `Next Round  →  ${timer}s` : `Waiting for ${askerName_}${youSuffix(askerName_)}…`}
                   </Text>
-                </View>
+                </BrandGradient>
               </ActionButton>
               <TouchableOpacity onPress={handleQuit} activeOpacity={0.7} style={{ paddingVertical: 10, alignItems: "center" }}>
                 <Text style={{ color: colors.red, fontSize: 13, fontWeight: "600" }}>End Game</Text>
@@ -770,11 +790,11 @@ export default function GameScreen() {
             {showQMedia && <MediaPicker selected={qMedia} onChange={setQMedia} />}
             {showQAudio && <AudioRecorder onRecorded={handleQAudioRecorded} accentColor={moodCfg.color} />}
             <View style={s.stickyRow}>
-              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${colors.purple}15`, borderColor: colors.border }]} onPress={() => setShowQMedia(v => !v)} activeOpacity={0.82}>
+              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${colors.brand}15`, borderColor: colors.border }]} onPress={() => setShowQMedia(v => !v)} activeOpacity={0.82}>
                 <Paperclip size={20} color={colors.sub} />
                 {qMedia.length > 0 && <View style={[s.badge, { backgroundColor: moodCfg.color }]}><Text style={s.badgeTxt}>{qMedia.length}</Text></View>}
               </TouchableOpacity>
-              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${colors.purple}15`, borderColor: colors.border }]} onPress={() => setShowQAudio(v => !v)} activeOpacity={0.82}>
+              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${colors.brand}15`, borderColor: colors.border }]} onPress={() => setShowQAudio(v => !v)} activeOpacity={0.82}>
                 <Mic size={20} color={colors.sub} />
                 {qMedia.filter(m => m.type === "audio").length > 0 && <View style={[s.badge, { backgroundColor: moodCfg.color }]}><Text style={s.badgeTxt}>{qMedia.filter(m => m.type === "audio").length}</Text></View>}
               </TouchableOpacity>
@@ -784,7 +804,7 @@ export default function GameScreen() {
                 style={[{ backgroundColor: moodCfg.color, borderRadius: RADIUS.button, flex: 1 }, !canSendQ && s.stickyDisabled]}
               >
                 <View style={[s.stickyBtn, { backgroundColor: "transparent" }]}>
-                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     {currentMode === "truth" ? <Send size={16} color="#fff" /> : <Target size={16} color="#fff" />}
                     <Text style={s.stickyBtnTxt}>
                       Send {currentMode === "truth" ? "Question" : "Dare"}
@@ -802,11 +822,11 @@ export default function GameScreen() {
             {showAMedia && <MediaPicker selected={aMedia} onChange={setAMedia} />}
             {showAAudio && <AudioRecorder onRecorded={handleAAudioRecorded} accentColor={moodCfg.color} />}
             <View style={s.stickyRow}>
-              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${colors.purple}15`, borderColor: colors.border }]} onPress={() => setShowAMedia(v => !v)} activeOpacity={0.82}>
+              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${colors.brand}15`, borderColor: colors.border }]} onPress={() => setShowAMedia(v => !v)} activeOpacity={0.82}>
                 <Camera size={20} color={colors.sub} />
                 {aMedia.length > 0 && <View style={[s.badge, { backgroundColor: colors.green }]}><Text style={s.badgeTxt}>{aMedia.length}</Text></View>}
               </TouchableOpacity>
-              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${colors.purple}15`, borderColor: colors.border }]} onPress={() => setShowAAudio(v => !v)} activeOpacity={0.82}>
+              <TouchableOpacity style={[s.attachBtn, { backgroundColor: `${colors.brand}15`, borderColor: colors.border }]} onPress={() => setShowAAudio(v => !v)} activeOpacity={0.82}>
                 <Mic size={20} color={colors.sub} />
                 {aMedia.filter(m => m.type === "audio").length > 0 && <View style={[s.badge, { backgroundColor: colors.green }]}><Text style={s.badgeTxt}>{aMedia.filter(m => m.type === "audio").length}</Text></View>}
               </TouchableOpacity>
@@ -816,7 +836,7 @@ export default function GameScreen() {
                 style={[{ borderRadius: RADIUS.button, flex: 1 }, !canSendA && s.submitBtnDisabled]}
               >
                 <View style={[s.submitBtn, { backgroundColor: moodCfg.color }]}>
-                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Check size={18} color="#fff" />
                     <Text style={s.submitBtnTxt}>
                       {aMedia.length > 0 && !inputA.trim()
@@ -860,7 +880,7 @@ export default function GameScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: "#0b081c" },
+  safe:  { flex: 1, backgroundColor: "#0d0d10" },
   flex:  { flex: 1 },
 
   topBar: {
@@ -870,7 +890,14 @@ const s = StyleSheet.create({
   },
   topBtn:    { width: 36, height: 36, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
   topBtnTxt: { color: "#ffffff", fontSize: 18, fontWeight: "700" },
-  topTitle:  { color: "#ffffff", fontSize: 14, fontWeight: "800", letterSpacing: 1 },
+  topTitleWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
+  logoRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  maskRow: { flexDirection: "row", gap: 2 },
+  maskBlue: { fontSize: 20 },
+  logoTextCol: { position: "relative", alignItems: "center", justifyContent: "center" },
+  logoTruth: { fontSize: 15, fontWeight: "900", color: "#fd267a", letterSpacing: -0.4, lineHeight: 15, zIndex: 0 },
+  logoOr: { position: "absolute", fontSize: 10, fontWeight: "900", color: "#ffffff", opacity: 0.8, letterSpacing: 2, zIndex: 2, alignSelf: "center", top: 10 },
+  logoDare: { fontSize: 19, fontWeight: "900", color: "#ff6036", letterSpacing: 1, lineHeight: 19, zIndex: 0 },
 
   scroll: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24, paddingTop: 8 },
 
@@ -878,15 +905,15 @@ const s = StyleSheet.create({
   chooseWrap: { alignItems: "center", paddingVertical: 32, width: "100%", flex: 1, justifyContent: "center" },
   section:    { gap: 14, paddingTop: 8 },
 
-  chooseLabel: { color: "#a19bb3", fontSize: 14, textAlign: "center", fontWeight: "600", marginBottom: 4 },
+  chooseLabel: { color: "#a0a0ac", fontSize: 14, textAlign: "center", fontWeight: "600", marginBottom: 4 },
 
   choiceTimer: {
     flexDirection: "row", alignItems: "center", gap: 6,
     marginBottom: 20, paddingHorizontal: 12, paddingVertical: 6,
     borderRadius: RADIUS.small,
   },
-  choiceTimerUrgent: { backgroundColor: "#dc262610" },
-  choiceTimerTxt: { color: "#a19bb3", fontSize: 12, fontWeight: "700" },
+  choiceTimerUrgent: { backgroundColor: "#ff4d4d10" },
+  choiceTimerTxt: { color: "#a0a0ac", fontSize: 12, fontWeight: "700" },
   choiceTrack: { height: 3, borderRadius: 2, flex: 1, overflow: "hidden", minWidth: 60 },
   choiceFill: { height: "100%", borderRadius: 2 },
 
@@ -895,9 +922,9 @@ const s = StyleSheet.create({
     borderWidth: 1, width: "100%",
   },
 
-  phaseLabel: { color: "#a19bb3", fontSize: 14, textAlign: "center", fontWeight: "600" },
+  phaseLabel: { color: "#a0a0ac", fontSize: 14, textAlign: "center", fontWeight: "600" },
   waitTitle:  { color: "#ffffff", fontSize: 18, fontWeight: "700", textAlign: "center" },
-  waitSub:    { color: "#a19bb3", fontSize: 13, textAlign: "center" },
+  waitSub:    { color: "#a0a0ac", fontSize: 13, textAlign: "center" },
 
   browseBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
@@ -907,7 +934,7 @@ const s = StyleSheet.create({
   },
   browseBtnText: { fontSize: 12, fontWeight: "800", letterSpacing: 0.3 },
 
-  modeRow: { flexDirection: "row", gap: 12, width: "100%" },
+  modeRow: { flexDirection: "row", gap: 12, width: "100%", marginTop: 20 },
   modeCard: {
     flex: 1, borderRadius: RADIUS.cardSm, paddingVertical: 32,
     alignItems: "center", justifyContent: "center",
@@ -915,14 +942,14 @@ const s = StyleSheet.create({
   },
   modeIconWrap: { width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center" },
   modeWord:  { fontSize: 22, fontWeight: "900", letterSpacing: 2 },
-  modeSub:   { color: "#a19bb3", fontSize: 12 },
+  modeSub:   { color: "#a0a0ac", fontSize: 12 },
 
   textBox: {
     borderWidth: 1.5,
     borderRadius: RADIUS.cardSm,
     paddingHorizontal: 14, paddingVertical: 12,
     color: "#ffffff", fontSize: 15, minHeight: 90, textAlignVertical: "top",
-    backgroundColor: "rgba(23, 19, 50, 0.5)",
+    backgroundColor: "rgba(28, 28, 34, 0.5)",
   },
 
   // ── Answer-centric UI ──
@@ -940,7 +967,7 @@ const s = StyleSheet.create({
     position: "relative",
   },
   questionText: {
-    color: "#a19bb3",
+    color: "#a0a0ac",
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
@@ -955,7 +982,7 @@ const s = StyleSheet.create({
     fontSize: 17,
     minHeight: 140,
     textAlignVertical: "top",
-    backgroundColor: "rgba(23, 19, 50, 0.6)",
+    backgroundColor: "rgba(28, 28, 34, 0.6)",
     lineHeight: 24,
   },
   waitingAnswer: {
@@ -966,7 +993,7 @@ const s = StyleSheet.create({
     paddingVertical: 32,
   },
   waitingAnswerText: {
-    color: "#a19bb3",
+    color: "#a0a0ac",
     fontSize: 14,
     fontWeight: "600",
   },
@@ -1030,7 +1057,7 @@ const s = StyleSheet.create({
   emojiPicker: {
     flexDirection: "row",
     gap: 2,
-    backgroundColor: "rgba(23, 19, 50, 0.95)",
+    backgroundColor: "rgba(28, 28, 34, 0.95)",
     borderRadius: RADIUS.small,
     paddingHorizontal: 6,
     paddingVertical: 4,
@@ -1048,7 +1075,7 @@ const s = StyleSheet.create({
     position: "absolute",
     bottom: -12,
     right: -8,
-    backgroundColor: "rgba(23, 19, 50, 0.9)",
+    backgroundColor: "rgba(28, 28, 34, 0.9)",
     borderRadius: 16,
     width: 36,
     height: 36,
@@ -1063,14 +1090,14 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#dc262615",
+    backgroundColor: "#ff4d4d15",
     borderRadius: RADIUS.small,
     paddingVertical: 12,
     paddingHorizontal: 20,
     alignSelf: "center",
   },
-  forfeitTxt: { color: "#dc2626", fontSize: 14, fontWeight: "700" },
-  nextBtn: { borderRadius: RADIUS.button, paddingVertical: 16, alignItems: "center" },
+  forfeitTxt: { color: "#ff4d4d", fontSize: 14, fontWeight: "700" },
+  nextBtnGrad: { borderRadius: RADIUS.button, paddingVertical: 16, alignItems: "center" },
   nextBtnDisabled: { opacity: 0.4 },
   nextBtnTxt: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: 1 },
 
@@ -1087,13 +1114,13 @@ const s = StyleSheet.create({
   sticky: {
     paddingHorizontal: 16, paddingVertical: 10,
     gap: 8,
-    backgroundColor: "rgba(11, 8, 28, 0.9)",
+    backgroundColor: "rgba(13, 13, 16, 0.9)",
     borderTopWidth: 1,
     borderTopColor: "rgba(255, 255, 255, 0.08)",
   },
   stickyBtn:      { flex: 1, borderRadius: RADIUS.small, paddingVertical: 15, alignItems: "center" },
-  stickyGreen:    { backgroundColor: "#10b981" },
-  stickyRed:      { backgroundColor: "#dc262615", borderWidth: 1, borderColor: "#dc262630" },
+  stickyGreen:    { backgroundColor: "#34c271" },
+  stickyRed:      { backgroundColor: "#ff4d4d15", borderWidth: 1, borderColor: "#ff4d4d30" },
   stickyDisabled: { opacity: 0.35 },
   stickyBtnTxt:   { color: "#fff", fontSize: 14, fontWeight: "800", letterSpacing: 1 },
 
@@ -1111,8 +1138,8 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.small,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#dc262615",
+    backgroundColor: "#ff4d4d15",
     borderWidth: 1,
-    borderColor: "#dc262630",
+    borderColor: "#ff4d4d30",
   },
 });

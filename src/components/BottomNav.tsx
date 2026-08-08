@@ -2,13 +2,14 @@ import { memo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Home, User, HelpCircle, Users } from "lucide-react-native";
+import { Home, User, Gamepad2, MessagesSquare } from "lucide-react-native";
+import { BrandGradient } from "@/components/BrandGradient";
 
 const NAV_TABS = [
   { key: "home",      label: "Home",      icon: "Home" },
   { key: "profile",   label: "Profile",   icon: "User" },
-  { key: "questions", label: "Questions", icon: "HelpCircle" },
-  { key: "community", label: "Community", icon: "Users" },
+  { key: "questions", label: "Questions", icon: "Gamepad2" },
+  { key: "community", label: "Community", icon: "MessagesSquare" },
 ];
 
 interface BottomNavProps {
@@ -16,7 +17,7 @@ interface BottomNavProps {
   onNavigate: (tab: string) => void;
 }
 
-const icons: Record<string, React.ComponentType<{ size: number; color: string }>> = { Home, User, HelpCircle, Users };
+const icons: Record<string, React.ComponentType<{ size: number; color: string }>> = { Home, User, Gamepad2, MessagesSquare };
 
 function BottomNavInner({ activeTab, onNavigate }: BottomNavProps) {
   const insets = useSafeAreaInsets();
@@ -33,12 +34,18 @@ function BottomNavInner({ activeTab, onNavigate }: BottomNavProps) {
             onPress={() => onNavigate(tab.key)}
             activeOpacity={0.85}
           >
-            <View style={s.navIconWrap}>
-              {IconComp && <IconComp size={18} color={isActive ? colors.text : colors.sub} />}
-            </View>
-            <View style={[s.navLabelWrap, isActive && { backgroundColor: colors.navActiveBg }]}>
-              <Text style={[s.navLabel, isActive && s.navLabelActive, { color: isActive ? "#fff" : colors.sub }]}>{tab.label}</Text>
-            </View>
+            {isActive ? (
+              <BrandGradient variant="primary" style={s.navIconActive}>
+                <IconComp size={20} color="#fff" />
+              </BrandGradient>
+            ) : (
+              <View style={s.navIcon}>
+                <IconComp size={20} color={colors.sub} />
+              </View>
+            )}
+            <Text style={[s.navLabel, { color: isActive ? colors.text : colors.sub }, isActive && s.navLabelActive]}>
+              {tab.label}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -51,32 +58,30 @@ export default memo(BottomNavInner);
 const s = StyleSheet.create({
   bottomNav: {
     flexDirection: "row",
-    paddingTop: 2,
-    paddingHorizontal: 4,
+    paddingTop: 8,
+    paddingHorizontal: 6,
     borderTopWidth: 1,
   },
   navItem: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 2,
-    borderRadius: 20,
-    position: "relative",
+    gap: 3,
   },
-  navIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  navIcon: {
+    width: 44,
+    height: 32,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 0,
   },
-  navLabel: { fontSize: 9, fontWeight: "700" },
-  navLabelActive: {},
-  navLabelWrap: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    overflow: "hidden",
+  navIconActive: {
+    width: 48,
+    height: 32,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  navLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 0.4 },
+  navLabelActive: { fontWeight: "900" },
 });

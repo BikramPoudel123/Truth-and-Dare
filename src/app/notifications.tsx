@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RADIUS } from "@/constants/design-system";
 import { useTheme } from "@/contexts/ThemeContext";
+import { FlameBackground } from "@/components/FlameBackground";
 import { getHttpBase } from "@/utils/http";
 import { timeAgo } from "@/utils/format";
 import { ArrowLeft, Bell, CheckCheck, Heart, UserPlus, UserX } from "lucide-react-native";
@@ -126,6 +127,7 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
+      <FlameBackground />
       <View style={[s.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={onBack} style={[s.backBtn, { backgroundColor: colors.glassBg, borderColor: colors.border }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <ArrowLeft size={18} color={colors.text} />
@@ -166,7 +168,7 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0b081c" },
+  safe: { flex: 1, backgroundColor: "#0d0d10" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -178,18 +180,18 @@ const s = StyleSheet.create({
   },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
   title: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
-  subtitle: { color: "#a19bb3", fontSize: 12, marginTop: 1 },
-  markBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(59, 130, 246, 0.15)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(59, 130, 246, 0.30)" },
+  subtitle: { color: "#a0a0ac", fontSize: 12, marginTop: 1 },
+  markBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(253, 38, 122, 0.15)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(253, 38, 122, 0.30)" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
   emptyState: { alignItems: "center", paddingTop: 80, gap: 12 },
-  emptyText: { color: "#a19bb3", fontSize: 14, textAlign: "center" },
+  emptyText: { color: "#a0a0ac", fontSize: 14, textAlign: "center" },
   list: { padding: 16, gap: 8, flexGrow: 1 },
-  card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  unread: { borderColor: "rgba(59, 130, 246, 0.40)", backgroundColor: "rgba(59, 130, 246, 0.08)" },
+  card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(28, 28, 34, 0.7)", borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
+  unread: { borderColor: "rgba(253, 38, 122, 0.40)", backgroundColor: "rgba(253, 38, 122, 0.08)" },
   iconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   cardBody: { flex: 1, gap: 2 },
-  msg: { color: "#a19bb3", fontSize: 13, fontWeight: "500", lineHeight: 18 },
+  msg: { color: "#a0a0ac", fontSize: 13, fontWeight: "500", lineHeight: 18 },
   msgUnread: { color: "#ffffff", fontWeight: "700" },
-  time: { color: "#7c7890", fontSize: 11, fontWeight: "600" },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#3b82f6" },
+  time: { color: "#6e6e7a", fontSize: 11, fontWeight: "600" },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#fd267a" },
 });

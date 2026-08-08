@@ -1,5 +1,7 @@
 import { TouchableOpacity, TouchableOpacityProps, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { BrandGradient } from '@/components/BrandGradient';
+import { RADIUS } from '@/constants/design-system';
 
 interface ButtonProps extends TouchableOpacityProps {
   children: React.ReactNode;
@@ -10,23 +12,21 @@ interface ButtonProps extends TouchableOpacityProps {
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: 8,
+    borderRadius: RADIUS.button,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  primary: {
-    backgroundColor: '#3b82f6',
+    overflow: 'hidden',
   },
   secondary: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#1c1c22',
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#27272a',
   },
   danger: {
-    backgroundColor: '#ef4444',
+    backgroundColor: '#ff6036',
   },
   success: {
-    backgroundColor: '#22c55e',
+    backgroundColor: '#34c271',
   },
   sm: {
     paddingHorizontal: 16,
@@ -42,10 +42,18 @@ const styles = StyleSheet.create({
   },
   textWhite: {
     color: 'white',
-    fontWeight: '700',
+    fontWeight: '800',
   },
   fullWidth: {
     width: '100%',
+  },
+  gradFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: RADIUS.button,
   },
 });
 
@@ -58,7 +66,8 @@ export function Button({
   ...props
 }: ButtonProps) {
   const { colors } = useTheme();
-  const variantStyle = variant === 'primary' ? styles.primary : variant === 'secondary' ? styles.secondary : variant === 'danger' ? styles.danger : styles.success;
+  const isPrimary = variant === 'primary';
+  const variantStyle = isPrimary ? null : variant === 'secondary' ? styles.secondary : variant === 'danger' ? styles.danger : styles.success;
   const sizeStyle = size === 'sm' ? styles.sm : size === 'md' ? styles.md : styles.lg;
 
   return (
@@ -73,6 +82,7 @@ export function Button({
       ]}
       {...props}
     >
+      {isPrimary && <BrandGradient variant="primary" style={styles.gradFill} pointerEvents="none" />}
       <Text style={styles.textWhite}>{children}</Text>
     </TouchableOpacity>
   );

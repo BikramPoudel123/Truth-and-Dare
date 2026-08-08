@@ -10,7 +10,7 @@ export function useTw() {
       isDark,
       container: {
         flex: 1,
-        backgroundColor: isDark ? '#09090b' : '#ffffff',
+        backgroundColor: isDark ? '#0d0d10' : '#ffffff',
       },
       text: {
         color: isDark ? '#ffffff' : '#000000',

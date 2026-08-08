@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RADIUS } from "@/constants/design-system";
+import { FlameBackground } from "@/components/FlameBackground";
 
 const iconMap: Record<string, any> = { Sparkles, SmilePlus, MessageCircle, Flame, Handshake, Waves, Balloon, Heart, Skull };
 
@@ -45,10 +46,10 @@ const QuestionCard = memo(function QuestionCard({ item }: { item: Question }) {
       activeOpacity={0.8}
     >
       <View style={s.qTop}>
-        <View style={[s.typeBadge, isTruth ? s.typeBadgeTruth : s.typeBadgeDare, isTruth ? { backgroundColor: `${colors.purple}20`, borderColor: `${colors.purple}40` } : { backgroundColor: `${colors.red}20`, borderColor: `${colors.red}40` }]}>
+        <View style={[s.typeBadge, isTruth ? s.typeBadgeTruth : s.typeBadgeDare, isTruth ? { backgroundColor: `${colors.brand}20`, borderColor: `${colors.brand}40` } : { backgroundColor: `${colors.dare}20`, borderColor: `${colors.dare}40` }]}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-            {isTruth ? <Eye size={12} color={colors.purple} /> : <Flame size={12} color={colors.red} />}
-            <Text style={[s.typeBadgeText, { color: isTruth ? colors.purple : colors.red }]}>
+            {isTruth ? <Eye size={12} color={colors.brand} /> : <Flame size={12} color={colors.dare} />}
+            <Text style={[s.typeBadgeText, { color: isTruth ? colors.brand : colors.dare }]}>
               {isTruth ? "TRUTH" : "DARE"}
             </Text>
           </View>
@@ -82,6 +83,7 @@ export default function QuestionsScreen({ onUse }: Props) {
 
   return (
     <SafeAreaView edges={["top"]} style={[s.safe, { backgroundColor: colors.bg }]}>
+      <FlameBackground />
       <View style={s.header}>
         <View style={{ flex: 1 }}>
           <Text style={[s.title, { color: colors.text }]}>Question Bank</Text>
@@ -91,7 +93,7 @@ export default function QuestionsScreen({ onUse }: Props) {
 
       <View style={s.typeRow}>
         {(["truth", "dare"] as const).map(t => (
-          <TouchableOpacity key={t} style={[s.typeBtn, { backgroundColor: colors.surfaceLight, borderColor: colors.border }, typeFilter === t && { backgroundColor: t === "truth" ? colors.purple : colors.red, borderColor: t === "truth" ? colors.purple : colors.red }]} onPress={() => setTypeFilter(t)} activeOpacity={0.8}>
+          <TouchableOpacity key={t} style={[s.typeBtn, { backgroundColor: colors.surfaceLight, borderColor: colors.border }, typeFilter === t && { backgroundColor: t === "truth" ? colors.brand : colors.dare, borderColor: t === "truth" ? colors.brand : colors.dare }]} onPress={() => setTypeFilter(t)} activeOpacity={0.8}>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
               {t === "truth" ? <Eye size={14} color={typeFilter === t ? "#fff" : colors.sub} /> : <Flame size={14} color={typeFilter === t ? "#fff" : colors.sub} />}
               <Text style={[s.typeBtnText, { color: colors.sub }, typeFilter === t && { color: "#fff" }]}>{t === "truth" ? "Truth" : "Dare"}</Text>
@@ -106,7 +108,7 @@ export default function QuestionsScreen({ onUse }: Props) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: "center" }}
           renderItem={({ item }) => (
-            <TouchableOpacity style={[s.tagChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }, tagFilter === item.key && { backgroundColor: `${colors.purple}20`, borderColor: colors.purple }]} onPress={() => setTagFilter(item.key as QTag | "all")} activeOpacity={0.8}>
+            <TouchableOpacity style={[s.tagChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }, tagFilter === item.key && { backgroundColor: `${colors.brand}20`, borderColor: colors.brand }]} onPress={() => setTagFilter(item.key as QTag | "all")} activeOpacity={0.8}>
               <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
                 {(() => { const IconComp = iconMap[item.icon]; return <IconComp size={14} color={tagFilter === item.key ? colors.text : colors.sub} />; })()}
                 <Text style={[s.tagChipText, { color: colors.sub }, tagFilter === item.key && { color: colors.text }]}>{item.label}</Text>
@@ -131,27 +133,27 @@ export default function QuestionsScreen({ onUse }: Props) {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0b081c" },
+  safe: { flex: 1, backgroundColor: "#0d0d10" },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   moodBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: RADIUS.small, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1 },
   moodBadgeLabel: { fontSize: 11, fontWeight: "800" },
   title: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
-  subtitle: { color: "#a19bb3", fontSize: 12, marginTop: 1 },
+  subtitle: { color: "#a0a0ac", fontSize: 12, marginTop: 1 },
   typeRow: { flexDirection: "row", paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
-  typeBtn: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.small, alignItems: "center", backgroundColor: "rgba(23, 19, 50, 0.6)", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  typeBtnText: { fontSize: 13, fontWeight: "700", color: "#a19bb3" },
+  typeBtn: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.small, alignItems: "center", backgroundColor: "rgba(28, 28, 34, 0.6)", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
+  typeBtnText: { fontSize: 13, fontWeight: "700", color: "#a0a0ac" },
   tagScrollWrap: { height: 52, justifyContent: "center" },
-  tagChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: "rgba(23, 19, 50, 0.6)", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  tagChipText: { fontSize: 12, fontWeight: "700", color: "#a19bb3" },
-  countText: { color: "#7c7890", fontSize: 11, fontWeight: "700", paddingHorizontal: 16, paddingVertical: 6 },
+  tagChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: "rgba(28, 28, 34, 0.6)", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
+  tagChipText: { fontSize: 12, fontWeight: "700", color: "#a0a0ac" },
+  countText: { color: "#6e6e7a", fontSize: 11, fontWeight: "700", paddingHorizontal: 16, paddingVertical: 6 },
   list: { paddingHorizontal: 16, paddingBottom: 32, gap: 10 },
-  qCard: { backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: RADIUS.cardSm, padding: 16, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  qCardTruth: { borderLeftWidth: 4, borderLeftColor: "#3b82f6" },
-  qCardDare:  { borderLeftWidth: 4, borderLeftColor: "#dc2626" },
+  qCard: { backgroundColor: "rgba(28, 28, 34, 0.7)", borderRadius: RADIUS.cardSm, padding: 16, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
+  qCardTruth: { borderLeftWidth: 4, borderLeftColor: "#fd267a" },
+  qCardDare:  { borderLeftWidth: 4, borderLeftColor: "#ff6036" },
   qTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   typeBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  typeBadgeTruth: { backgroundColor: "#3b82f620", borderWidth: 1, borderColor: "#3b82f640" },
-  typeBadgeDare:  { backgroundColor: "#dc262620", borderWidth: 1, borderColor: "#dc262640" },
+  typeBadgeTruth: { backgroundColor: "#fd267a20", borderWidth: 1, borderColor: "#fd267a40" },
+  typeBadgeDare:  { backgroundColor: "#ff603620", borderWidth: 1, borderColor: "#ff603640" },
   typeBadgeText: { fontSize: 11, fontWeight: "900", letterSpacing: 1 },
   tagRow: { flexDirection: "row", gap: 4 },
   tagPill: { fontSize: 16 },

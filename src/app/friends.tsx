@@ -2,6 +2,7 @@ import { SERVER_URL } from "@/constants/server";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Avatar } from "@/components/Avatar";
+import { FlameBackground } from "@/components/FlameBackground";
 import { ProfileModal, ProfileModalData, DEFAULT_MODAL_DATA } from "@/components/ProfileModal";
 import { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
 import {
@@ -269,6 +270,7 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
+      <FlameBackground />
       <View style={[s.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={onBack} style={[s.backBtn, { borderColor: colors.border, backgroundColor: colors.glassBg }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <ArrowLeft size={18} color={colors.text} />
@@ -348,6 +350,7 @@ export default function FriendsScreen({ onBack, initialTab }: { onBack?: () => v
       {/* ─── Search overlay ────────────────────────────────────────────── */}
       <Modal visible={searchVisible} animationType="slide" onRequestClose={closeSearch}>
         <SafeAreaView style={[ss.safe, { backgroundColor: colors.bg }]}>
+          <FlameBackground />
           <View style={[ss.header, { borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={closeSearch} style={[ss.backBtn, { borderColor: colors.border, backgroundColor: colors.glassBg }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <ArrowLeft size={18} color={colors.text} />
@@ -435,7 +438,7 @@ const s = StyleSheet.create({
   searchBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   badge: { borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, minWidth: 24, alignItems: "center" },
   badgeTxt: { color: "#fff", fontSize: 11, fontWeight: "800" },
-  tabs: { flexDirection: "row", backgroundColor: "rgba(23, 19, 50, 0.7)", borderBottomWidth: 1 },
+  tabs: { flexDirection: "row", backgroundColor: "rgba(28, 28, 34, 0.7)", borderBottomWidth: 1 },
   tab: { flex: 1, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   tabActive: { borderBottomWidth: 2.5 },
   tabTxt: { fontSize: 13, fontWeight: "700" },
@@ -446,7 +449,7 @@ const s = StyleSheet.create({
   emptyState: { alignItems: "center", paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 14, textAlign: "center", lineHeight: 22 },
   list: { padding: 16, gap: 10, flexGrow: 1 },
-  card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1 },
+  card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(28, 28, 34, 0.7)", borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1 },
   cardName: { fontSize: 14, fontWeight: "700", flex: 1 },
   actions: { flexDirection: "row", gap: 8 },
   acceptBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
@@ -483,7 +486,7 @@ const ss = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    backgroundColor: "rgba(28, 28, 34, 0.7)",
     borderRadius: RADIUS.cardSm,
     padding: 14,
     borderWidth: 1,

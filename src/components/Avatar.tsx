@@ -30,12 +30,12 @@ export function Avatar({
     width: size,
     height: size,
     borderRadius: size / 2,
-    backgroundColor: initialsBgColor ?? `${colors.purple}25`,
+    backgroundColor: initialsBgColor ?? `${colors.brand}25`,
     alignItems: "center",
     justifyContent: "center",
     borderWidth,
     borderColor: borderColor ?? colors.border,
-  }), [size, initialsBgColor, borderWidth, borderColor, colors.purple, colors.border]);
+  }), [size, initialsBgColor, borderWidth, borderColor, colors.brand, colors.border]);
 
   const imageStyle: ImageStyle = useMemo(() => ({
     width: size,
@@ -46,10 +46,10 @@ export function Avatar({
   }) as ImageStyle, [size, borderWidth, borderColor, colors.border]);
 
   const initialsTextStyle = useMemo(() => ({
-    color: initialsTextColor ?? colors.purple,
+    color: initialsTextColor ?? colors.brand,
     fontSize: size * 0.4,
     fontWeight: "800" as const,
-  }), [initialsTextColor, size, colors.purple]);
+  }), [initialsTextColor, size, colors.brand]);
 
   if (showInitials) {
     const inner = (

@@ -20,16 +20,18 @@ import { PLAY_STYLE_ICON_MAP } from "@/constants/profile";
 
 import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves, Star, Skull, Heart, CalendarDays, ChevronRight } from "lucide-react-native";
 import { ParticleBurst } from "@/components/ParticleBurst";
+import { BrandGradient } from "@/components/BrandGradient";
+import { FlameBackground } from "@/components/FlameBackground";
 
 const ICON_MAP: Record<string, any> = { SmilePlus, MessageCircle, Flame, Handshake, Waves };
 
 const INTEREST_META: { key: Interest; label: string; emoji: string; icon: string; gradient: string[] }[] = [
-  { key: "fun",     label: "fun",     emoji: "😂", icon: "SmilePlus",     gradient: ["#3b82f6", "#60a5fa"] },
-  { key: "life",    label: "life",    emoji: "💬", icon: "MessageCircle", gradient: ["#2563eb", "#93c5fd"] },
-  { key: "hot",     label: "hot",     emoji: "🔥", icon: "Flame",         gradient: ["#dc2626", "#f87171"] },
-  { key: "connect", label: "connect", emoji: "🤝", icon: "Handshake",     gradient: ["#3b82f6", "#60a5fa"] },
-  { key: "spicy",   label: "spicy",   emoji: "🌶", icon: "Flame",         gradient: ["#dc2626", "#ef4444"] },
-  { key: "deep",    label: "deep",    emoji: "🌊", icon: "Waves",         gradient: ["#1d4ed8", "#60a5fa"] },
+  { key: "fun",     label: "fun",     emoji: "😂", icon: "SmilePlus",     gradient: ["#fd267a", "#fd267a"] },
+  { key: "life",    label: "life",    emoji: "💬", icon: "MessageCircle", gradient: ["#fd267a", "#fd267a"] },
+  { key: "hot",     label: "hot",     emoji: "🔥", icon: "Flame",         gradient: ["#ff4d4d", "#ff9b6b"] },
+  { key: "connect", label: "connect", emoji: "🤝", icon: "Handshake",     gradient: ["#fd267a", "#fd267a"] },
+  { key: "spicy",   label: "spicy",   emoji: "🌶", icon: "Flame",         gradient: ["#ff4d4d", "#ff6036"] },
+  { key: "deep",    label: "deep",    emoji: "🌊", icon: "Waves",         gradient: ["#fd267a", "#fd267a"] },
 ];
 
 function SearchingDots() {
@@ -146,11 +148,16 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
 
   return (
     <SafeAreaView edges={["top"]} style={[s.safe, { backgroundColor: colors.bg }]}>
+      <FlameBackground variant="full" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: 110 }, mode === "random_waiting" && s.waitingCenter]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
             {mode === "home" && (
               <View style={s.homeCenter}>
+                {/* Flame hero banner */}
+                <BrandGradient variant="hero" style={s.heroBanner} pointerEvents="none" />
+                <BrandGradient variant="primary" style={s.heroBannerSmall} pointerEvents="none" />
+
                 {/* Header with Logo */}
                 <View style={s.header}>
                   <View style={s.logoWrap}>
@@ -159,8 +166,8 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                       <Text style={s.maskBlue}>🎭</Text>
                     </View>
                 <View style={s.logoTextCol}>
-                  <Text style={[s.logoTruth, { color: colors.purple }]}>Truth</Text>
-                  <Text style={[s.logoDare, { color: colors.red }]}>Dare</Text>
+                  <Text style={[s.logoTruth, { color: colors.truth }]}>Truth</Text>
+                  <Text style={[s.logoDare, { color: colors.dare }]}>Dare</Text>
                   <Text style={[s.logoOr, { color: colors.text }]}>or</Text>
                 </View>
                   </View>
@@ -200,9 +207,9 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
               {/* Hero Card */}
               <View style={[s.matchCard, { backgroundColor: colors.card, borderColor: colors.border, ...shadows.subtle }]}>
                 <View style={s.matchContent}>
-                  <View style={[s.matchIconWrap, s.matchIconWrapPink]}>
+                  <BrandGradient variant="primary" style={s.matchIconWrap}>
                     <Image source={require("../../assets/images/fun.png")} style={{ width: 36, height: 36 }} />
-                  </View>
+                  </BrandGradient>
                   <View style={s.matchTextCol}>
                     <Text style={[s.matchTitle, { color: colors.text }]}>Ready for the <Text style={{ color: colors.purple }}>fun?</Text></Text>
                     <Text style={[s.matchDesc, { color: colors.sub }]}>Truth reveals. Dare dares. Let the game begin!</Text>
@@ -216,19 +223,21 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                 onPress={() => { setQuickMatchBurst(true); setTimeout(() => setQuickMatchBurst(false), 100); guard(() => { setJoining(true); autoJoin(profile.name.trim()); setMode("random_waiting"); }); }}
                 activeOpacity={0.85}
               >
-                <ParticleBurst trigger={quickMatchBurst} count={12} colors={[colors.purple, "#60a5fa", colors.red, "#f87171"]} spread={80} />
+                <ParticleBurst trigger={quickMatchBurst} count={12} colors={[colors.purple, "#fd267a", colors.red, "#ff9b6b"]} spread={80} />
                 <View style={[s.matchContent, s.quickMatchContent]}>
-                  <View style={[s.matchIconWrap, s.quickMatchIcon]}>
-                    <Zap size={28} color={colors.purple} />
-                  </View>
+                  <BrandGradient variant="quickMatch" style={[s.matchIconWrap, s.quickMatchIcon]}>
+                    <Zap size={28} color="#fff" />
+                  </BrandGradient>
                   <View style={s.matchTextCol}>
                     <Text style={[s.matchTitle, s.quickMatchTitle, { color: colors.text }]}>Quick Match</Text>
                     <Text style={[s.matchDesc, s.quickMatchDesc, { color: colors.sub }]} numberOfLines={2}>Find a random player and start instantly</Text>
                   </View>
-                  <View style={[s.matchBtnPill, s.quickMatchPill, { backgroundColor: colors.purple }]}>
-                    <Text style={[s.matchBtnText, { color: "#fff" }]}>Play Now</Text>
-                    <ChevronRight size={14} color="#fff" />
-                  </View>
+                  <BrandGradient variant="quickMatch" style={[s.matchBtnPill, s.quickMatchPill]}>
+                    <View style={s.matchBtnInner}>
+                      <Text style={[s.matchBtnText, { color: "#fff" }]}>Play Now</Text>
+                      <ChevronRight size={14} color="#fff" />
+                    </View>
+                  </BrandGradient>
                 </View>
               </TouchableOpacity>
 
@@ -238,19 +247,21 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                 onPress={() => { setPrivateGameBurst(true); setTimeout(() => setPrivateGameBurst(false), 100); guard(() => setMode("private_join")); }}
                 activeOpacity={0.85}
               >
-                <ParticleBurst trigger={privateGameBurst} count={10} colors={[colors.purple, "#60a5fa", "#93c5fd", colors.electricBlue]} spread={70} />
+                <ParticleBurst trigger={privateGameBurst} count={10} colors={[colors.purple, "#fd267a", "#fd267a", colors.electricBlue]} spread={70} />
                 <View style={s.matchContent}>
-                  <View style={[s.matchIconWrap, s.matchIconWrapBlue]}>
-                    <Users size={24} color={colors.purple} />
-                  </View>
+                  <BrandGradient variant="privateGame" style={[s.matchIconWrap, s.matchIconWrapBlue]}>
+                    <Users size={24} color="#fff" />
+                  </BrandGradient>
                   <View style={s.matchTextCol}>
                     <Text style={[s.matchTitle, { color: colors.text }]}>Private Game</Text>
                     <Text style={[s.matchDesc, { color: colors.sub }]} numberOfLines={2}>Invite a friend and play together</Text>
                   </View>
-                  <View style={[s.matchBtnPill, s.matchBtnPillBlue, { backgroundColor: colors.purple }]}>
-                    <Text style={[s.matchBtnText, { color: "#fff" }]}>Create Room</Text>
-                    <ChevronRight size={14} color="#fff" />
-                  </View>
+                  <BrandGradient variant="privateGame" style={[s.matchBtnPill, s.matchBtnPillBlue]}>
+                    <View style={s.matchBtnInner}>
+                      <Text style={[s.matchBtnText, { color: "#fff" }]}>Create Room</Text>
+                      <ChevronRight size={14} color="#fff" />
+                    </View>
+                  </BrandGradient>
                 </View>
               </TouchableOpacity>
 
@@ -263,7 +274,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
               {/* Profile Avatar */}
               <View style={s.profileAvatarSection}>
                 <TouchableOpacity onPress={pickPic} activeOpacity={0.8}>
-                  <View style={[s.avatarRing, { width: isSmall ? 80 : 96, height: isSmall ? 80 : 96, borderRadius: isSmall ? 40 : 48, borderColor: colors.text, ...shadows.pinkGlow }]}>
+                  <BrandGradient variant="primary" style={[s.avatarRing, { width: isSmall ? 80 : 96, height: isSmall ? 80 : 96, borderRadius: isSmall ? 40 : 48, ...shadows.pinkGlow }]}>
                     <View style={[s.avatarGlow, { width: isSmall ? 72 : 88, height: isSmall ? 72 : 88, borderRadius: isSmall ? 36 : 44, backgroundColor: colors.cardDark }]}>
                       {profile.pic && !avatarFailed ? (
                         <Image source={{ uri: profile.pic }} style={[s.avatarImage, { width: isSmall ? 72 : 88, height: isSmall ? 72 : 88, borderRadius: isSmall ? 36 : 44 }]} onError={() => setAvatarFailed(true)} />
@@ -273,7 +284,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                         </View>
                       )}
                     </View>
-                  </View>
+                  </BrandGradient>
                   <View style={[s.cameraBtn, { width: isSmall ? 24 : 28, height: isSmall ? 24 : 28, borderRadius: isSmall ? 12 : 14, backgroundColor: colors.cardDark, borderColor: colors.borderLight }]}>
                     <Camera size={isSmall ? 10 : 12} color={colors.sub} />
                   </View>
@@ -397,8 +408,8 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                         style={[
                           s.interestChip,
                           { backgroundColor: colors.glassBg, borderColor: colors.border },
-                          active && { backgroundColor: "#22c55e" },
-                          active && { borderColor: "#22c55e" },
+                          active && { backgroundColor: "#34c271" },
+                          active && { borderColor: "#34c271" },
                         ]}
                         onPress={() => toggleInterest(key)}
                         activeOpacity={0.7}
@@ -453,8 +464,10 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                 </View>
               </View>
               
-              <TouchableOpacity style={[s.btnFill, { backgroundColor: colors.purple }, code.length < 3 && s.disabled]} onPress={() => { if (!isConnected) { reconnect(); return; } setJoining(true); joinRoom(code, profile.name.trim()); setMode("private_waiting_joiner"); }} disabled={code.length < 3 || joining} activeOpacity={0.82}>
-                {joining ? <ActivityIndicator color="#fff" /> : <Text style={[s.btnFillTitle, { textAlign: "center", flex: 1 }]}>Join Room</Text>}
+              <TouchableOpacity style={[s.btnFill, code.length < 3 && s.disabled]} onPress={() => { if (!isConnected) { reconnect(); return; } setJoining(true); joinRoom(code, profile.name.trim()); setMode("private_waiting_joiner"); }} disabled={code.length < 3 || joining} activeOpacity={0.82}>
+                <BrandGradient variant="primary" style={s.btnFillGrad}>
+                  {joining ? <ActivityIndicator color="#fff" /> : <Text style={[s.btnFillTitle, { textAlign: "center", flex: 1 }]}>Join Room</Text>}
+                </BrandGradient>
               </TouchableOpacity>
               
               <View style={s.divider}><View style={[s.divLine, { backgroundColor: colors.border }]} /><Text style={[s.divText, { color: colors.sub }]}>or</Text><View style={[s.divLine, { backgroundColor: colors.border }]} /></View>
@@ -511,7 +524,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0b081c" },
+  safe: { flex: 1, backgroundColor: "#0d0d10" },
   scroll: { paddingHorizontal: 20, paddingBottom: 48 },
   waitingCenter: { flexGrow: 1, justifyContent: "center" },
   disabled: { opacity: 0.4 },
@@ -523,34 +536,35 @@ const s = StyleSheet.create({
 
   // ── Header ──
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingTop: 16, paddingBottom: 12 },
+  heroBanner: { position: "absolute", top: -80, left: -70, right: -70, height: 220, borderRadius: 120, opacity: 0.22 },
+  heroBannerSmall: { position: "absolute", top: -24, right: -50, width: 160, height: 160, borderRadius: 80, opacity: 0.14 },
   logoWrap: {},
   logoRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   maskRow: { flexDirection: "row", gap: 2 },
   maskBlue: { fontSize: 28 },
   logoTextCol: { position: "relative", alignItems: "center", justifyContent: "center", paddingVertical: 0 },
-  logoTextRow: {},
-  logoTruth: { fontSize: 22, fontWeight: "900", color: "#3b82f6", letterSpacing: -0.5, lineHeight: 22, zIndex: 0 },
+  logoTruth: { fontSize: 22, fontWeight: "900", color: "#fd267a", letterSpacing: -0.5, lineHeight: 22, zIndex: 0 },
   logoOr: { position: "absolute", fontSize: 13, fontWeight: "900", color: "#ffffff", opacity: 0.8, letterSpacing: 2, zIndex: 2, alignSelf: "center", top: 14 },
-  logoDare: { fontSize: 28, fontWeight: "900", color: "#dc2626", letterSpacing: 1, lineHeight: 28, zIndex: 0 },
+  logoDare: { fontSize: 28, fontWeight: "900", color: "#ff6036", letterSpacing: 1, lineHeight: 28, zIndex: 0 },
 
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
   notifBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
-  notifDot: { position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: "#dc2626", zIndex: 1, borderWidth: 1.5, borderColor: "#0b081c" },
+  notifDot: { position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: "#ff4d4d", zIndex: 1, borderWidth: 1.5, borderColor: "#0d0d10" },
 
   // ── Online Players ──
   onlineRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 20 },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#10b981" },
-  onlineTxt: { fontSize: 12, color: "#a19bb3", fontWeight: "600", letterSpacing: 0.5 },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#34c271" },
+  onlineTxt: { fontSize: 12, color: "#a0a0ac", fontWeight: "600", letterSpacing: 0.5 },
 
   // ── Profile Banner ──
-  profileBanner: { backgroundColor: "rgba(59, 130, 246, 0.1)", borderRadius: RADIUS.small, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16, borderWidth: 1, borderColor: "rgba(59, 130, 246, 0.3)" },
-  profileBannerTitle: { color: "#3b82f6", fontSize: 14, fontWeight: "800" },
-  profileBannerSub: { color: "#a19bb3", fontSize: 11, marginTop: 2 },
+  profileBanner: { backgroundColor: "rgba(253, 38, 122, 0.1)", borderRadius: RADIUS.small, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16, borderWidth: 1, borderColor: "rgba(253, 38, 122, 0.3)" },
+  profileBannerTitle: { color: "#fd267a", fontSize: 14, fontWeight: "800" },
+  profileBannerSub: { color: "#a0a0ac", fontSize: 11, marginTop: 2 },
 
   // ── Match Cards ──
   matchCard: {
-    backgroundColor: "rgba(26, 16, 64, 0.85)",
+    backgroundColor: "rgba(28, 28, 34, 0.85)",
     borderRadius: RADIUS.cardSm,
     marginBottom: 14,
     borderWidth: 1,
@@ -562,46 +576,46 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  matchCardPrivate: { backgroundColor: "rgba(26, 16, 64, 0.85)", borderColor: "rgba(255, 255, 255, 0.08)", paddingVertical: 4 },
+  matchCardPrivate: { backgroundColor: "rgba(28, 28, 34, 0.85)", borderColor: "rgba(255, 255, 255, 0.08)", paddingVertical: 4 },
   quickMatchCard: { paddingVertical: 6 },
   matchContent: { flexDirection: "row", alignItems: "center", padding: 18 },
   quickMatchContent: { padding: 22 },
-  matchIconWrap: { width: 48, height: 48, borderRadius: RADIUS.icon, backgroundColor: "transparent", alignItems: "center", justifyContent: "center", marginRight: 14 },
-  quickMatchIcon: { width: 56, height: 56, borderRadius: 20 },
+  matchIconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", marginRight: 14 },
+  quickMatchIcon: { width: 56, height: 56, borderRadius: 28 },
   matchIconWrapPink: { backgroundColor: "transparent" },
   matchIconWrapBlue: { backgroundColor: "transparent" },
   matchTextCol: { flex: 1, paddingRight: 8 },
   matchTitle: { color: "#ffffff", fontSize: 17, fontWeight: "800", marginBottom: 3 },
   quickMatchTitle: { fontSize: 19 },
-  matchDesc: { color: "#a19bb3", fontSize: 11, lineHeight: 15 },
+  matchDesc: { color: "#a0a0ac", fontSize: 11, lineHeight: 15 },
   quickMatchDesc: { fontSize: 11, lineHeight: 16 },
   matchBtnPill: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#3b82f6",
     borderRadius: RADIUS.pill,
     paddingVertical: 10,
     paddingHorizontal: 18,
   },
+  matchBtnInner: { flexDirection: "row", alignItems: "center", gap: 6 },
   matchBtnText: { color: "#ffffff", fontSize: 12, fontWeight: "700", lineHeight: 16 },
   quickMatchPill: { paddingVertical: 12, paddingHorizontal: 22 },
-  matchBtnPillPink: { backgroundColor: "#3b82f6" },
-  matchBtnPillBlue: { backgroundColor: "#3b82f6" },
+  matchBtnPillPink: { backgroundColor: "#fd267a" },
+  matchBtnPillBlue: {},
 
   // ── Game Modes ──
   modesSection: { marginTop: 4, marginBottom: 16 },
   modesHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   modesTitle: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
   spicyToggle: { flexDirection: "row", alignItems: "center", gap: 8 },
-  spicyLabel: { color: "#a19bb3", fontSize: 12, fontWeight: "600" },
+  spicyLabel: { color: "#a0a0ac", fontSize: 12, fontWeight: "600" },
 
   // ── Feature Cards ──
   featureRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
   featureCard: {
     flex: 1,
-    backgroundColor: "rgba(23, 19, 50, 0.6)",
+    backgroundColor: "rgba(28, 28, 34, 0.6)",
     borderRadius: RADIUS.cardSm,
     padding: 16,
     alignItems: "center",
@@ -611,7 +625,7 @@ const s = StyleSheet.create({
   featureIconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   featureIcon: { fontSize: 16 },
   featureNumber: { color: "#ffffff", fontSize: 20, fontWeight: "900" },
-  featureLabel: { color: "#a19bb3", fontSize: 10, fontWeight: "600" },
+  featureLabel: { color: "#a0a0ac", fontSize: 10, fontWeight: "600" },
 
   // ── Profile Screen ──
   profileContainer: { gap: 16, paddingTop: 24 },
@@ -619,14 +633,10 @@ const s = StyleSheet.create({
   // Avatar Section
   profileAvatarSection: { alignItems: "center", marginBottom: 8 },
   avatarRing: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 3,
-    borderColor: "#ffffff",
+    padding: 4,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#dc2626",
+    shadowColor: "#fd267a",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 15,
@@ -637,10 +647,10 @@ const s = StyleSheet.create({
     height: 88,
     borderRadius: 44,
     overflow: "hidden",
-    backgroundColor: "rgba(23, 19, 50, 0.95)",
+    backgroundColor: "rgba(28, 28, 34, 0.95)",
   },
   avatarImage: { width: 88, height: 88, borderRadius: 44 },
-  avatarPlaceholder: { width: 88, height: 88, borderRadius: 44, backgroundColor: "#2a2440", alignItems: "center", justifyContent: "center" },
+  avatarPlaceholder: { width: 88, height: 88, borderRadius: 44, backgroundColor: "#27272a", alignItems: "center", justifyContent: "center" },
   cameraBtn: {
     position: "absolute",
     bottom: 2,
@@ -648,7 +658,7 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "rgba(23, 19, 50, 0.95)",
+    backgroundColor: "rgba(28, 28, 34, 0.95)",
     borderWidth: 2,
     borderColor: "rgba(255, 255, 255, 0.15)",
     alignItems: "center",
@@ -675,7 +685,7 @@ const s = StyleSheet.create({
   // Stats Card
   statsCard: {
     flexDirection: "row",
-    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    backgroundColor: "rgba(28, 28, 34, 0.7)",
     borderRadius: RADIUS.cardSm,
     padding: 20,
     borderWidth: 1,
@@ -688,7 +698,7 @@ const s = StyleSheet.create({
   },
   statColumn: { flex: 1, alignItems: "center", gap: 4 },
   statNumber: { color: "#ffffff", fontSize: 22, fontWeight: "900" },
-  statLabel: { color: "#a19bb3", fontSize: 11, fontWeight: "600" },
+  statLabel: { color: "#a0a0ac", fontSize: 11, fontWeight: "600" },
   statDate: { color: "#ffffff", fontSize: 14, fontWeight: "800" },
   statDivider: { width: 1, backgroundColor: "rgba(255, 255, 255, 0.08)", marginVertical: 4 },
   reactionsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center", marginTop: 10 },
@@ -704,11 +714,11 @@ const s = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.08)",
   },
   reactionEmoji: { fontSize: 14 },
-  reactionCount: { color: "#a19bb3", fontSize: 11, fontWeight: "700" },
+  reactionCount: { color: "#a0a0ac", fontSize: 11, fontWeight: "700" },
 
   // Bio Card
   bioCard: {
-    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    backgroundColor: "rgba(28, 28, 34, 0.7)",
     borderRadius: RADIUS.cardSm,
     padding: 16,
     borderWidth: 1,
@@ -726,7 +736,7 @@ const s = StyleSheet.create({
 
   // Interests Card
   interestsCard: {
-    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    backgroundColor: "rgba(28, 28, 34, 0.7)",
     borderRadius: RADIUS.cardSm,
     padding: 16,
     borderWidth: 1,
@@ -752,41 +762,42 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.08)",
   },
-  interestChipLabel: { fontSize: 12, fontWeight: "600", color: "#a19bb3" },
+  interestChipLabel: { fontSize: 12, fontWeight: "600", color: "#a0a0ac" },
 
   // ── State/Waiting Cards ──
-  stateCard: { backgroundColor: "rgba(23, 19, 50, 0.85)", borderRadius: RADIUS.cardSm, padding: 24, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)", gap: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  stateCard: { backgroundColor: "rgba(28, 28, 34, 0.85)", borderRadius: RADIUS.cardSm, padding: 24, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)", gap: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
   stateBlock: { alignItems: "center", paddingVertical: 16, gap: 10 },
-  pulseRing: { width: 88, height: 88, borderRadius: 44, backgroundColor: "rgba(59, 130, 246, 0.15)", borderWidth: 2, borderColor: "#3b82f6", alignItems: "center", justifyContent: "center" },
+  pulseRing: { width: 88, height: 88, borderRadius: 44, backgroundColor: "rgba(253, 38, 122, 0.15)", borderWidth: 2, borderColor: "#fd267a", alignItems: "center", justifyContent: "center" },
   stateTitle: { color: "#ffffff", fontSize: 22, fontWeight: "800" },
-  stateSub: { color: "#a19bb3", fontSize: 14 },
-  stateHint: { color: "#a19bb3", fontSize: 12, textAlign: "center", marginTop: 4 },
+  stateSub: { color: "#a0a0ac", fontSize: 14 },
+  stateHint: { color: "#a0a0ac", fontSize: 12, textAlign: "center", marginTop: 4 },
   
-  btnDanger: { borderRadius: RADIUS.button, paddingVertical: 16, alignItems: "center", backgroundColor: "rgba(220, 38, 38, 0.15)", borderWidth: 1, borderColor: "rgba(220, 38, 38, 0.4)" },
-  btnDangerText: { color: "#dc2626", fontSize: 15, fontWeight: "800" },
+  btnDanger: { borderRadius: RADIUS.button, paddingVertical: 16, alignItems: "center", backgroundColor: "rgba(255, 77, 77, 0.15)", borderWidth: 1, borderColor: "rgba(255, 77, 77, 0.4)" },
+  btnDangerText: { color: "#ff4d4d", fontSize: 15, fontWeight: "800" },
   
   backBtn: { alignSelf: "flex-start", paddingBottom: 10 },
-  backBtnText: { color: "#a19bb3", fontSize: 14, fontWeight: "700" },
+  backBtnText: { color: "#a0a0ac", fontSize: 14, fontWeight: "700" },
   fieldWrap: { gap: 10 },
-  fieldLabel: { fontSize: 11, fontWeight: "800", color: "#a19bb3", letterSpacing: 2 },
-  inputBox: { backgroundColor: "#0b081c", borderRadius: RADIUS.small, paddingHorizontal: 16, paddingVertical: 16, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)", justifyContent: "center" },
-  codeInput: { color: "#3b82f6", fontSize: 32, fontWeight: "900", letterSpacing: 14, textAlign: "center" },
+  fieldLabel: { fontSize: 11, fontWeight: "800", color: "#a0a0ac", letterSpacing: 2 },
+  inputBox: { backgroundColor: "#0d0d10", borderRadius: RADIUS.small, paddingHorizontal: 16, paddingVertical: 16, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)", justifyContent: "center" },
+  codeInput: { color: "#fd267a", fontSize: 32, fontWeight: "900", letterSpacing: 14, textAlign: "center" },
   
-  btnFill: { backgroundColor: "#3b82f6", borderRadius: RADIUS.button, paddingVertical: 16, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  btnFill: { position: "relative", borderRadius: RADIUS.button, paddingVertical: 16, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between", overflow: "hidden" },
+  btnFillGrad: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: RADIUS.button, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   btnFillTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  btnGhost: { backgroundColor: "rgba(23, 19, 50, 0.85)", borderRadius: RADIUS.button, paddingVertical: 16, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
+  btnGhost: { backgroundColor: "rgba(28, 28, 34, 0.85)", borderRadius: RADIUS.button, paddingVertical: 16, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
   btnGhostLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   btnGhostTitle: { color: "#ffffff", fontSize: 15, fontWeight: "800" },
-  btnGhostSub: { color: "#a19bb3", fontSize: 12, marginTop: 2 },
+  btnGhostSub: { color: "#a0a0ac", fontSize: 12, marginTop: 2 },
   
   divider: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
   divLine: { flex: 1, height: 1, backgroundColor: "rgba(255, 255, 255, 0.08)" },
-  divText: { color: "#a19bb3", fontSize: 13, fontWeight: "600" },
+  divText: { color: "#a0a0ac", fontSize: 13, fontWeight: "600" },
   
-  codeCard: { backgroundColor: "#0b081c", borderRadius: RADIUS.small, paddingHorizontal: 40, paddingVertical: 20, alignItems: "center", marginTop: 12, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  codeCardLabel: { color: "#a19bb3", fontSize: 11, fontWeight: "800", letterSpacing: 3, marginBottom: 8 },
-  codeCardValue: { color: "#3b82f6", fontSize: 48, fontWeight: "900", letterSpacing: 12 },
+  codeCard: { backgroundColor: "#0d0d10", borderRadius: RADIUS.small, paddingHorizontal: 40, paddingVertical: 20, alignItems: "center", marginTop: 12, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
+  codeCardLabel: { color: "#a0a0ac", fontSize: 11, fontWeight: "800", letterSpacing: 3, marginBottom: 8 },
+  codeCardValue: { color: "#fd267a", fontSize: 48, fontWeight: "900", letterSpacing: 12 },
   waitRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
-  waitRowText: { color: "#a19bb3", fontSize: 14 },
+  waitRowText: { color: "#a0a0ac", fontSize: 14 },
 
 });

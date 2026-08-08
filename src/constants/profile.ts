@@ -13,11 +13,11 @@ export const INTEREST_LABEL: Record<string, string> = {
 export const PLAY_STYLE_ICON_MAP: Record<string, [React.ComponentType<{ size: number; color: string }>, string]> = {
   "Rising Star":       [Star, COLORS.gold],
   "Hot Player":        [Flame, COLORS.orange],
-  "Funny Player":      [SmilePlus, "#facc15"],
+  "Funny Player":      [SmilePlus, "#ffb100"],
   "Heartthrob":        [Heart, COLORS.pink],
   "Shocking Player":   [Zap, COLORS.electricBlue],
-  "Savage Player":     [Skull, "#a855f7"],
-  "Emotional Player":  [Heart, "#60a5fa"],
-  "Life of the Party": [PartyPopper, "#f97316"],
+  "Savage Player":     [Skull, "#ff6036"],
+  "Emotional Player":  [Heart, "#fd267a"],
+  "Life of the Party": [PartyPopper, "#ff6036"],
   "Respected Player":  [Crown, COLORS.gold],
 };

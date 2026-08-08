@@ -327,11 +327,6 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
             style={styles.fill}
             contentFit="cover"
           />
-          {media.playerName && (
-            <View style={styles.nameOverlay}>
-              <Text style={styles.nameText}>{media.playerName}</Text>
-            </View>
-          )}
           <View style={styles.tapHint}>
             <Search size={12} color="white" />
           </View>
@@ -345,9 +340,6 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
         >
           <View style={styles.modalBg}>
             <ZoomableImage uri={media.data} />
-            {media.playerName && (
-              <Text style={styles.fullscreenName}>{media.playerName}</Text>
-            )}
             <Text style={styles.closeHint}>
               Pinch or double-tap to zoom · Tap X to close
             </Text>
@@ -367,11 +359,6 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
     return (
       <View style={[styles.container, { backgroundColor: colors.card }, dims]}>
         <VideoPlayer data={media.data} style={styles.fill} />
-        {media.playerName && (
-          <View style={styles.nameOverlay}>
-            <Text style={styles.nameText}>{media.playerName}</Text>
-          </View>
-        )}
       </View>
     );
   }
@@ -385,20 +372,11 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1f2937",
+    backgroundColor: "#1c1c22",
     borderRadius: 8,
     overflow: "hidden",
   },
   fill: { width: "100%", height: "100%" },
-  nameOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    padding: 8,
-  },
-  nameText: { color: "white", fontSize: 12, fontWeight: "600" },
   tapHint: {
     position: "absolute",
     top: 6,
@@ -411,9 +389,9 @@ const styles = StyleSheet.create({
   videoLoading: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#111827",
+    backgroundColor: "#0a0a0c",
   },
-  videoLoadingText: { color: "#6b7280", fontSize: 12 },
+  videoLoadingText: { color: "#6e6e7a", fontSize: 12 },
   modalBg: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.97)",
@@ -425,13 +403,7 @@ const styles = StyleSheet.create({
     height: SCREEN.height * 0.8,
     overflow: "hidden",
   },
-  fullscreenName: {
-    color: "white",
-    fontSize: 15,
-    fontWeight: "600",
-    marginTop: 12,
-  },
-  closeHint: { color: "#6b7280", fontSize: 12, marginTop: 6 },
+  closeHint: { color: "#6e6e7a", fontSize: 12, marginTop: 6 },
   closeBtn: {
     position: "absolute",
     top: 48,
@@ -450,7 +422,7 @@ const audioStyles = StyleSheet.create({
     alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(23, 19, 50, 0.85)",
+    backgroundColor: "rgba(28, 28, 34, 0.85)",
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -462,7 +434,7 @@ const audioStyles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#fd267a",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -478,7 +450,7 @@ const audioStyles = StyleSheet.create({
     borderRadius: 1.5,
   },
   time: {
-    color: "#a19bb3",
+    color: "#a0a0ac",
     fontSize: 12,
     fontWeight: "600",
     minWidth: 32,

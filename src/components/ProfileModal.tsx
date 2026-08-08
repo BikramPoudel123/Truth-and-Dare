@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/Avatar";
+import { BrandGradient } from "@/components/BrandGradient";
 import { COLORS, SHADOWS, RADIUS } from "@/constants/design-system";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -181,7 +182,9 @@ function ProfileModalInner({
                 }}
                 scrollEventThrottle={16}
               >
-                <Avatar uri={data.pic} name={data.name} size={72} borderWidth={2} borderColor={colors.purple} />
+                <BrandGradient variant="primary" style={s.avatarRing}>
+                  <Avatar uri={data.pic} name={data.name} size={72} borderWidth={2} borderColor="rgba(255,255,255,0.9)" />
+                </BrandGradient>
                 <Text style={[s.name, { color: colors.text }]}>{data.name}</Text>
 
                 {data.playStyle && (
@@ -321,7 +324,7 @@ const s = StyleSheet.create({
 
   statsCard: {
     flexDirection: "row",
-    backgroundColor: "rgba(23, 19, 50, 0.7)",
+    backgroundColor: "rgba(28, 28, 34, 0.7)",
     borderRadius: RADIUS.cardSm,
     padding: 16,
     borderWidth: 1,
@@ -372,5 +375,14 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  avatarRing: {
+    padding: 3,
+    borderRadius: 39,
+    shadowColor: "#fd267a",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
   },
 });

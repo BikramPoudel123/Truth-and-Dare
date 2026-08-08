@@ -14,7 +14,7 @@ export default function HomeScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#1a0a2e" },
+  safe: { flex: 1, backgroundColor: "#0d0d10" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  text: { color: "#e879f9", fontSize: 32, fontWeight: "900" },
+  text: { color: "#fd267a", fontSize: 32, fontWeight: "900" },
 });

@@ -1,5 +1,6 @@
 import { View, ViewProps, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { RADIUS } from '@/constants/design-system';
 
 interface CardProps extends ViewProps {
   children: React.ReactNode;
@@ -8,23 +9,23 @@ interface CardProps extends ViewProps {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 8,
-    padding: 24,
+    borderRadius: RADIUS.cardSm,
+    padding: 20,
   },
   default: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#1c1c22',
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: '#27272a',
   },
   subtle: {
-    backgroundColor: 'rgba(31, 41, 55, 0.5)',
+    backgroundColor: 'rgba(28, 28, 34, 0.5)',
     borderWidth: 1,
-    borderColor: 'rgba(55, 65, 81, 0.5)',
+    borderColor: 'rgba(39, 39, 42, 0.5)',
   },
   bordered: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#4f46e5',
+    borderColor: '#fd267a',
   },
 });
 

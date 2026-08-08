@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   thumbVideo: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#6b21a8",
+    backgroundColor: "#fd267a",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -287,9 +287,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  blue: { backgroundColor: "#2563eb" },
-  cyan: { backgroundColor: "#0891b2" },
-  red: { backgroundColor: "#dc2626" },
-  purple: { backgroundColor: "#9333ea" },
+  blue: { backgroundColor: "#fd267a" },
+  cyan: { backgroundColor: "#fd267a" },
+  red: { backgroundColor: "#ff4d4d" },
+  purple: { backgroundColor: "#fd267a" },
   btnTxt: { color: "white", fontSize: 12, fontWeight: "700" },
 });
