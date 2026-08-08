@@ -147,7 +147,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
   return (
     <SafeAreaView edges={["top"]} style={[s.safe, { backgroundColor: colors.bg }]}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: 110 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: 110 }, mode === "random_waiting" && s.waitingCenter]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
             {mode === "home" && (
               <View style={s.homeCenter}>
@@ -226,8 +226,8 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                     <Text style={[s.matchDesc, s.quickMatchDesc, { color: colors.sub }]} numberOfLines={2}>Find a random player and start instantly</Text>
                   </View>
                   <View style={[s.matchBtnPill, s.quickMatchPill, { backgroundColor: colors.purple }]}>
-                    <Text style={[s.matchBtnText, { color: colors.text }]}>Play Now</Text>
-                    <ChevronRight size={14} color={colors.text} />
+                    <Text style={[s.matchBtnText, { color: "#fff" }]}>Play Now</Text>
+                    <ChevronRight size={14} color="#fff" />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -248,8 +248,8 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                     <Text style={[s.matchDesc, { color: colors.sub }]} numberOfLines={2}>Invite a friend and play together</Text>
                   </View>
                   <View style={[s.matchBtnPill, s.matchBtnPillBlue, { backgroundColor: colors.purple }]}>
-                    <Text style={[s.matchBtnText, { color: colors.text }]}>Create Room</Text>
-                    <ChevronRight size={14} color={colors.text} />
+                    <Text style={[s.matchBtnText, { color: "#fff" }]}>Create Room</Text>
+                    <ChevronRight size={14} color="#fff" />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -295,7 +295,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                   />
                 ) : (
                   <TouchableOpacity style={s.displayNameRow} onPress={() => setEditingName(true)} activeOpacity={0.7}>
-                    <Text style={[s.displayName, { fontSize: isSmall ? 20 : 24, color: colors.text }]}>{profile.name || "Your Name"}</Text>
+                    <Text style={[s.displayName, { fontSize: isSmall ? 20 : 24, color: colors.text }]}>{profile.name}</Text>
                     <Pencil size={14} color={colors.sub} />
                   </TouchableOpacity>
                 )}
@@ -377,7 +377,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                     autoFocus
                   />
                 ) : (
-                  <Text style={[s.bioText, { color: colors.text }]}>{profile.bio || "Here for fun, laughs and deep talks. Let's play!"}</Text>
+                  <Text style={[s.bioText, { color: colors.text }]}>{profile.bio}</Text>
                 )}
               </View>
 
@@ -385,6 +385,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
               <View style={[s.interestsCard, { backgroundColor: colors.surface, borderColor: colors.border, ...shadows.subtle }]}>
                 <View style={s.interestsHeader}>
                   <Text style={[s.interestsTitle, { color: colors.text }]}>Your Interests</Text>
+                  <Text style={[s.interestsHint, { color: colors.sub }]}>click to change</Text>
                 </View>
                 <View style={s.interestsChips}>
                   {INTEREST_META.map(({ key, label, icon, gradient }) => {
@@ -426,7 +427,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
 
           {/* RANDOM SEARCHING */}
           {mode === "random_waiting" && (
-            <View style={[s.stateCard, { backgroundColor: colors.card, marginTop: 40, borderColor: colors.border, ...shadows.subtle }]}>
+            <View style={[s.stateCard, { backgroundColor: colors.card, borderColor: colors.border, ...shadows.subtle }]}>
               <View style={s.stateBlock}>
                 <View style={[s.pulseRing, { backgroundColor: colors.purpleLight, borderColor: colors.purple }]}><Search size={36} color={colors.purple} /></View>
                 <Text style={[s.stateTitle, { color: colors.text }]}>Finding opponent...</Text>
@@ -512,6 +513,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0b081c" },
   scroll: { paddingHorizontal: 20, paddingBottom: 48 },
+  waitingCenter: { flexGrow: 1, justifyContent: "center" },
   disabled: { opacity: 0.4 },
 
   // ── Home Center ──
@@ -737,6 +739,7 @@ const s = StyleSheet.create({
   },
   interestsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   interestsTitle: { color: "#ffffff", fontSize: 14, fontWeight: "800" },
+  interestsHint: { fontSize: 11, fontWeight: "600", opacity: 0.5 },
   interestsChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   interestChip: {
     flexDirection: "row",

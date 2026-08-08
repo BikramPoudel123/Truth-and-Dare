@@ -37,7 +37,7 @@ function BottomNavInner({ activeTab, onNavigate }: BottomNavProps) {
               {IconComp && <IconComp size={18} color={isActive ? colors.text : colors.sub} />}
             </View>
             <View style={[s.navLabelWrap, isActive && { backgroundColor: colors.navActiveBg }]}>
-              <Text style={[s.navLabel, isActive && s.navLabelActive, { color: isActive ? colors.text : colors.sub }]}>{tab.label}</Text>
+              <Text style={[s.navLabel, isActive && s.navLabelActive, { color: isActive ? "#fff" : colors.sub }]}>{tab.label}</Text>
             </View>
           </TouchableOpacity>
         );

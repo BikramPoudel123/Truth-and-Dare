@@ -875,7 +875,7 @@ const s = StyleSheet.create({
   scroll: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24, paddingTop: 8 },
 
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 32 },
-  chooseWrap: { alignItems: "center", paddingVertical: 32, width: "100%" },
+  chooseWrap: { alignItems: "center", paddingVertical: 32, width: "100%", flex: 1, justifyContent: "center" },
   section:    { gap: 14, paddingTop: 8 },
 
   chooseLabel: { color: "#a19bb3", fontSize: 14, textAlign: "center", fontWeight: "600", marginBottom: 4 },

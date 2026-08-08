@@ -1,42 +1,50 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useGame } from "@/contexts/GameContext";
-import { RADIUS } from "@/constants/design-system";
 import { useTheme } from "@/contexts/ThemeContext";
-import { AlertTriangle } from "lucide-react-native";
+import { AlertTriangle, WifiOff, RefreshCw, Home } from "lucide-react-native";
 
 export default function ErrorScreen() {
   const { error, reset, reconnect, isConnected } = useGame();
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
+
+  const opponentLeft =
+    isConnected && !!error && /(quit|disconnected|left)/i.test(error);
+
+  const title = opponentLeft
+    ? "Your opponent left"
+    : isConnected
+      ? "Game interrupted"
+      : "No connection";
+
+  const message = opponentLeft
+    ? "Start a new game whenever you're ready."
+    : isConnected
+      ? (error ?? "Something went wrong during the game.")
+      : "Check that the server is running and both devices are on the same network.";
+
+  const accent = opponentLeft ? colors.gold : colors.red;
+
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
       <View style={s.center}>
-        <View style={[s.iconWrap, { backgroundColor: `${colors.red}15`, borderColor: `${colors.red}30` }]}>
-          <AlertTriangle size={38} color={colors.red} />
+        <View style={[s.iconWrap, { borderColor: accent }]}>
+          {opponentLeft ? <AlertTriangle size={40} color={accent} /> : <WifiOff size={40} color={accent} />}
         </View>
 
-        <Text style={[s.title, { color: colors.text }]}>Something went wrong</Text>
+        <Text style={[s.title, { color: colors.text }]}>{title}</Text>
+        <Text style={[s.message, { color: colors.sub }]}>{message}</Text>
 
-        <View style={[s.card, { borderColor: `${colors.red}30`, backgroundColor: colors.surface, ...shadows.subtle }]}>
-          <Text style={[s.errorText, { color: colors.red }]}>{error || "An unexpected error occurred."}</Text>
-        </View>
+        <TouchableOpacity style={[s.btn, { backgroundColor: colors.purple }]} onPress={reset} activeOpacity={0.85}>
+          <Text style={s.btnText}>Back to Menu</Text>
+        </TouchableOpacity>
 
-        <Text style={[s.hint, { color: colors.sub }]}>
-          {isConnected
-            ? "The other player disconnected or the game ended."
-            : "Can't reach the server.\n\nMake sure the server is running and both devices are on the same Wi-Fi."}
-        </Text>
-
-        <View style={s.btnGroup}>
-          {!isConnected && (
-            <TouchableOpacity style={[s.btnPrimary, { backgroundColor: colors.purple }]} onPress={reconnect} activeOpacity={0.85}>
-              <Text style={s.btnPrimaryText}>Reconnect</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={[s.btnSecondary, { borderColor: colors.border, backgroundColor: colors.glassBg }]} onPress={reset} activeOpacity={0.85}>
-            <Text style={[s.btnSecondaryText, { color: colors.text }]}>Back to Menu</Text>
+        {!isConnected && (
+          <TouchableOpacity onPress={reconnect} activeOpacity={0.7} style={s.reconnectRow}>
+            <RefreshCw size={14} color={colors.sub} />
+            <Text style={[s.reconnectText, { color: colors.sub }]}>Reconnect</Text>
           </TouchableOpacity>
-        </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -44,23 +52,16 @@ export default function ErrorScreen() {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0b081c" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, gap: 16 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 16 },
   iconWrap: {
-    width: 80, height: 80, borderRadius: RADIUS.cardSm,
-    backgroundColor: "rgba(220, 38, 38, 0.15)", borderWidth: 1.5, borderColor: "rgba(220, 38, 38, 0.30)",
+    width: 88, height: 88, borderRadius: 44,
+    borderWidth: 2,
     alignItems: "center", justifyContent: "center",
   },
   title: { color: "#ffffff", fontSize: 22, fontWeight: "800" },
-  card: {
-    backgroundColor: "rgba(23, 19, 50, 0.7)", borderRadius: RADIUS.cardSm,
-    padding: 20, width: "100%", alignItems: "center",
-    borderWidth: 1.5, borderColor: "rgba(220, 38, 38, 0.30)",
-  },
-  errorText: { color: "#dc2626", fontSize: 15, fontWeight: "600", textAlign: "center", lineHeight: 22 },
-  hint: { color: "#a19bb3", fontSize: 13, textAlign: "center", lineHeight: 20 },
-  btnGroup: { width: "100%", gap: 10, marginTop: 4 },
-  btnPrimary: { backgroundColor: "#3b82f6", borderRadius: RADIUS.button, paddingVertical: 15, alignItems: "center" },
-  btnPrimaryText: { color: "#fff", fontSize: 15, fontWeight: "800" },
-  btnSecondary: { backgroundColor: "rgba(255,255,255,0.06)", borderRadius: RADIUS.button, paddingVertical: 15, alignItems: "center", borderWidth: 1.5, borderColor: "rgba(255, 255, 255, 0.08)" },
-  btnSecondaryText: { color: "#ffffff", fontSize: 15, fontWeight: "700" },
+  message: { fontSize: 14, textAlign: "center", lineHeight: 21 },
+  btn: { borderRadius: 14, paddingVertical: 14, width: "100%", alignItems: "center" },
+  btnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  reconnectRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6 },
+  reconnectText: { fontSize: 14, fontWeight: "600" },
 });
