@@ -3,7 +3,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { GameProvider, useGame } from "@/contexts/GameContext";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
 import MenuScreen from "./menu";
 import GameScreen from "./game";
 import ErrorScreen from "./error";
@@ -14,6 +16,8 @@ import NotificationsScreen from "./notifications";
 import SettingsScreen from "./settings";
 import BottomNav from "@/components/BottomNav";
 
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 type AppScreen = "menu" | "questions" | "community" | "friends" | "notifications" | "settings";
 
 function AppContent() {
@@ -21,6 +25,7 @@ function AppContent() {
   const { colors } = useTheme();
   const [screen, setScreen] = useState<AppScreen>("menu");
   const [menuTab, setMenuTab] = useState("home");
+  const [menuMode, setMenuMode] = useState("home");
   const [friendsInitialTab, setFriendsInitialTab] = useState<"friends" | "requests">("friends");
 
   const menuOpacity = useRef(new Animated.Value(1)).current;
@@ -53,6 +58,8 @@ function AppContent() {
       const next = tab as AppScreen;
       animateTransition(next);
       setScreen(next);
+    } else if (tab === "settings") {
+      setScreen("settings");
     } else {
       animateTransition("menu");
       setScreen("menu");
@@ -66,6 +73,10 @@ function AppContent() {
 
   const isActive = (s: AppScreen) => screen === s;
   const activeTab = screen === "menu" ? menuTab : screen;
+
+  const isBackScreen = screen === "friends" || screen === "notifications";
+  const isProfileMode = screen === "menu" && menuMode === "profile";
+  const showNav = !isBackScreen && !isProfileMode;
 
   if (!isConnected && phase === "connecting") {
     return (
@@ -85,14 +96,12 @@ function AppContent() {
     return <GameScreen />;
   }
 
-  const isBackScreen = screen === "friends" || screen === "notifications" || screen === "settings";
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {!isBackScreen && (
         <View style={{ flex: 1, position: "relative" }}>
           <Animated.View style={[s.screenAbs, { opacity: menuOpacity }]} pointerEvents={isActive("menu") ? "auto" : "none"}>
-            <MenuScreen onNavigate={(s) => { setMenuTab("home"); setScreen(s); }} initialMode={menuTab} />
+            <MenuScreen onNavigate={(s) => { setMenuTab("home"); setScreen(s); }} initialMode={menuTab} onModeChange={setMenuMode} />
           </Animated.View>
 
           <Animated.View style={[s.screenAbs, { opacity: questionsOpacity }]} pointerEvents={isActive("questions") ? "auto" : "none"}>
@@ -102,14 +111,19 @@ function AppContent() {
           <Animated.View style={[s.screenAbs, { opacity: communityOpacity }]} pointerEvents={isActive("community") ? "auto" : "none"}>
             <CommunityScreen />
           </Animated.View>
+
+          {isActive("settings") && (
+            <View style={s.screenAbs}>
+              <SettingsScreen />
+            </View>
+          )}
         </View>
       )}
 
       {isActive("friends") && <FriendsScreen key={friendsInitialTab} onBack={goHome} initialTab={friendsInitialTab} />}
       {isActive("notifications") && <NotificationsScreen onBack={goHome} onNavigateFriends={navigateToFriendsRequests} />}
-      {isActive("settings") && <SettingsScreen onBack={goHome} />}
 
-      {!isBackScreen && (
+      {showNav && (
         <BottomNav activeTab={activeTab} onNavigate={onNav} />
       )}
     </View>
@@ -124,6 +138,16 @@ const s = StyleSheet.create({
 });
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    "BarlowCondensed-Bold": require("@/assets/fonts/BarlowCondensed-Bold.ttf"),
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>

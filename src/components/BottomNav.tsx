@@ -2,14 +2,14 @@ import { memo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Home, User, Gamepad2, MessagesSquare } from "lucide-react-native";
+import { Gamepad2, CircleQuestionMark, MessagesSquare, Settings } from "lucide-react-native";
 import { BrandGradient } from "@/components/BrandGradient";
 
 const NAV_TABS = [
-  { key: "home",      label: "Home",      icon: "Home" },
-  { key: "profile",   label: "Profile",   icon: "User" },
-  { key: "questions", label: "Questions", icon: "Gamepad2" },
-  { key: "community", label: "Community", icon: "MessagesSquare" },
+  { key: "home",      label: "Game",       icon: "Gamepad2" },
+  { key: "questions", label: "Questions",  icon: "CircleQuestionMark" },
+  { key: "community", label: "Community",  icon: "MessagesSquare" },
+  { key: "settings",  label: "Settings",   icon: "Settings" },
 ];
 
 interface BottomNavProps {
@@ -17,7 +17,7 @@ interface BottomNavProps {
   onNavigate: (tab: string) => void;
 }
 
-const icons: Record<string, React.ComponentType<{ size: number; color: string }>> = { Home, User, Gamepad2, MessagesSquare };
+const icons: Record<string, React.ComponentType<{ size: number; color: string }>> = { Gamepad2, CircleQuestionMark, MessagesSquare, Settings };
 
 function BottomNavInner({ activeTab, onNavigate }: BottomNavProps) {
   const insets = useSafeAreaInsets();

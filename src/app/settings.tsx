@@ -10,7 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { RADIUS } from "@/constants/design-system";
 import { useTheme } from "@/contexts/ThemeContext";
 import { FlameBackground } from "@/components/FlameBackground";
-import { ArrowLeft, Bell, Moon, Volume2, Info } from "lucide-react-native";
+import { Bell, Moon, Volume2, Info } from "lucide-react-native";
 
 function Toggle({ value, onChange, disabled }: { value: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
@@ -25,7 +25,7 @@ function Toggle({ value, onChange, disabled }: { value: boolean; onChange?: (v: 
   );
 }
 
-export default function SettingsScreen({ onBack }: { onBack?: () => void }) {
+export default function SettingsScreen() {
   const { colors, shadows, isDark, toggleTheme } = useTheme();
   const [sound, setSoundState] = useState(true);
   const [vibrate, setVibrate] = useState(true);
@@ -47,10 +47,7 @@ export default function SettingsScreen({ onBack }: { onBack?: () => void }) {
     <SafeAreaView style={[s.safe, { backgroundColor: c.bg }]}>
       <FlameBackground />
       <View style={[s.header, { borderBottomColor: c.border }]}>
-        <TouchableOpacity onPress={onBack} style={[s.backBtn, { backgroundColor: c.glassBg, borderColor: c.border }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={18} color={c.text} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
+        <View style={s.headerTitle}>
           <Text style={[s.title, { color: c.text }]}>Settings</Text>
           <Text style={[s.subtitle, { color: c.sub }]}>App preferences</Text>
         </View>
@@ -113,14 +110,15 @@ const s = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 12,
     borderBottomWidth: 1,
   },
-  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 1 },
-  title: { fontSize: 18, fontWeight: "900" },
-  subtitle: { fontSize: 12, marginTop: 1 },
+  headerTitle: { flex: 1, alignItems: "center" },
+  title: { fontSize: 18, fontWeight: "900", textAlign: "center" },
+  subtitle: { fontSize: 12, marginTop: 1, textAlign: "center" },
   scroll: { padding: 16, gap: 14, paddingBottom: 40 },
   section: { borderRadius: RADIUS.cardSm, padding: 16, borderWidth: 1, gap: 4 },
   sectionTitle: { fontSize: 11, fontWeight: "800", letterSpacing: 1, marginBottom: 8, textTransform: "uppercase" },

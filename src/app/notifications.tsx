@@ -1,9 +1,7 @@
-import { SERVER_URL } from "@/constants/server";
 import { useProfile } from "@/contexts/ProfileContext";
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
   FlatList,
   StyleSheet,
   Text,
@@ -16,7 +14,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { FlameBackground } from "@/components/FlameBackground";
 import { getHttpBase } from "@/utils/http";
 import { timeAgo } from "@/utils/format";
-import { ArrowLeft, Bell, CheckCheck, Heart, UserPlus, UserX } from "lucide-react-native";
+import { ArrowLeft, Bell, Heart, UserPlus, UserX } from "lucide-react-native";
 
 interface NotificationItem {
   id: string;
@@ -29,84 +27,48 @@ interface NotificationItem {
   createdAt: number;
 }
 
-const NOTIF_ICONS: Record<string, React.ComponentType<{size: number; color: string}>> = {
+const NOTIF_ICONS: Record<string, React.ComponentType<{ size: number; color: string }>> = {
   "friend_request": UserPlus,
   "friend_request_accepted": Heart,
   "friend_request_rejected": UserX,
 };
 
-function AnimatedNotificationItemInner({ children }: { children: React.ReactNode }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateX = useRef(new Animated.Value(-12)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 8, tension: 80 }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View style={{ opacity, transform: [{ translateX }] }}>
-      {children}
-    </Animated.View>
-  );
-}
-const AnimatedNotificationItem = memo(AnimatedNotificationItemInner);
-
 export default function NotificationsScreen({ onBack, onNavigateFriends }: { onBack?: () => void; onNavigateFriends?: () => void }) {
   const { playerId } = useProfile();
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const base = getHttpBase();
 
-  const fetchNotifs = async (quiet = false) => {
-    if (!quiet) setLoading(true);
-    else setRefreshing(true);
-    try {
-      const res = await fetch(`${base}/notifications/${encodeURIComponent(playerId)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setNotifs(data.notifications ?? []);
-      }
-    } catch {}
-    setLoading(false);
-    setRefreshing(false);
-  };
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${base}/notifications/${encodeURIComponent(playerId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setNotifs(data.notifications ?? []);
+        }
+      } catch {}
+      setLoading(false);
+    })();
+  }, []);
 
-  useEffect(() => { fetchNotifs(); }, []);
+  const unreadCount = notifs.filter(n => !n.read).length;
 
-  const markRead = async () => {
-    try {
-      await fetch(`${base}/notifications/read`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player_id: playerId }),
-      });
-      setNotifs(prev => prev.map(n => ({ ...n, read: true })));
-    } catch {}
-  };
-
-  const unreadCount = useMemo(() => notifs.filter(n => !n.read).length, [notifs]);
-
-  const renderItem = useCallback(({ item: n }: { item: NotificationItem }) => {
+  const renderItem = ({ item: n }: { item: NotificationItem }) => {
     const Icon = NOTIF_ICONS[n.type] ?? Bell;
     const isFriendRequest = n.type === "friend_request";
     const card = (
-      <AnimatedNotificationItem>
-      <View style={[s.card, { backgroundColor: colors.glassBg, borderColor: colors.border, ...shadows.subtle }, !n.read && { borderColor: `${colors.purple}40`, backgroundColor: `${colors.purple}08` }]}>
-        <View style={[s.iconWrap, { backgroundColor: !n.read ? `${colors.purple}20` : "rgba(255,255,255,0.04)" }]}>
-          <Icon size={18} color={!n.read ? colors.purple : colors.sub} />
+      <View style={[s.card, { backgroundColor: colors.glassBg, borderColor: colors.border }]}>
+        <View style={[s.iconWrap, { backgroundColor: n.read ? "rgba(255,255,255,0.04)" : `${colors.purple}20` }]}>
+          <Icon size={18} color={n.read ? colors.sub : colors.purple} />
         </View>
         <View style={s.cardBody}>
-          <Text style={[s.msg, { color: colors.sub }, !n.read && [s.msgUnread, { color: colors.text }]]}>{n.message}</Text>
+          <Text style={[s.msg, { color: colors.sub }, !n.read && { color: colors.text }]} numberOfLines={2}>{n.message}</Text>
           <Text style={[s.time, { color: colors.subAlt }]}>{timeAgo(n.createdAt)}</Text>
         </View>
         {!n.read && <View style={[s.dot, { backgroundColor: colors.purple }]} />}
       </View>
-      </AnimatedNotificationItem>
     );
     if (isFriendRequest && onNavigateFriends) {
       return (
@@ -116,11 +78,11 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
       );
     }
     return card;
-  }, [onNavigateFriends, colors]);
+  };
 
   const ListEmpty = () => (
     <View style={s.emptyState}>
-      <Bell size={48} color={colors.sub} />
+      <Bell size={40} color={colors.sub} />
       <Text style={[s.emptyText, { color: colors.sub }]}>No notifications yet</Text>
     </View>
   );
@@ -136,11 +98,7 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
           <Text style={[s.title, { color: colors.text }]}>Notifications</Text>
           <Text style={[s.subtitle, { color: colors.sub }]}>{unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}</Text>
         </View>
-        {unreadCount > 0 ? (
-          <TouchableOpacity onPress={markRead} style={[s.markBtn, { backgroundColor: `${colors.purple}15`, borderColor: `${colors.purple}30` }]} activeOpacity={0.8}>
-            <CheckCheck size={16} color={colors.purple} />
-          </TouchableOpacity>
-        ) : <View style={{ width: 36 }} />}
+        <View style={{ width: 36 }} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -154,12 +112,7 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
             style={{ flex: 1 }}
             contentContainerStyle={s.list}
             showsVerticalScrollIndicator={false}
-            refreshing={refreshing}
-            onRefresh={() => fetchNotifs(true)}
             ListEmptyComponent={ListEmpty}
-            windowSize={5}
-            maxToRenderPerBatch={10}
-            removeClippedSubviews
           />
         )}
       </View>
@@ -181,17 +134,14 @@ const s = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
   title: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
   subtitle: { color: "#a0a0ac", fontSize: 12, marginTop: 1 },
-  markBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(253, 38, 122, 0.15)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(253, 38, 122, 0.30)" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyState: { alignItems: "center", paddingTop: 80, gap: 12 },
   emptyText: { color: "#a0a0ac", fontSize: 14, textAlign: "center" },
   list: { padding: 16, gap: 8, flexGrow: 1 },
-  card: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(28, 28, 34, 0.7)", borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  unread: { borderColor: "rgba(253, 38, 122, 0.40)", backgroundColor: "rgba(253, 38, 122, 0.08)" },
+  card: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1 },
   iconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   cardBody: { flex: 1, gap: 2 },
-  msg: { color: "#a0a0ac", fontSize: 13, fontWeight: "500", lineHeight: 18 },
-  msgUnread: { color: "#ffffff", fontWeight: "700" },
-  time: { color: "#6e6e7a", fontSize: 11, fontWeight: "600" },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#fd267a" },
+  msg: { fontSize: 13, fontWeight: "500", lineHeight: 18 },
+  time: { fontSize: 11, fontWeight: "600" },
+  dot: { width: 8, height: 8, borderRadius: 4 },
 });

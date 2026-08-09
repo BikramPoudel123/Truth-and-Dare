@@ -31,6 +31,7 @@ import { ArrowLeft, CalendarDays, Crown, Eye, Flame, Heart, Mic, PartyPopper, Sk
 import { BrandGradient } from "@/components/BrandGradient";
 import { FlameBackground } from "@/components/FlameBackground";
 import { ParticleBurst } from "@/components/ParticleBurst";
+import { Logo } from "@/components/Logo";
 
 const PlayerAvatarItem = memo(function PlayerAvatarItem({
   player, active, playerId, playerName, profilePic, onAvatarPress, moodColor,
@@ -506,16 +507,7 @@ export default function GameScreen() {
             <ArrowLeft size={18} color={moodCfg.color} />
           </TouchableOpacity>
           <View style={s.topTitleWrap}>
-            <View style={s.logoRow}>
-              <View style={s.maskRow}>
-                <Text style={s.maskBlue}>🎭</Text>
-              </View>
-              <View style={s.logoTextCol}>
-                <Text style={[s.logoTruth, { color: colors.truth }]}>Truth</Text>
-                <Text style={[s.logoDare, { color: colors.dare }]}>Dare</Text>
-                <Text style={[s.logoOr, { color: colors.text }]}>or</Text>
-              </View>
-            </View>
+            <Logo size="sm" />
           </View>
           <View style={{ width: 36 }} />
         </View>
@@ -891,13 +883,6 @@ const s = StyleSheet.create({
   topBtn:    { width: 36, height: 36, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
   topBtnTxt: { color: "#ffffff", fontSize: 18, fontWeight: "700" },
   topTitleWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
-  logoRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  maskRow: { flexDirection: "row", gap: 2 },
-  maskBlue: { fontSize: 20 },
-  logoTextCol: { position: "relative", alignItems: "center", justifyContent: "center" },
-  logoTruth: { fontSize: 15, fontWeight: "900", color: "#fd267a", letterSpacing: -0.4, lineHeight: 15, zIndex: 0 },
-  logoOr: { position: "absolute", fontSize: 10, fontWeight: "900", color: "#ffffff", opacity: 0.8, letterSpacing: 2, zIndex: 2, alignSelf: "center", top: 10 },
-  logoDare: { fontSize: 19, fontWeight: "900", color: "#ff6036", letterSpacing: 1, lineHeight: 19, zIndex: 0 },
 
   scroll: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24, paddingTop: 8 },
 

@@ -18,10 +18,11 @@ import { getHttpBase } from "@/utils/http";
 import { getLevelProgress } from "@/utils/levels";
 import { PLAY_STYLE_ICON_MAP } from "@/constants/profile";
 
-import { Users, Settings, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves, Star, Skull, Heart, CalendarDays, ChevronRight } from "lucide-react-native";
+import { Users, Bell, AlertTriangle, Zap, Gamepad2, Camera, Pencil, Flame, Crown, Sparkles, Search, PartyPopper, Hourglass, SmilePlus, MessageCircle, Handshake, Waves, Star, Skull, Heart, CalendarDays, ChevronRight, User, ArrowLeft } from "lucide-react-native";
 import { ParticleBurst } from "@/components/ParticleBurst";
 import { BrandGradient } from "@/components/BrandGradient";
 import { FlameBackground } from "@/components/FlameBackground";
+import { Logo } from "@/components/Logo";
 
 const ICON_MAP: Record<string, any> = { SmilePlus, MessageCircle, Flame, Handshake, Waves };
 
@@ -65,7 +66,7 @@ function SearchingDots() {
 
 type ScreenMode = "home" | "profile" | "random_waiting" | "private_join" | "private_waiting_creator" | "private_waiting_joiner";
 
-export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (screen: "questions" | "community" | "friends" | "notifications" | "settings") => void; initialMode?: string }) {
+export default function MenuScreen({ onNavigate, initialMode, onModeChange }: { onNavigate?: (screen: "questions" | "community" | "friends" | "notifications" | "settings") => void; initialMode?: string; onModeChange?: (mode: string) => void }) {
   const { createRoom, autoJoin, joinRoom, roomId, players, isConnected, phase, reconnect, error, quitGame, setInterests, gameMood, setGameMood, playersOnline, notificationCount } = useGame();
   const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, reactions, playedSince, playerId } = useProfile();
   const { colors, shadows } = useTheme();
@@ -91,6 +92,7 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
   useEffect(() => {
     if (initialMode) setMode(initialMode as ScreenMode);
   }, [initialMode]);
+  useEffect(() => { onModeChange?.(mode); }, [mode, onModeChange]);
   useEffect(() => {
     if (initialRun.current) { initialRun.current = false; return; }
     if (phase === "menu") { setMode("home"); setJoining(false); setCode(""); }
@@ -160,19 +162,8 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
 
                 {/* Header with Logo */}
                 <View style={s.header}>
-                  <View style={s.logoWrap}>
-                  <View style={s.logoRow}>
-                    <View style={s.maskRow}>
-                      <Text style={s.maskBlue}>🎭</Text>
-                    </View>
-                <View style={s.logoTextCol}>
-                  <Text style={[s.logoTruth, { color: colors.truth }]}>Truth</Text>
-                  <Text style={[s.logoDare, { color: colors.dare }]}>Dare</Text>
-                  <Text style={[s.logoOr, { color: colors.text }]}>or</Text>
-                </View>
-                  </View>
-                </View>
-                <View style={s.headerRight}>
+                  <Logo size="md" />
+                  <View style={s.headerRight}>
                   <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.glassBg, borderColor: colors.border }]} activeOpacity={0.8} onPress={() => onNavigate?.("friends")}>
                     <Users size={18} color={colors.sub} />
                   </TouchableOpacity>
@@ -180,8 +171,8 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
                     {notificationCount > 0 && <View style={[s.notifDot, { backgroundColor: colors.red, borderColor: colors.bg }]} />}
                     <Bell size={18} color={notificationCount > 0 ? colors.purple : colors.sub} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.glassBg, borderColor: colors.border }]} activeOpacity={0.8} onPress={() => onNavigate?.("settings")}>
-                    <Settings size={18} color={colors.sub} />
+                  <TouchableOpacity style={[s.iconBtn, { backgroundColor: colors.glassBg, borderColor: colors.border }]} activeOpacity={0.8} onPress={() => setMode("profile")}>
+                    <User size={18} color={colors.sub} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -271,6 +262,12 @@ export default function MenuScreen({ onNavigate, initialMode }: { onNavigate?: (
           {/* PROFILE SCREEN */}
           {mode === "profile" && (
             <View style={s.profileContainer}>
+              <TouchableOpacity style={s.profileBack} onPress={() => setMode("home")} activeOpacity={0.7}>
+                <View style={[s.profileBackBtn, { backgroundColor: colors.glassBg, borderColor: colors.border }]}>
+                  <ArrowLeft size={16} color={colors.text} />
+                </View>
+                <Text style={[s.profileBackText, { color: colors.sub }]}>Back</Text>
+              </TouchableOpacity>
               {/* Profile Avatar */}
               <View style={s.profileAvatarSection}>
                 <TouchableOpacity onPress={pickPic} activeOpacity={0.8}>
@@ -535,18 +532,9 @@ const s = StyleSheet.create({
   // ── Background Particles ──
 
   // ── Header ──
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingTop: 16, paddingBottom: 12 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 16, paddingBottom: 12, columnGap: 16 },
   heroBanner: { position: "absolute", top: -80, left: -70, right: -70, height: 220, borderRadius: 120, opacity: 0.22 },
   heroBannerSmall: { position: "absolute", top: -24, right: -50, width: 160, height: 160, borderRadius: 80, opacity: 0.14 },
-  logoWrap: {},
-  logoRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  maskRow: { flexDirection: "row", gap: 2 },
-  maskBlue: { fontSize: 28 },
-  logoTextCol: { position: "relative", alignItems: "center", justifyContent: "center", paddingVertical: 0 },
-  logoTruth: { fontSize: 22, fontWeight: "900", color: "#fd267a", letterSpacing: -0.5, lineHeight: 22, zIndex: 0 },
-  logoOr: { position: "absolute", fontSize: 13, fontWeight: "900", color: "#ffffff", opacity: 0.8, letterSpacing: 2, zIndex: 2, alignSelf: "center", top: 14 },
-  logoDare: { fontSize: 28, fontWeight: "900", color: "#ff6036", letterSpacing: 1, lineHeight: 28, zIndex: 0 },
-
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
   notifBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
@@ -629,6 +617,9 @@ const s = StyleSheet.create({
 
   // ── Profile Screen ──
   profileContainer: { gap: 16, paddingTop: 24 },
+  profileBack: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start" },
+  profileBackBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  profileBackText: { fontSize: 14, fontWeight: "700" },
 
   // Avatar Section
   profileAvatarSection: { alignItems: "center", marginBottom: 8 },
