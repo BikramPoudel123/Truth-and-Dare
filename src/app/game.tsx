@@ -29,7 +29,7 @@ import { RADIUS } from "@/constants/design-system";
 import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi, fetchFriendIdsAndSent } from "@/utils/http";
 import { ArrowLeft, CalendarDays, Crown, Eye, Flame, Heart, Mic, PartyPopper, Skull, SmilePlus, Sparkles, Star, Timer as TimerIcon, Paperclip, Send, Camera, Check, X, Flag, UserPlus, UserMinus, UserCheck, Users, Zap, Target } from "lucide-react-native";
 import { BrandGradient } from "@/components/BrandGradient";
-import { FlameBackground } from "@/components/FlameBackground";
+import { AppBackground } from "@/components/AppBackground";
 import { ParticleBurst } from "@/components/ParticleBurst";
 import { Logo } from "@/components/Logo";
 
@@ -143,10 +143,10 @@ const pb = StyleSheet.create({
     marginBottom: 4,
     borderRadius: RADIUS.cardSm,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "rgba(28, 28, 34, 0.7)",
+    backgroundColor: "#f5f5f6",
   },
   slot: { flex: 1, gap: 2 },
   avatar: {
@@ -157,11 +157,11 @@ const pb = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 2,
     borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
   avatarTxt: { fontSize: 12, fontWeight: "800" },
-  name: { fontSize: 11, fontWeight: "700", color: "#6e6e7a", maxWidth: 80 },
-  nameOn: { color: "#ffffff" },
+  name: { fontSize: 11, fontWeight: "700", color: "#8a8a94", maxWidth: 80 },
+  nameOn: { color: "#1c1c1e" },
   turnTag: { fontSize: 8, fontWeight: "800", letterSpacing: 0.8 },
   vsWrap: {
     width: 32,
@@ -498,8 +498,8 @@ export default function GameScreen() {
   }, [canSendA, aMedia, base, playerId, submitAnswer, inputA, playSubmit]);
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
-      <FlameBackground />
+    <SafeAreaView style={s.safe}>
+      <AppBackground />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={s.flex}>
 
         <View style={[s.topBar, { borderBottomColor: `${moodCfg.color}20` }]}>
@@ -872,16 +872,16 @@ export default function GameScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: "#0d0d10" },
+  safe:  { flex: 1 },
   flex:  { flex: 1 },
 
   topBar: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 16, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: "rgba(255, 255, 255, 0.08)",
+    borderBottomWidth: 1, borderBottomColor: "rgba(0, 0, 0, 0.08)",
   },
-  topBtn:    { width: 36, height: 36, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  topBtnTxt: { color: "#ffffff", fontSize: 18, fontWeight: "700" },
+  topBtn:    { width: 36, height: 36, alignItems: "center", justifyContent: "center", backgroundColor: "#f0f0f2", borderRadius: 18, borderWidth: 1, borderColor: "rgba(0, 0, 0, 0.08)" },
+  topBtnTxt: { color: "#1c1c1e", fontSize: 18, fontWeight: "700" },
   topTitleWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
 
   scroll: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24, paddingTop: 8 },
@@ -890,7 +890,7 @@ const s = StyleSheet.create({
   chooseWrap: { alignItems: "center", paddingVertical: 32, width: "100%", flex: 1, justifyContent: "center" },
   section:    { gap: 14, paddingTop: 8 },
 
-  chooseLabel: { color: "#a0a0ac", fontSize: 14, textAlign: "center", fontWeight: "600", marginBottom: 4 },
+  chooseLabel: { color: "#5c5c66", fontSize: 14, textAlign: "center", fontWeight: "600", marginBottom: 4 },
 
   choiceTimer: {
     flexDirection: "row", alignItems: "center", gap: 6,
@@ -898,7 +898,7 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.small,
   },
   choiceTimerUrgent: { backgroundColor: "#ff4d4d10" },
-  choiceTimerTxt: { color: "#a0a0ac", fontSize: 12, fontWeight: "700" },
+  choiceTimerTxt: { color: "#5c5c66", fontSize: 12, fontWeight: "700" },
   choiceTrack: { height: 3, borderRadius: 2, flex: 1, overflow: "hidden", minWidth: 60 },
   choiceFill: { height: "100%", borderRadius: 2 },
 
@@ -907,9 +907,9 @@ const s = StyleSheet.create({
     borderWidth: 1, width: "100%",
   },
 
-  phaseLabel: { color: "#a0a0ac", fontSize: 14, textAlign: "center", fontWeight: "600" },
-  waitTitle:  { color: "#ffffff", fontSize: 18, fontWeight: "700", textAlign: "center" },
-  waitSub:    { color: "#a0a0ac", fontSize: 13, textAlign: "center" },
+  phaseLabel: { color: "#5c5c66", fontSize: 14, textAlign: "center", fontWeight: "600" },
+  waitTitle:  { color: "#1c1c1e", fontSize: 18, fontWeight: "700", textAlign: "center" },
+  waitSub:    { color: "#5c5c66", fontSize: 13, textAlign: "center" },
 
   browseBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
@@ -927,14 +927,14 @@ const s = StyleSheet.create({
   },
   modeIconWrap: { width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center" },
   modeWord:  { fontSize: 22, fontWeight: "900", letterSpacing: 2 },
-  modeSub:   { color: "#a0a0ac", fontSize: 12 },
+  modeSub:   { color: "#5c5c66", fontSize: 12 },
 
   textBox: {
     borderWidth: 1.5,
     borderRadius: RADIUS.cardSm,
     paddingHorizontal: 14, paddingVertical: 12,
-    color: "#ffffff", fontSize: 15, minHeight: 90, textAlignVertical: "top",
-    backgroundColor: "rgba(28, 28, 34, 0.5)",
+    color: "#1c1c1e", fontSize: 15, minHeight: 90, textAlignVertical: "top",
+    backgroundColor: "#f5f5f6",
   },
 
   // ── Answer-centric UI ──
@@ -952,7 +952,7 @@ const s = StyleSheet.create({
     position: "relative",
   },
   questionText: {
-    color: "#a0a0ac",
+    color: "#5c5c66",
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
@@ -963,11 +963,11 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.cardSm,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: "#ffffff",
+    color: "#1c1c1e",
     fontSize: 17,
     minHeight: 140,
     textAlignVertical: "top",
-    backgroundColor: "rgba(28, 28, 34, 0.6)",
+    backgroundColor: "#f5f5f6",
     lineHeight: 24,
   },
   waitingAnswer: {
@@ -978,7 +978,7 @@ const s = StyleSheet.create({
     paddingVertical: 32,
   },
   waitingAnswerText: {
-    color: "#a0a0ac",
+    color: "#5c5c66",
     fontSize: 14,
     fontWeight: "600",
   },
@@ -990,7 +990,7 @@ const s = StyleSheet.create({
     gap: 12,
   },
   revealLabel: {
-    color: "#ffffff",
+    color: "#1c1c1e",
     fontSize: 20,
     fontWeight: "800",
     textAlign: "center",
@@ -1001,7 +1001,7 @@ const s = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 40,
   },
-  divLine: { flex: 1, height: 1, backgroundColor: "rgba(255, 255, 255, 0.08)" },
+  divLine: { flex: 1, height: 1, backgroundColor: "rgba(0, 0, 0, 0.08)" },
   divDot: { width: 6, height: 6, borderRadius: 3 },
   responderSection: {
     flexDirection: "row",
@@ -1017,18 +1017,18 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   responderAvatarTxt: { color: "#fff", fontSize: 12, fontWeight: "800" },
-  responderName: { color: "#ffffff", fontSize: 12, fontWeight: "600" },
+  responderName: { color: "#1c1c1e", fontSize: 12, fontWeight: "600" },
   answerCard: {
     borderRadius: RADIUS.cardSm,
     padding: 28,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
     alignItems: "center",
     justifyContent: "center",
     minHeight: 160,
   },
   answerText: {
-    color: "#ffffff",
+    color: "#1c1c1e",
     fontSize: 20,
     fontWeight: "700",
     textAlign: "center",
@@ -1042,12 +1042,12 @@ const s = StyleSheet.create({
   emojiPicker: {
     flexDirection: "row",
     gap: 2,
-    backgroundColor: "rgba(28, 28, 34, 0.95)",
+    backgroundColor: "#ffffff",
     borderRadius: RADIUS.small,
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
   emojiBtn: {
     width: 32,
@@ -1060,14 +1060,14 @@ const s = StyleSheet.create({
     position: "absolute",
     bottom: -12,
     right: -8,
-    backgroundColor: "rgba(28, 28, 34, 0.9)",
+    backgroundColor: "#f5f5f6",
     borderRadius: 16,
     width: 36,
     height: 36,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
   reactEmoji: { fontSize: 18 },
   forfeitBadge: {
@@ -1099,9 +1099,9 @@ const s = StyleSheet.create({
   sticky: {
     paddingHorizontal: 16, paddingVertical: 10,
     gap: 8,
-    backgroundColor: "rgba(13, 13, 16, 0.9)",
+    backgroundColor: "#e8e8ec",
     borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.08)",
+    borderTopColor: "rgba(0, 0, 0, 0.08)",
   },
   stickyBtn:      { flex: 1, borderRadius: RADIUS.small, paddingVertical: 15, alignItems: "center" },
   stickyGreen:    { backgroundColor: "#34c271" },

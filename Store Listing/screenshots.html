@@ -3,302 +3,89 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Truth or Dare — Play Store Screenshots (App UI · Light)</title>
+<title>Truth or Dare — Play Store Screenshots</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@500;600;700;800&display=swap" rel="stylesheet" />
 <style>
-  :root{
-    --pink:#fd267a; --orange:#ff6036; --green:#34c271; --red:#ff4d4d; --gold:#ffb100;
-    --grad:linear-gradient(135deg,#fd267a,#ff6036);
-    --quick:linear-gradient(135deg,#fd267a,#ff6fa8);
-    --priv:linear-gradient(135deg,#ff6036,#fd267a);
-  }
-  *{ box-sizing:border-box; margin:0; padding:0; -webkit-font-smoothing:antialiased; }
-  html,body{ background:#e9e9ee; }
-  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:#1c1c1e; }
-  .ic{ display:inline-block; width:1em; height:1em; vertical-align:-0.125em; flex:none; }
+  @font-face{ font-family:'Barlow Condensed'; src:url('../assets/fonts/BarlowCondensed-Bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
+  @font-face{ font-family:'Barlow Condensed'; src:url('../assets/fonts/BarlowCondensed-SemiBold.ttf') format('truetype'); font-weight:600; font-display:swap; }
+  @font-face{ font-family:'Barlow Condensed'; src:url('../assets/fonts/BarlowCondensed-Medium.ttf') format('truetype'); font-weight:500; font-display:swap; }
 
-  /* ══════════ TOOLBAR (preview only — hidden in full mode) ══════════ */
-  .toolbar{ position:fixed; top:0; left:0; right:0; z-index:999; background:rgba(13,13,16,.96);
-    border-bottom:1px solid rgba(255,255,255,.1); padding:12px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  :root{
+    --pink:#fd267a; --orange:#ff6036; --red:#ff4d4d; --gold:#ffb100; --green:#34c271;
+    --ink:#0b0b10;
+    --cond:'Barlow Condensed',Impact,'Arial Narrow',sans-serif;
+    --sans:'Barlow',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-font-smoothing:antialiased; }
+  html,body{ background:#1a1a1f; }
+  body{ font-family:var(--sans); color:#fff; }
+
+  /* ══════════ TOOLBAR ══════════ */
+  .toolbar{ position:fixed; top:0; left:0; right:0; z-index:999; background:rgba(10,10,14,.96);
+    border-bottom:1px solid rgba(255,255,255,.1); padding:12px 20px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .toolbar .tt{ font-size:14px; font-weight:800; color:#fff; margin-right:6px; }
-  .toolbar .tt span{ color:#fd267a; }
+  .toolbar .tt span{ color:var(--pink); }
   .toolbar button{ background:#1c1c22; color:#fff; border:1px solid rgba(255,255,255,.16); border-radius:10px;
-    padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; }
-  .toolbar button.on{ background:var(--grad); border-color:transparent; }
-  .toolbar .hint{ color:#a0a0ac; font-size:11px; margin-left:auto; line-height:1.6; }
+    padding:8px 12px; font-size:13px; font-weight:700; cursor:pointer; }
+  .toolbar button.on{ background:linear-gradient(90deg,var(--pink),var(--orange)); border-color:transparent; }
+  .toolbar .hint{ color:#9a9aa4; font-size:11px; margin-left:auto; line-height:1.6; }
   .toolbar .hint b{ color:#fff; }
   body.full .toolbar{ display:none; }
 
-  .stage{ padding:90px 20px 40px; }
+  .stage{ padding:86px 20px 40px; }
   .slot{ width:1080px; height:1920px; overflow:hidden; flex:none; }
   body.full .slot{ height:auto; }
-  body.preview .stage{ display:flex; flex-direction:row; flex-wrap:wrap; gap:24px; align-items:flex-start; }
-  body.full .stage{ display:flex; flex-direction:column; align-items:center; gap:36px; }
+  body.preview .stage{ display:flex; flex-direction:row; flex-wrap:wrap; gap:22px; align-items:flex-start; }
+  body.full .stage{ display:flex; flex-direction:column; align-items:center; gap:28px; }
 
-  /* ══════════ SCREENCAP 1080×1920 (headline OUTSIDE the phone) ══════════ */
+  /* ══════════ SCREENCAP 1080×1920 ══════════ */
   .screencap{ position:relative; width:1080px; height:1920px; overflow:hidden; transform-origin:top left;
-    display:flex; flex-direction:column; align-items:center; padding:38px 60px 26px;
+    display:flex; flex-direction:column; background:var(--ink); }
+
+  /* ── HEADLINE BAND ── */
+  .band{ flex:none; position:relative; height:656px; display:flex; flex-direction:column;
+    padding:44px 90px 54px; overflow:hidden;
     background:
-      radial-gradient(1200px 820px at 12% -6%, rgba(253,38,122,.10), transparent 55%),
-      radial-gradient(1000px 720px at 104% 4%, rgba(255,96,54,.14), transparent 55%),
-      radial-gradient(900px 700px at 50% 108%, rgba(253,38,122,.06), transparent 55%),
-      linear-gradient(180deg,#ffffff,#fff5fa 55%,#fffaf2 100%);
-    box-shadow:0 0 0 1px rgba(0,0,0,.06);
-  }
+      radial-gradient(120% 90% at 50% 130%, var(--acc) 0%, transparent 58%),
+      linear-gradient(180deg,#0b0b10 0%,#0e0c14 55%,#131018 100%); }
+  .band::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:4px;
+    background:linear-gradient(90deg,var(--acc),transparent 30%,transparent 70%,var(--acc)); opacity:.9; }
 
-  /* ── Store headline (outside phone) ── */
-  .sh-head{ width:100%; min-height:384px; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:16px; padding-bottom:24px; text-align:center; }
-  .apppill{ display:inline-flex; align-items:center; gap:12px; background:rgba(0,0,0,.05);
-    border:1px solid rgba(0,0,0,.1); border-radius:999px; padding:10px 22px 10px 10px; }
-  .apppill .apic{ width:46px; height:46px; border-radius:13px; background:var(--grad);
-    display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 4px 14px rgba(253,38,122,.4); }
-  .apppill .apt{ font-size:22px; font-weight:800; color:#1c1c1e; letter-spacing:.2px; }
-  .apppill .apt em{ font-style:normal; color:var(--pink); }
-  .bigtitle{ font-size:84px; line-height:1.04; font-weight:900; letter-spacing:-1.5px; color:#1c1c1e; }
-  .bigtitle .g{ background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .subtitle{ color:#5c5c66; font-size:28px; font-weight:600; line-height:1.3; }
+  .tag{ font-size:20px; font-weight:700; letter-spacing:5px; text-transform:uppercase; color:rgba(255,255,255,.38); }
+  .mid{ flex:1; display:flex; flex-direction:column; justify-content:center; gap:20px; }
+  .head{ font-family:var(--cond); font-weight:700; font-size:94px; line-height:.97; letter-spacing:-.5px; color:#fff; }
+  .head .g{ background:linear-gradient(90deg,var(--g1),var(--g2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub{ color:#a0a0ac; font-size:29px; font-weight:500; line-height:1.35; max-width:900px; }
+  .chips{ display:flex; gap:14px; align-items:center; justify-content:center; }
+  .chips span{ display:inline-flex; align-items:center; gap:8px; font-size:21px; font-weight:700; color:#e6e6ea;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); border-radius:999px;
+    padding:10px 20px; white-space:nowrap; }
 
-  /* ── Phone mockup ── */
-  .phone{ position:relative; width:804px; height:1464px; background:#1a1a20; border-radius:86px;
-    padding:22px; box-shadow:0 30px 80px rgba(20,20,30,.35), 0 0 0 2px rgba(0,0,0,.12), 0 4px 0 rgba(255,255,255,.06) inset; }
-  .phone::before{ content:""; position:absolute; top:150px; right:-3px; width:3px; height:72px; background:#0f0f13; border-radius:3px; }
-  .phone::after{ content:""; position:absolute; top:250px; left:-3px; width:3px; height:110px; background:#0f0f13; border-radius:3px; }
+  /* ── HERO (card 1) : full brand gradient band ── */
+  .band.hero{ background:
+      radial-gradient(120% 100% at 50% 0%, rgba(255,255,255,.32) 0%, transparent 55%),
+      linear-gradient(180deg,#ff6036 0%,#fd267a 62%,#e31464 100%); }
+  .band.hero::after{ background:linear-gradient(90deg,#ffd9e6,transparent 30%,transparent 70%,#ffd9e6); }
+  .band.hero .tag{ color:rgba(40,4,18,.66); }
+  .band.hero .head{ color:#fff; font-size:112px; }
+  .band.hero .kick{ font-family:var(--cond); font-weight:700; font-size:46px; letter-spacing:1px; color:rgba(255,255,255,.95); margin-top:-6px; }
+  .band.hero .sub{ color:rgba(40,4,18,.78); }
+  .band.hero .chips span{ background:rgba(30,2,13,.34); border:1px solid rgba(30,2,13,.28); color:#fff; }
 
-  /* ══════════ LIGHT-THEME APP SCREEN (inside phone) ══════════ */
-  .screen{
-    position:relative; width:760px; height:1420px; overflow:hidden; border-radius:68px;
-    display:flex; flex-direction:column; background:#fff;
-    background:
-      radial-gradient(1050px 720px at 50% -14%, rgba(253,38,122,.13), rgba(253,38,122,0) 60%),
-      radial-gradient(620px 480px at 110% 22%, rgba(255,96,54,.10), rgba(255,96,54,0) 60%),
-      linear-gradient(180deg, rgba(253,38,122,.12) 0%, rgba(255,96,54,.07) 48%, rgba(253,38,122,.04) 100%),
-      #ffffff;
-  }
-  .island{ position:absolute; top:16px; left:50%; transform:translateX(-50%); width:190px; height:48px;
-    background:#000; border-radius:999px; z-index:60; }
-
-  /* ── Status bar (light) ── */
-  .status{ height:104px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 44px 22px; }
-  .status .time{ font-size:32px; font-weight:700; color:#1c1c1e; letter-spacing:.4px; }
-  .status .sig{ display:flex; align-items:center; gap:9px; color:#1c1c1e; }
-  .status .bars{ display:flex; align-items:flex-end; gap:3px; }
-  .status .bars i{ width:6px; background:#1c1c1e; border-radius:2px; display:block; }
-  .status .bars i:nth-child(1){ height:10px; } .status .bars i:nth-child(2){ height:15px; } .status .bars i:nth-child(3){ height:22px; }
-  .status .batt{ width:46px; height:23px; border:2.5px solid #1c1c1e; border-radius:6px; position:relative; padding:2px; }
-  .status .batt::after{ content:""; position:absolute; right:-8px; top:6px; width:4px; height:9px; background:#1c1c1e; border-radius:2px; }
-  .status .batt i{ display:block; height:100%; background:#1c1c1e; border-radius:3px; width:85%; }
-  .status .sig .lbl{ font-size:22px; font-weight:700; }
-
-  /* ── Content ── */
-  .content{ flex:1; min-height:0; padding:14px 30px 16px; display:flex; flex-direction:column; gap:16px; overflow:hidden; }
-  .homec, .roomc, .profc{ flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center; gap:16px; }
-
-  /* ── Bottom nav (light) ── */
-  .bnav{ flex:none; display:flex; padding:12px 14px 0; background:#fff; border-top:1px solid rgba(0,0,0,.08); }
-  .bitem{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding-bottom:8px; }
-  .bicon{ width:68px; height:46px; border-radius:23px; display:flex; align-items:center; justify-content:center; font-size:26px; color:#8a8a94; }
-  .bicon.on{ background:var(--grad); color:#fff; box-shadow:0 4px 16px rgba(253,38,122,.45); }
-  .blab{ font-size:20px; font-weight:700; color:#8a8a94; letter-spacing:.3px; }
-  .blab.on{ color:#1c1c1e; font-weight:900; }
-  .homeind{ flex:none; height:54px; display:flex; align-items:center; justify-content:center; }
-  .homeind i{ width:200px; height:13px; border-radius:999px; background:rgba(0,0,0,.9); }
-
-  /* ── Logo ── */
-  .logo{ display:flex; align-items:center; gap:12px; }
-  .logo .mask{ font-size:40px; line-height:1; }
-  .logocol{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-  .logocol .lt{ font-size:32px; font-weight:900; color:var(--pink); letter-spacing:-.4px; line-height:1; }
-  .logocol .lor{ position:absolute; font-size:18px; font-weight:900; color:#1c1c1e; opacity:.85; letter-spacing:2px; top:44%; }
-  .logocol .ld{ font-size:38px; font-weight:900; color:var(--orange); letter-spacing:1px; line-height:1; }
-
-  /* ── Header (home) ── */
-  .hdr{ display:flex; align-items:flex-start; justify-content:space-between; padding-top:6px; }
-  .hdrbtns{ display:flex; gap:12px; }
-  .hbtn{ position:relative; width:66px; height:66px; border-radius:50%; background:rgba(0,0,0,.05);
-    border:1px solid rgba(0,0,0,.1); display:flex; align-items:center; justify-content:center; font-size:28px; color:#8a8a94; }
-  .hbtn .dot{ position:absolute; top:10px; right:10px; width:13px; height:13px; border-radius:50%; background:var(--red);
-    border:2px solid #fff; }
-
-  /* ── Online row ── */
-  .online{ display:flex; align-items:center; justify-content:center; gap:10px; }
-  .online i{ width:14px; height:14px; border-radius:50%; background:var(--green); box-shadow:0 0 0 6px rgba(52,194,113,.14); }
-  .online span{ color:#5c5c66; font-size:22px; font-weight:600; letter-spacing:.5px; }
-
-  /* ── Match cards (light) ── */
-  .mcard{ background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:42px; padding:24px 26px;
-    display:flex; align-items:center; gap:20px; box-shadow:0 6px 20px rgba(0,0,0,.06); }
-  .mic{ width:78px; height:78px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
-    font-size:36px; color:#fff; box-shadow:0 5px 16px rgba(253,38,122,.35); }
-  .mic.quick{ background:var(--quick); } .mic.priv{ background:var(--priv); } .mic.hero{ background:var(--grad); }
-  .mbody{ flex:1; min-width:0; }
-  .mtitle{ font-size:31px; font-weight:800; color:#1c1c1e; margin-bottom:4px; }
-  .mdesc{ color:#5c5c66; font-size:20px; line-height:1.3; }
-  .mpill{ flex:none; display:inline-flex; align-items:center; gap:10px; padding:16px 24px; border-radius:999px;
-    font-size:22px; font-weight:700; color:#fff; }
-  .mpill.q{ background:var(--quick); } .mpill.p{ background:var(--priv); }
-
-  /* ── Game top bar ── */
-  .gtop{ flex:none; display:flex; align-items:center; justify-content:space-between; padding:6px 30px 0; }
-  .gtop .gback{ width:52px; height:52px; border-radius:50%; background:rgba(0,0,0,.05); border:1px solid rgba(0,0,0,.1);
-    display:flex; align-items:center; justify-content:center; font-size:28px; color:var(--pink); }
-  .gtop .gspace{ width:52px; }
-
-  /* ── Player bar ── */
-  .pbar{ flex:none; display:flex; align-items:center; margin:14px 30px 0; background:#fff; border:1px solid rgba(0,0,0,.08);
-    border-radius:42px; padding:16px 20px; box-shadow:0 4px 14px rgba(0,0,0,.05); }
-  .pslot{ flex:1; display:flex; flex-direction:column; gap:3px; min-width:0; }
-  .pslot.right{ align-items:flex-end; }
-  .pava{ width:58px; height:58px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:24px; font-weight:800; color:#fff; background:#e4e4ea; border:3px solid rgba(0,0,0,.1); margin-bottom:5px; }
-  .pava.on{ border-color:var(--pink); box-shadow:0 0 0 4px rgba(253,38,122,.16); }
-  .pname{ font-size:19px; font-weight:700; color:#8a8a94; display:flex; align-items:center; gap:7px; white-space:nowrap; }
-  .pname.on{ color:#1c1c1e; }
-  .pname .lvl{ display:inline-flex; align-items:center; gap:3px; background:rgba(255,177,0,.15); border-radius:10px;
-    padding:2px 9px; color:var(--gold); font-size:15px; font-weight:900; }
-  .turn{ font-size:17px; font-weight:800; letter-spacing:1px; color:#8a8a94; opacity:0; }
-  .turn.on{ opacity:1; color:var(--pink); }
-  .vs{ flex:none; width:54px; height:54px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:20px; font-weight:900; color:#fff; margin:0 12px; border:1.5px solid rgba(253,38,122,.5); }
-
-  /* ── Choose screen ── */
-  .chooselabel{ color:#5c5c66; font-size:27px; font-weight:600; text-align:center; }
-  .choosetimer{ align-self:center; display:flex; align-items:center; gap:10px; background:rgba(0,0,0,.04);
-    border-radius:26px; padding:11px 16px; min-width:300px; color:#5c5c66; }
-  .choosetimer .ct{ font-size:20px; font-weight:700; }
-  .choosetimer .tr{ flex:1; height:6px; border-radius:4px; background:rgba(253,38,122,.16); overflow:hidden; }
-  .choosetimer .tr i{ display:block; height:100%; width:71%; background:var(--pink); border-radius:4px; }
-  .modes{ display:flex; gap:16px; width:100%; margin-top:20px; }
-  .mode{ flex:1; display:flex; flex-direction:column; align-items:center; gap:16px; padding:48px 14px;
-    border-radius:42px; border:3px solid; }
-  .mode.truth{ background:rgba(253,38,122,.08); border-color:var(--pink); box-shadow:0 10px 34px rgba(253,38,122,.18); }
-  .mode.dare{ background:rgba(255,96,54,.08); border-color:var(--orange); box-shadow:0 10px 34px rgba(255,96,54,.18); }
-  .mode .micon{ width:106px; height:106px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:60px; }
-  .mode.truth .micon{ background:rgba(253,38,122,.14); color:var(--pink); }
-  .mode.dare .micon{ background:rgba(255,96,54,.14); color:var(--orange); }
-  .mode .mword{ font-size:46px; font-weight:900; letter-spacing:3px; }
-  .mode .msub{ color:#5c5c66; font-size:22px; }
-
-  /* ── Timer bar ── */
-  .timerbar{ display:flex; flex-direction:column; gap:6px; }
-  .timerbar .tr{ display:flex; align-items:center; gap:10px; color:var(--pink); font-size:27px; font-weight:800; }
-  .timerbar .tt{ height:7px; border-radius:5px; background:rgba(253,38,122,.18); overflow:hidden; }
-  .timerbar .tt i{ display:block; height:100%; width:63%; background:var(--pink); border-radius:5px; }
-
-  /* ── Question pill ── */
-  .qpill{ position:relative; background:rgba(253,38,122,.08); border:1px solid rgba(253,38,122,.28); border-radius:42px;
-    padding:24px 28px; display:flex; flex-direction:column; align-items:center; gap:12px; }
-  .modebadge{ display:inline-flex; align-items:center; gap:8px; background:rgba(253,38,122,.14); border:1.5px solid var(--pink);
-    border-radius:26px; padding:8px 18px; color:var(--pink); font-size:19px; font-weight:900; letter-spacing:2px; }
-  .qtext{ color:#5c5c66; font-size:28px; font-weight:600; text-align:center; line-height:1.4; }
-  .qemoji{ position:absolute; top:16px; right:16px; font-size:30px; color:#8a8a94; }
-
-  /* ── Answer input ── */
-  .ainput{ border:3px solid var(--pink); border-radius:42px; background:#f0f0f2;
-    min-height:210px; padding:26px 28px; font-size:32px; line-height:1.45; color:#1c1c1e; display:flex; align-items:flex-start; }
-  .ainput .txt{ white-space:pre-wrap; }
-  .ainput .caret{ display:inline-block; width:4px; height:38px; background:var(--pink); margin-left:5px; margin-top:5px;
-    animation:blink 1s steps(1) infinite; }
-  @keyframes blink{ 50%{ opacity:0; } }
-
-  /* ── Sticky submit bar ── */
-  .sticky{ flex:none; display:flex; align-items:center; gap:14px; background:rgba(255,255,255,.97);
-    border-top:1px solid rgba(253,38,122,.18); padding:16px 34px 10px; }
-  .att{ width:70px; height:70px; border-radius:26px; background:rgba(253,38,122,.08); border:1px solid rgba(0,0,0,.08);
-    display:flex; align-items:center; justify-content:center; font-size:32px; color:#5c5c66; }
-  .submit{ flex:1; display:flex; align-items:center; justify-content:center; gap:12px; background:var(--pink);
-    border-radius:32px; padding:22px 0; font-size:26px; font-weight:800; color:#fff; letter-spacing:1px;
-    box-shadow:0 7px 22px rgba(253,38,122,.4); }
-  .submit .ck{ font-size:26px; }
-  .forf{ width:72px; height:72px; border-radius:26px; background:rgba(255,77,77,.12); border:1px solid rgba(255,77,77,.3);
-    display:flex; align-items:center; justify-content:center; font-size:30px; color:var(--red); }
-
-  /* ── State card (room) ── */
-  .state{ background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:42px; padding:40px 28px;
-    display:flex; flex-direction:column; align-items:center; gap:16px; box-shadow:0 6px 20px rgba(0,0,0,.06); }
-  .state .big{ font-size:64px; color:var(--pink); }
-  .state .title{ font-size:38px; font-weight:800; color:#1c1c1e; }
-  .state .sub{ color:#5c5c66; font-size:23px; }
-  .codecard{ background:#f5f5f6; border:1px solid rgba(0,0,0,.08); border-radius:26px; padding:30px 64px;
-    text-align:center; margin-top:8px; }
-  .codecard .cl{ color:#8a8a94; font-size:19px; font-weight:800; letter-spacing:5px; margin-bottom:12px; }
-  .codecard .cv{ color:var(--pink); font-size:80px; font-weight:900; letter-spacing:16px; line-height:1; }
-  .waitrow{ display:flex; align-items:center; gap:13px; color:#5c5c66; font-size:23px; font-weight:600; }
-  .spinner{ width:30px; height:30px; border-radius:50%; border:4px solid rgba(253,38,122,.25); border-top-color:var(--pink);
-    animation:spin 1s linear infinite; }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
-  .danger{ align-self:stretch; text-align:center; background:rgba(255,77,77,.12); border:1px solid rgba(255,77,77,.35);
-    border-radius:32px; padding:22px 0; color:var(--red); font-size:24px; font-weight:800; }
-
-  /* ── Profile ── */
-  .backrow{ display:flex; align-items:center; gap:12px; align-self:flex-start; }
-  .backrow .b{ width:46px; height:46px; border-radius:50%; background:rgba(0,0,0,.05); border:1px solid rgba(0,0,0,.1);
-    display:flex; align-items:center; justify-content:center; font-size:24px; color:#1c1c1e; }
-  .backrow span{ color:#5c5c66; font-size:22px; font-weight:700; }
-  .psec{ display:flex; flex-direction:column; align-items:center; gap:10px; }
-  .pava-ring{ padding:7px; border-radius:50%; background:var(--grad); box-shadow:0 0 34px rgba(253,38,122,.4); position:relative; }
-  .pava-ring .in{ width:126px; height:126px; border-radius:50%; background:#f0f0f2; display:flex; align-items:center;
-    justify-content:center; font-size:58px; font-weight:900; color:#1c1c1e; }
-  .pava-ring .cam{ position:absolute; right:2px; bottom:10px; width:42px; height:42px; border-radius:50%;
-    background:#fff; border:2px solid rgba(0,0,0,.12); display:flex; align-items:center; justify-content:center; font-size:20px; color:#8a8a94; }
-  .pname-big{ font-size:42px; font-weight:900; color:#1c1c1e; display:flex; align-items:center; gap:12px; }
-  .pname-big .pen{ font-size:22px; color:#8a8a94; }
-  .badges{ display:flex; gap:12px; }
-  .badge{ display:inline-flex; align-items:center; gap:8px; background:rgba(0,0,0,.05); border:1px solid rgba(0,0,0,.08);
-    border-radius:999px; padding:10px 22px; font-size:20px; font-weight:700; color:#1c1c1e; }
-  .badge .star{ color:#5c5c66; } .badge .crown{ color:var(--gold); }
-  .xpbar{ width:100%; margin-top:8px; text-align:center; }
-  .xpbar .x{ height:8px; border-radius:5px; background:rgba(0,0,0,.08); overflow:hidden; }
-  .xpbar .x i{ display:block; height:100%; width:24%; background:var(--gold); border-radius:5px; }
-  .xpbar span{ color:#5c5c66; font-size:17px; font-weight:600; margin-top:6px; display:block; }
-  .stats{ display:flex; align-items:center; background:#f5f5f6; border:1px solid rgba(0,0,0,.08); border-radius:42px;
-    padding:28px 8px; box-shadow:0 5px 18px rgba(0,0,0,.05); }
-  .scol{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
-  .scol .ic{ font-size:28px; color:#8a8a94; }
-  .scol .num{ font-size:40px; font-weight:900; color:#1c1c1e; }
-  .scol .lbl{ color:#8a8a94; font-size:20px; font-weight:600; }
-  .sdiv{ width:1.5px; align-self:stretch; background:rgba(0,0,0,.08); margin:5px 0; }
-  .scard{ background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:42px; padding:24px 26px;
-    box-shadow:0 5px 18px rgba(0,0,0,.05); }
-  .scard .head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-  .scard .head b{ font-size:25px; font-weight:800; color:#1c1c1e; }
-  .scard .head .pen{ color:#8a8a94; font-size:22px; }
-  .scard .bio{ font-size:23px; line-height:1.5; color:#1c1c1e; }
-  .chips{ display:flex; flex-wrap:wrap; gap:10px; }
-  .chip{ display:inline-flex; align-items:center; gap:8px; padding:13px 20px; border-radius:999px;
-    background:rgba(0,0,0,.05); border:1px solid rgba(0,0,0,.08); color:#5c5c66; font-size:20px; font-weight:600; }
-  .chip.on{ background:var(--green); border-color:var(--green); color:#fff; }
+  /* ── REAL SCREENSHOT AREA ── */
+  .shot{ flex:1; min-height:0; position:relative; background:#0d0d10; }
+  .shot .ph{ position:absolute; inset:0; z-index:0; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:16px; padding:40px; text-align:center; color:#55555f; }
+  .shot .ph .pi{ font-size:52px; }
+  .shot .ph p{ font-size:27px; line-height:1.5; color:#3c3c44; }
+  .shot .ph b{ color:#4f4f58; }
+  .shot img{ position:absolute; inset:0; z-index:1; width:100%; height:100%; object-fit:cover; display:block; }
 </style>
 </head>
 <body class="preview">
-
-<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
-  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
-  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
-  <symbol id="i-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
-  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
-  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
-  <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
-  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
-  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
-  <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
-  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
-  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></symbol>
-  <symbol id="i-gamepad" viewBox="0 0 24 24"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></symbol>
-  <symbol id="i-qmark" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
-  <symbol id="i-msgsq" viewBox="0 0 24 24"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></symbol>
-  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
-  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></symbol>
-  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
-  <symbol id="i-star" viewBox="0 0 24 24"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></symbol>
-  <symbol id="i-timer" viewBox="0 0 24 24"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></symbol>
-  <symbol id="i-cal" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></symbol>
-  <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
-  <symbol id="i-party" viewBox="0 0 24 24"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></symbol>
-  <symbol id="i-smile" viewBox="0 0 24 24"><path d="M22 11v1a10 10 0 1 1-9-10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/><path d="M16 5h6"/><path d="M19 2v6"/></symbol>
-  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
-  <symbol id="i-hand" viewBox="0 0 24 24"><path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></symbol>
-  <symbol id="i-waves" viewBox="0 0 24 24"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></symbol>
-</svg>
 
 <div class="toolbar">
   <div class="tt">Truth <span>or</span> Dare — Screenshots</div>
@@ -306,335 +93,147 @@
   <button id="btnPrev" class="on">Preview</button>
   <button data-goto="1">1 Home</button>
   <button data-goto="2">2 Mode</button>
-  <button data-goto="3">3 Answer</button>
-  <button data-goto="4">4 Room</button>
-  <button data-goto="5">5 Profile</button>
+  <button data-goto="3">3 Ask</button>
+  <button data-goto="4">4 Truth</button>
+  <button data-goto="5">5 Dare</button>
+  <button data-goto="6">6 Reveal</button>
+  <button data-goto="7">7 Room</button>
+  <button data-goto="8">8 Profile</button>
   <div class="hint">
-    <b>Full mode</b> = 5 cards, each exactly 1080×1920 (toolbar hidden). App icons (lucide) + light-theme UI in a phone mockup.<br />
-    Shortcuts: <b>F</b> full · <b>P</b> preview · <b>1-5</b> jump. Capture: F12 → device toolbar → 1080×1920 → Capture screenshot.
+    <b>Full mode</b> = 8 cards, each exactly 1080×1920. Dark headline band + your real app screenshot (full-bleed).<br />
+    Replace: drop your PNG into <b>Store Listing/real/</b> (same names) — the band automatically hides the app's status bar &amp; header.<br />
+    Shortcuts: <b>F</b> full · <b>P</b> preview · <b>1-8</b> jump. Capture: F12 → device toolbar → 1080×1920 → Capture screenshot.
   </div>
 </div>
 
 <div class="stage">
 
-  <!-- ════════ 1 · HOME ════════ -->
+  <!-- ════════ 1 · HERO / HOME ════════ -->
   <div class="slot" id="s1"><div class="screencap">
-    <div class="sh-head">
-      <div class="apppill"><span class="apic">🎭</span><span class="apt"><em>Truth</em> or Dare</span></div>
-      <div class="bigtitle">The party game<br /><span class="g">that never stops.</span></div>
-      <div class="subtitle">Instant matches. Private rooms. Pure chaos.</div>
+    <div class="band hero">
+      <div class="tag">Play store · 01</div>
+      <div class="mid">
+        <div class="head">TRUTH OR DARE.</div>
+        <div class="kick">PLAY ANYONE. ANYWHERE.</div>
+        <div class="chips"><span>⚡ Quick match</span><span>🔑 Private room</span><span>🌐 1000+ online</span></div>
+      </div>
     </div>
-    <div class="phone"><div class="screen">
-      <div class="island"></div>
-      <div class="status">
-        <div class="time">9:41</div>
-        <div class="sig">
-          <span class="bars"><i></i><i></i><i></i></span>
-          <span class="lbl">5G</span>
-          <span class="batt"><i></i></span>
-        </div>
-      </div>
-      <div class="content">
-        <div class="hdr">
-          <div class="logo">
-            <span class="mask">🎭</span>
-            <div class="logocol">
-              <span class="lt">Truth</span><span class="lor">or</span><span class="ld">Dare</span>
-            </div>
-          </div>
-          <div class="hdrbtns">
-            <div class="hbtn"><svg class="ic"><use href="#i-users"/></svg></div>
-            <div class="hbtn"><svg class="ic"><use href="#i-bell"/></svg><span class="dot"></span></div>
-            <div class="hbtn"><svg class="ic"><use href="#i-user"/></svg></div>
-          </div>
-        </div>
-        <div class="homec">
-          <div class="online"><i></i><span>12,347 Players Online</span></div>
-          <div class="mcard">
-            <div class="mic hero"><svg class="ic"><use href="#i-smile"/></svg></div>
-            <div class="mbody">
-              <div class="mtitle">Ready for the <span style="color:var(--pink)">fun?</span></div>
-              <div class="mdesc">Truth reveals. Dare dares. Let the game begin!</div>
-            </div>
-          </div>
-          <div class="mcard">
-            <div class="mic quick"><svg class="ic"><use href="#i-zap"/></svg></div>
-            <div class="mbody">
-              <div class="mtitle">Quick Match</div>
-              <div class="mdesc">Find a random player and start instantly</div>
-            </div>
-            <div class="mpill q">Play Now ›</div>
-          </div>
-          <div class="mcard">
-            <div class="mic priv"><svg class="ic"><use href="#i-users"/></svg></div>
-            <div class="mbody">
-              <div class="mtitle">Private Game</div>
-              <div class="mdesc">Invite a friend and play together</div>
-            </div>
-            <div class="mpill p">Create Room ›</div>
-          </div>
-        </div>
-      </div>
-      <nav class="bnav">
-        <div class="bitem"><div class="bicon on"><svg class="ic"><use href="#i-gamepad"/></svg></div><span class="blab on">Game</span></div>
-        <div class="bitem"><div class="bicon"><svg class="ic"><use href="#i-qmark"/></svg></div><span class="blab">Questions</span></div>
-        <div class="bitem"><div class="bicon"><svg class="ic"><use href="#i-msgsq"/></svg></div><span class="blab">Community</span></div>
-        <div class="bitem"><div class="bicon"><svg class="ic"><use href="#i-settings"/></svg></div><span class="blab">Settings</span></div>
-      </nav>
-      <div class="homeind"><i></i></div>
-    </div></div>
+    <div class="shot">
+      <div class="ph"><span class="pi">📱</span><p><b>1-home.png</b><br />Home screen: Quick Match + Private Game</p></div>
+      <img src="real/1-home.png" alt="Home screen" />
+    </div>
   </div></div>
 
   <!-- ════════ 2 · CHOOSE MODE ════════ -->
   <div class="slot" id="s2"><div class="screencap">
-    <div class="sh-head">
-      <div class="apppill"><span class="apic">🎭</span><span class="apt"><em>Truth</em> or Dare</span></div>
-      <div class="bigtitle">Your move<span class="g">.</span></div>
-      <div class="subtitle">Truth reveals. Dare dares.</div>
+    <div class="band" style="--acc:#fd267a;--g1:#fd267a;--g2:#ff6036;">
+      <div class="tag">02 · Your turn</div>
+      <div class="mid">
+        <div class="head"><div>YOUR TURN.</div><div>TRUTH <span class="g">OR DARE?</span></div></div>
+        <div class="sub">Seven seconds to choose before the clock decides.</div>
+        <div class="chips"><span>👁 Truth</span><span>🔥 Dare</span><span>⏱ 7s</span></div>
+      </div>
     </div>
-    <div class="phone"><div class="screen">
-      <div class="island"></div>
-      <div class="status">
-        <div class="time">9:41</div>
-        <div class="sig">
-          <span class="bars"><i></i><i></i><i></i></span>
-          <span class="lbl">5G</span>
-          <span class="batt"><i></i></span>
-        </div>
-      </div>
-      <div class="gtop">
-        <div class="gback"><svg class="ic"><use href="#i-back"/></svg></div>
-        <div class="logo">
-          <span class="mask" style="font-size:30px;">🎭</span>
-          <div class="logocol">
-            <span class="lt" style="font-size:26px;">Truth</span><span class="lor" style="font-size:15px;">or</span><span class="ld" style="font-size:30px;">Dare</span>
-          </div>
-        </div>
-        <div class="gspace"></div>
-      </div>
-      <div class="pbar">
-        <div class="pslot">
-          <div class="pava on">S</div>
-          <div class="pname on">Sanjay (you) <span class="lvl"><svg class="ic"><use href="#i-crown"/></svg> 7</span></div>
-          <div class="turn on">● TURN</div>
-        </div>
-        <div class="vs" style="background:var(--grad);">VS</div>
-        <div class="pslot right">
-          <div class="pava">A</div>
-          <div class="pname">Alex <span class="lvl"><svg class="ic"><use href="#i-crown"/></svg> 9</span></div>
-          <div class="turn">● TURN</div>
-        </div>
-      </div>
-      <div class="content ctr">
-        <div class="chooselabel">Your turn — pick a mode</div>
-        <div class="choosetimer">
-          <svg class="ic" style="font-size:22px;"><use href="#i-timer"/></svg>
-          <span class="ct">Choose in 5s</span>
-          <span class="tr"><i></i></span>
-        </div>
-        <div class="modes">
-          <div class="mode truth">
-            <div class="micon"><svg class="ic"><use href="#i-eye"/></svg></div>
-            <div class="mword" style="color:var(--pink)">TRUTH</div>
-            <div class="msub">Answer honestly</div>
-          </div>
-          <div class="mode dare">
-            <div class="micon"><svg class="ic"><use href="#i-flame"/></svg></div>
-            <div class="mword" style="color:var(--orange)">DARE</div>
-            <div class="msub">Accept challenge</div>
-          </div>
-        </div>
-      </div>
-      <div class="homeind"><i></i></div>
-    </div></div>
+    <div class="shot">
+      <div class="ph"><span class="pi">📱</span><p><b>2-choose-a-mode.png</b><br />Mode select: TRUTH vs DARE cards</p></div>
+      <img src="real/2-choose-a-mode.png" alt="Choose mode screen" />
+    </div>
   </div></div>
 
-  <!-- ════════ 3 · ANSWER ════════ -->
+  <!-- ════════ 3 · ASK ════════ -->
   <div class="slot" id="s3"><div class="screencap">
-    <div class="sh-head">
-      <div class="apppill"><span class="apic">🎭</span><span class="apt"><em>Truth</em> or Dare</span></div>
-      <div class="bigtitle">Prove it.<br /><span class="g">Camera on!</span></div>
-      <div class="subtitle">Send photo, voice &amp; video answers</div>
+    <div class="band" style="--acc:#ff6036;--g1:#ff8a6b;--g2:#ff6036;">
+      <div class="tag">03 · Set the trap</div>
+      <div class="mid">
+        <div class="head"><div>SET THE</div><div>TRAP. OR THE <span class="g">DARE.</span></div></div>
+        <div class="sub">Pick from the question bank — or write your own. Add a voice note.</div>
+        <div class="chips"><span>📚 Question bank</span><span>✍️ Type</span><span>🎤 Voice note</span></div>
+      </div>
     </div>
-    <div class="phone"><div class="screen">
-      <div class="island"></div>
-      <div class="status">
-        <div class="time">9:41</div>
-        <div class="sig">
-          <span class="bars"><i></i><i></i><i></i></span>
-          <span class="lbl">5G</span>
-          <span class="batt"><i></i></span>
-        </div>
-      </div>
-      <div class="gtop">
-        <div class="gback"><svg class="ic"><use href="#i-back"/></svg></div>
-        <div class="logo">
-          <span class="mask" style="font-size:30px;">🎭</span>
-          <div class="logocol">
-            <span class="lt" style="font-size:26px;">Truth</span><span class="lor" style="font-size:15px;">or</span><span class="ld" style="font-size:30px;">Dare</span>
-          </div>
-        </div>
-        <div class="gspace"></div>
-      </div>
-      <div class="pbar">
-        <div class="pslot">
-          <div class="pava on">S</div>
-          <div class="pname on">Sanjay (you) <span class="lvl"><svg class="ic"><use href="#i-crown"/></svg> 7</span></div>
-          <div class="turn on">● TURN</div>
-        </div>
-        <div class="vs" style="background:var(--grad);">VS</div>
-        <div class="pslot right">
-          <div class="pava">A</div>
-          <div class="pname">Alex <span class="lvl"><svg class="ic"><use href="#i-crown"/></svg> 9</span></div>
-          <div class="turn">● TURN</div>
-        </div>
-      </div>
-      <div class="content">
-        <div class="timerbar">
-          <div class="tr"><svg class="ic"><use href="#i-timer"/></svg><span>00:38</span></div>
-          <div class="tt"><i></i></div>
-        </div>
-        <div class="qpill">
-          <div class="modebadge"><svg class="ic"><use href="#i-eye"/></svg> TRUTH</div>
-          <div class="qtext">What&rsquo;s the most embarrassing thing you&rsquo;ve ever done?</div>
-          <div class="qemoji"><svg class="ic"><use href="#i-smile"/></svg></div>
-        </div>
-        <div class="ainput">
-          <span class="txt">Okay honestly? I once did karaoke in front of my whole class… and the mic was NOT plugged in 😅</span><span class="caret"></span>
-        </div>
-      </div>
-      <div class="sticky">
-        <div class="att"><svg class="ic"><use href="#i-camera"/></svg></div>
-        <div class="att"><svg class="ic"><use href="#i-mic"/></svg></div>
-        <div class="submit"><svg class="ic ck"><use href="#i-check"/></svg> Submit Answer</div>
-        <div class="forf"><svg class="ic"><use href="#i-x"/></svg></div>
-      </div>
-      <div class="homeind"><i></i></div>
-    </div></div>
+    <div class="shot">
+      <div class="ph"><span class="pi">📱</span><p><b>3-ask-a-question.png</b><br />Asking screen: question input + media</p></div>
+      <img src="real/3-ask-a-question.png" alt="Ask a question screen" />
+    </div>
   </div></div>
 
-  <!-- ════════ 4 · ROOM READY ════════ -->
+  <!-- ════════ 4 · ANSWER TRUTH ════════ -->
   <div class="slot" id="s4"><div class="screencap">
-    <div class="sh-head">
-      <div class="apppill"><span class="apic">🎭</span><span class="apt"><em>Truth</em> or Dare</span></div>
-      <div class="bigtitle">Play with<br /><span class="g">your friends.</span></div>
-      <div class="subtitle">Create a room, share the code, start playing</div>
+    <div class="band" style="--acc:#fd267a;--g1:#fd267a;--g2:#ff6fa8;">
+      <div class="tag">04 · Answer honestly</div>
+      <div class="mid">
+        <div class="head"><div>NO <span class="g">SHY</span></div><div>ANSWERS.</div></div>
+        <div class="sub">Answer honestly in 60 seconds — text, photo or voice.</div>
+        <div class="chips"><span>⏱ 60s</span><span>📷 Photo</span><span>🎤 Voice</span></div>
+      </div>
     </div>
-    <div class="phone"><div class="screen">
-      <div class="island"></div>
-      <div class="status">
-        <div class="time">9:41</div>
-        <div class="sig">
-          <span class="bars"><i></i><i></i><i></i></span>
-          <span class="lbl">5G</span>
-          <span class="batt"><i></i></span>
-        </div>
-      </div>
-      <div class="content">
-        <div class="hdr">
-          <div class="logo">
-            <span class="mask">🎭</span>
-            <div class="logocol">
-              <span class="lt">Truth</span><span class="lor">or</span><span class="ld">Dare</span>
-            </div>
-          </div>
-          <div class="hdrbtns">
-            <div class="hbtn"><svg class="ic"><use href="#i-users"/></svg></div>
-            <div class="hbtn"><svg class="ic"><use href="#i-bell"/></svg><span class="dot"></span></div>
-            <div class="hbtn"><svg class="ic"><use href="#i-user"/></svg></div>
-          </div>
-        </div>
-        <div class="roomc">
-          <div class="state" style="margin-top:4px;">
-            <div class="big"><svg class="ic"><use href="#i-party"/></svg></div>
-            <div class="title">Room Ready!</div>
-            <div class="sub">Share this code with your friend</div>
-            <div class="codecard">
-              <div class="cl">ROOM CODE</div>
-              <div class="cv">ABC</div>
-            </div>
-            <div class="waitrow"><div class="spinner"></div><span>Waiting for friend...</span></div>
-          </div>
-          <div class="danger">Cancel</div>
-        </div>
-      </div>
-      <nav class="bnav">
-        <div class="bitem"><div class="bicon on"><svg class="ic"><use href="#i-gamepad"/></svg></div><span class="blab on">Game</span></div>
-        <div class="bitem"><div class="bicon"><svg class="ic"><use href="#i-qmark"/></svg></div><span class="blab">Questions</span></div>
-        <div class="bitem"><div class="bicon"><svg class="ic"><use href="#i-msgsq"/></svg></div><span class="blab">Community</span></div>
-        <div class="bitem"><div class="bicon"><svg class="ic"><use href="#i-settings"/></svg></div><span class="blab">Settings</span></div>
-      </nav>
-      <div class="homeind"><i></i></div>
-    </div></div>
+    <div class="shot">
+      <div class="ph"><span class="pi">📱</span><p><b>4-answer-truth.png</b><br />Answering a truth question</p></div>
+      <img src="real/4-answer-truth.png" alt="Answer truth screen" />
+    </div>
   </div></div>
 
-  <!-- ════════ 5 · PROFILE ════════ -->
+  <!-- ════════ 5 · ANSWER DARE ════════ -->
   <div class="slot" id="s5"><div class="screencap">
-    <div class="sh-head">
-      <div class="apppill"><span class="apic">🎭</span><span class="apt"><em>Truth</em> or Dare</span></div>
-      <div class="bigtitle">Find your<br /><span class="g">play style.</span></div>
-      <div class="subtitle">Level up, collect reactions, build your rep</div>
+    <div class="band" style="--acc:#ff4d4d;--g1:#ff5c5c;--g2:#e2342f;">
+      <div class="tag">05 · Accept the challenge</div>
+      <div class="mid">
+        <div class="head"><div>DARES ARE</div><div>MEANT TO BE <span class="g">SHOWN.</span></div></div>
+        <div class="sub">180 seconds of proof. Camera, video or voice.</div>
+        <div class="chips"><span>⏱ 180s</span><span>📹 Video</span><span>🎤 Voice</span></div>
+      </div>
     </div>
-    <div class="phone"><div class="screen">
-      <div class="island"></div>
-      <div class="status">
-        <div class="time">9:41</div>
-        <div class="sig">
-          <span class="bars"><i></i><i></i><i></i></span>
-          <span class="lbl">5G</span>
-          <span class="batt"><i></i></span>
-        </div>
+    <div class="shot">
+      <div class="ph"><span class="pi">📱</span><p><b>5-answer-dare.png</b><br />Answering a dare with media</p></div>
+      <img src="real/5-answer-dare.png" alt="Answer dare screen" />
+    </div>
+  </div></div>
+
+  <!-- ════════ 6 · REVEAL / REACTIONS ════════ -->
+  <div class="slot" id="s6"><div class="screencap">
+    <div class="band" style="--acc:#ffb100;--g1:#ffd34d;--g2:#ff8a00;">
+      <div class="tag">06 · The verdict</div>
+      <div class="mid">
+        <div class="head"><div>THE CROWD</div><div><span class="g">REACTS.</span></div></div>
+        <div class="sub">Judge answers with live reactions — then straight into the next round.</div>
+        <div class="chips"><span>😂 React</span><span>🔥 Judge</span><span>➡️ Next round</span></div>
       </div>
-      <div class="content">
-        <div class="backrow"><div class="b"><svg class="ic"><use href="#i-back"/></svg></div><span>Back</span></div>
-        <div class="profc">
-          <div class="psec">
-            <div class="pava-ring">
-              <div class="in">S</div>
-              <div class="cam"><svg class="ic"><use href="#i-camera"/></svg></div>
-            </div>
-            <div class="pname-big">Sanjay <span class="pen"><svg class="ic"><use href="#i-pencil"/></svg></span></div>
-            <div class="badges">
-              <div class="badge"><svg class="ic star"><use href="#i-star"/></svg> Rising Star</div>
-              <div class="badge"><svg class="ic crown"><use href="#i-crown"/></svg> Level 7</div>
-            </div>
-            <div class="xpbar">
-              <div class="x"><i></i></div>
-              <span>120 / 500 XP to next level</span>
-            </div>
-          </div>
-          <div class="stats">
-            <div class="scol"><span class="ic"><svg class="ic"><use href="#i-gamepad"/></svg></span><span class="num">42</span><span class="lbl">Games Played</span></div>
-            <div class="sdiv"></div>
-            <div class="scol"><span class="ic"><svg class="ic"><use href="#i-smile"/></svg></span><span class="num">187</span><span class="lbl">Reactions</span></div>
-            <div class="sdiv"></div>
-            <div class="scol"><span class="ic"><svg class="ic"><use href="#i-cal"/></svg></span><span class="num" style="font-size:29px;">Jan 2024</span><span class="lbl">Played Since</span></div>
-          </div>
-          <div class="scard">
-            <div class="head"><b>Your Bio</b><span class="pen"><svg class="ic"><use href="#i-pencil"/></svg></span></div>
-            <div class="bio">Here for fun, laughs and deep talks. Let&rsquo;s play!</div>
-          </div>
-          <div class="scard">
-            <div class="head"><b>Your Interests</b><span style="color:#8a8a94;font-size:19px;">click to change</span></div>
-            <div class="chips">
-              <span class="chip on"><svg class="ic"><use href="#i-smile"/></svg> fun</span>
-              <span class="chip"><svg class="ic"><use href="#i-msg"/></svg> life</span>
-              <span class="chip on"><svg class="ic"><use href="#i-flame"/></svg> hot</span>
-              <span class="chip"><svg class="ic"><use href="#i-hand"/></svg> connect</span>
-              <span class="chip"><svg class="ic"><use href="#i-flame"/></svg> spicy</span>
-              <span class="chip"><svg class="ic"><use href="#i-waves"/></svg> deep</span>
-            </div>
-          </div>
-        </div>
+    </div>
+    <div class="shot">
+      <div class="ph"><span class="pi">📱</span><p><b>6-reveal.png</b><br />Round results with emoji reactions</p></div>
+      <img src="real/6-reveal.png" alt="Reveal screen" />
+    </div>
+  </div></div>
+
+  <!-- ════════ 7 · PRIVATE ROOM ════════ -->
+  <div class="slot" id="s7"><div class="screencap">
+    <div class="band" style="--acc:#34c271;--g1:#5ee79a;--g2:#1fa35c;">
+      <div class="tag">07 · Private room</div>
+      <div class="mid">
+        <div class="head"><div>PLAY WITH</div><div>YOUR <span class="g">FRIENDS.</span></div></div>
+        <div class="sub">Create a room, share the 3-letter code, start playing.</div>
+        <div class="chips"><span>🔑 3-letter code</span><span>👥 Invite friends</span><span>▶ Start</span></div>
       </div>
-      <nav class="bnav">
-        <div class="bitem"><div class="bicon on"><svg class="ic"><use href="#i-gamepad"/></svg></div><span class="blab on">Game</span></div>
-        <div class="bitem"><div class="bicon"><svg class="ic"><use href="#i-qmark"/></svg></div><span class="blab">Questions</span></div>
-        <div class="bitem"><div class="bicon"><svg class="ic"><use href="#i-msgsq"/></svg></div><span class="blab">Community</span></div>
-        <div class="bitem"><div class="bicon"><svg class="ic"><use href="#i-settings"/></svg></div><span class="blab">Settings</span></div>
-      </nav>
-      <div class="homeind"><i></i></div>
-    </div></div>
+    </div>
+    <div class="shot">
+      <div class="ph"><span class="pi">📱</span><p><b>7-private-room.png</b><br />Room code screen — share it with a friend</p></div>
+      <img src="real/7-private-room.png" alt="Private room screen" />
+    </div>
+  </div></div>
+
+  <!-- ════════ 8 · PROFILE ════════ -->
+  <div class="slot" id="s8"><div class="screencap">
+    <div class="band" style="--acc:#ffb100;--g1:#ffd34d;--g2:#ff6036;">
+      <div class="tag">08 · Your rep</div>
+      <div class="mid">
+        <div class="head"><div>LEVEL UP.</div><div>SHOW YOUR <span class="g">STYLE.</span></div></div>
+        <div class="sub">Win rounds, collect reactions, build your rep.</div>
+        <div class="chips"><span>⭐ Level &amp; XP</span><span>🏆 Play style</span><span>📊 Stats</span></div>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="ph"><span class="pi">📱</span><p><b>8-profile.png</b><br />Profile: avatar, level, stats</p></div>
+      <img src="real/8-profile.png" alt="Profile screen" />
+    </div>
   </div></div>
 
 </div>
@@ -648,10 +247,10 @@
     var scale = 1;
     if(preview){
       scale = Math.max(0.04, Math.min((window.innerWidth - 60) / 1080, (window.innerHeight - 210) / 1920));
-      stage.style.gap = "28px";
+      stage.style.gap = "26px";
     } else {
       scale = 1;
-      stage.style.gap = "36px";
+      stage.style.gap = "28px";
     }
     document.querySelectorAll(".slot").forEach(function(slot){
       var cap = slot.querySelector(".screencap");
@@ -678,7 +277,7 @@
     if(e.key === "f" || e.key === "F"){ document.getElementById("btnFull").click(); }
     if(e.key === "p" || e.key === "P"){ document.getElementById("btnPrev").click(); }
     var n = parseInt(e.key, 10);
-    if(n >= 1 && n <= 5){ goto(n); }
+    if(n >= 1 && n <= 8){ goto(n); }
   });
 
   window.addEventListener("resize", applyMode);

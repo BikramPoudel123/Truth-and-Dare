@@ -1,37 +1,34 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/contexts/ThemeContext";
-import { BrandGradient } from "@/components/BrandGradient";
 
 interface LogoProps {
   size?: "sm" | "md" | "lg";
 }
 
 const DIMS = {
-  sm: { icon: 30, radius: 10, emoji: 16, text: 19, gap: 7 },
-  md: { icon: 40, radius: 12, emoji: 22, text: 25, gap: 8 },
-  lg: { icon: 52, radius: 15, emoji: 28, text: 30, gap: 10 },
+  sm: { icon: 30, text: 19, gap: 7 },
+  md: { icon: 40, text: 25, gap: 8 },
+  lg: { icon: 52, text: 30, gap: 10 },
 } as const;
 
 /** Bundled condensed font (loaded in src/app/index.tsx) — identical on every device. */
 const WORDMARK_FONT = "BarlowCondensed-Bold";
 
 /**
- * Brand logo: gradient rounded-square with 🎭 + "Truth or Dare" wordmark.
- * Mirrors the store-listing app pill. All words share the same font size.
+ * Brand logo: pill icon image + "Truth or Dare" wordmark.
+ * The icon (assets/images/logo-icon.png) mirrors the store-listing app pill.
  */
 export function Logo({ size = "md" }: LogoProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const d = DIMS[size];
-  const orColor = isDark ? "rgba(255,255,255,0.85)" : "rgba(28,28,30,0.8)";
+  const orColor = "rgba(28,28,30,0.8)";
 
   return (
     <View style={[styles.row, { gap: d.gap }]}>
-      <BrandGradient
-        variant="primary"
-        style={{ width: d.icon, height: d.icon, borderRadius: d.radius, alignItems: "center", justifyContent: "center" }}
-      >
-        <Text style={{ fontSize: d.emoji, lineHeight: d.emoji + 2 }}>🎭</Text>
-      </BrandGradient>
+      <Image
+        source={require("@/assets/images/logo.png")}
+        style={{ width: d.icon, height: d.icon }}
+      />
       <Text
         style={{
           color: colors.text,

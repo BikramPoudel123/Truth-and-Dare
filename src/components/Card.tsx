@@ -13,14 +13,14 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   default: {
-    backgroundColor: '#1c1c22',
+    backgroundColor: '#f5f5f6',
     borderWidth: 1,
-    borderColor: '#27272a',
+    borderColor: '#e8e8ec',
   },
   subtle: {
-    backgroundColor: 'rgba(28, 28, 34, 0.5)',
+    backgroundColor: '#f5f5f6',
     borderWidth: 1,
-    borderColor: 'rgba(39, 39, 42, 0.5)',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
   },
   bordered: {
     backgroundColor: 'transparent',

@@ -15,6 +15,8 @@ import FriendsScreen from "./friends";
 import NotificationsScreen from "./notifications";
 import SettingsScreen from "./settings";
 import BottomNav from "@/components/BottomNav";
+import { AppBackground } from "@/components/AppBackground";
+import { StatusBar } from "expo-status-bar";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -80,7 +82,8 @@ function AppContent() {
 
   if (!isConnected && phase === "connecting") {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <AppBackground />
         <ActivityIndicator size="large" color={colors.purple} />
       </View>
     );
@@ -97,7 +100,8 @@ function AppContent() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1 }}>
+      <AppBackground />
       {!isBackScreen && (
         <View style={{ flex: 1, position: "relative" }}>
           <Animated.View style={[s.screenAbs, { opacity: menuOpacity }]} pointerEvents={isActive("menu") ? "auto" : "none"}>
@@ -150,6 +154,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style="dark" />
       <ThemeProvider>
         <ProfileProvider>
           <GameProvider>

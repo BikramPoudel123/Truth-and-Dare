@@ -18,9 +18,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   secondary: {
-    backgroundColor: '#1c1c22',
+    backgroundColor: '#f5f5f6',
     borderWidth: 1,
-    borderColor: '#27272a',
+    borderColor: '#e8e8ec',
   },
   danger: {
     backgroundColor: '#ff6036',

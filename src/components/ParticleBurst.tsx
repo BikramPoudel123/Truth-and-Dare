@@ -17,7 +17,7 @@ interface ParticleBurstProps {
   style?: ViewStyle;
 }
 
-export function ParticleBurst({ trigger, count = 8, colors = ["#fd267a", "#ff4d4d", "#fd267a", "#ff9b6b", "#fd267a"], spread = 60, style }: ParticleBurstProps) {
+export function ParticleBurst({ trigger, count = 8,   colors = ["#fd267a", "#ff4d4d", "#fd267a", "#ff9b6b", "#fd267a"], spread = 60, style }: ParticleBurstProps) {
   const particles = useRef<Particle[]>([]);
 
   useEffect(() => {

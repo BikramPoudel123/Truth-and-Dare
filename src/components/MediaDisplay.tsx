@@ -372,7 +372,7 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#1c1c22",
+    backgroundColor: "#f5f5f6",
     borderRadius: 8,
     overflow: "hidden",
   },
@@ -389,9 +389,9 @@ const styles = StyleSheet.create({
   videoLoading: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#0a0a0c",
+    backgroundColor: "#f5f5f6",
   },
-  videoLoadingText: { color: "#6e6e7a", fontSize: 12 },
+  videoLoadingText: { color: "#5c5c66", fontSize: 12 },
   modalBg: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.97)",
@@ -422,13 +422,13 @@ const audioStyles = StyleSheet.create({
     alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(28, 28, 34, 0.85)",
+    backgroundColor: "#f5f5f6",
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 12,
     gap: 10,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
   playBtn: {
     width: 40,

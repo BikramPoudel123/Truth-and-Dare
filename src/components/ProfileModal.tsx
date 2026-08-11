@@ -303,7 +303,7 @@ const s = StyleSheet.create({
     alignSelf: "center",
     ...SHADOWS.glow,
   },
-  grabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.15)", alignSelf: "center" },
+  grabber: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(0,0,0,0.14)", alignSelf: "center" },
   scrollContent: { alignItems: "center", gap: 16 },
   stretch: { alignSelf: "stretch" },
   name: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
@@ -313,7 +313,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "#f0f0f2",
     borderRadius: RADIUS.pill,
     paddingVertical: 5,
     paddingHorizontal: 12,
@@ -324,7 +324,7 @@ const s = StyleSheet.create({
 
   statsCard: {
     flexDirection: "row",
-    backgroundColor: "rgba(28, 28, 34, 0.7)",
+    backgroundColor: "#f5f5f6",
     borderRadius: RADIUS.cardSm,
     padding: 16,
     borderWidth: 1,
@@ -337,7 +337,7 @@ const s = StyleSheet.create({
   statDate: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
   statDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
 
-  levelBarOuter: { width: "100%", height: 3, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden", marginTop: 2 },
+  levelBarOuter: { width: "100%", height: 3, backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 2, overflow: "hidden", marginTop: 2 },
   levelBarInner: { height: "100%", backgroundColor: COLORS.gold, borderRadius: 2 },
 
   reactionsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" },
@@ -345,7 +345,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "#f0f0f2",
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -372,7 +372,7 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(0,0,0,0.08)",
     alignItems: "center",
     justifyContent: "center",
   },

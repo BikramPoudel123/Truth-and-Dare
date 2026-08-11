@@ -31,7 +31,7 @@ export const MOODS: MoodConfig[] = [
     cardColor: "#ffffff",
     borderColor: "#fce7f3",
     textColor: "#0f172a",
-    subColor: "#6e6e7a",
+    subColor: "#8a8a94",
     tags: ["fun"],
   },
   {
@@ -46,7 +46,7 @@ export const MOODS: MoodConfig[] = [
     cardColor: "#ffffff",
     borderColor: "#fce7f3",
     textColor: "#0f172a",
-    subColor: "#6e6e7a",
+    subColor: "#8a8a94",
     tags: ["fun"],
   },
   {
@@ -61,7 +61,7 @@ export const MOODS: MoodConfig[] = [
     cardColor: "#ffffff",
     borderColor: "#fecdd3",
     textColor: "#0f172a",
-    subColor: "#6e6e7a",
+    subColor: "#8a8a94",
     tags: ["deep", "life"],
   },
   {
@@ -76,7 +76,7 @@ export const MOODS: MoodConfig[] = [
     cardColor: "#ffffff",
     borderColor: "#fecaca",
     textColor: "#0f172a",
-    subColor: "#6e6e7a",
+    subColor: "#8a8a94",
     tags: ["hot", "connect"],
   },
   {
@@ -91,7 +91,7 @@ export const MOODS: MoodConfig[] = [
     cardColor: "#ffffff",
     borderColor: "#fecaca",
     textColor: "#0f172a",
-    subColor: "#6e6e7a",
+    subColor: "#8a8a94",
     tags: ["spicy", "hot"],
   },
   {
@@ -106,7 +106,7 @@ export const MOODS: MoodConfig[] = [
     cardColor: "#ffffff",
     borderColor: "#fecdd3",
     textColor: "#0f172a",
-    subColor: "#6e6e7a",
+    subColor: "#8a8a94",
     tags: ["spicy", "deep", "hot"],
   },
 ];

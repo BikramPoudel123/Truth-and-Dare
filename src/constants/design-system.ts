@@ -1,46 +1,3 @@
-export const DARK_COLORS = {
-  bg: "#0d0d10",
-  bgTop: "#0d0d10",
-  bgMid: "#15151a",
-  bgBottom: "#0a0a0c",
-  card: "#1c1c22",
-  cardDark: "#1c1c22",
-  surface: "rgba(28, 28, 34, 0.7)",
-  surfaceLight: "rgba(28, 28, 34, 0.6)",
-  surfaceDark: "rgba(13, 13, 16, 0.92)",
-  input: "rgba(28, 28, 34, 0.5)",
-  border: "rgba(255, 255, 255, 0.08)",
-  borderLight: "rgba(255, 255, 255, 0.16)",
-  text: "#ffffff",
-  textOnDark: "#ffffff",
-  sub: "#a0a0ac",
-  subAlt: "#6e6e7a",
-  purple: "#fd267a",
-  purpleLight: "rgba(253, 38, 122, 0.15)",
-  purpleGlow: "rgba(253, 38, 122, 0.4)",
-  pink: "#fd267a",
-  pinkLight: "rgba(253, 38, 122, 0.15)",
-  pinkGlow: "rgba(253, 38, 122, 0.4)",
-  magenta: "#fd267a",
-  blue: "#fd267a",
-  electricBlue: "#fd267a",
-  orange: "#ff6036",
-  gold: "#ffb100",
-  green: "#34c271",
-  red: "#ff4d4d",
-  truth: "#fd267a",
-  dare: "#ff6036",
-  brand: "#fd267a",
-  brandLight: "rgba(253, 38, 122, 0.15)",
-  brandGlow: "rgba(253, 38, 122, 0.4)",
-  softWhite: "rgba(255, 255, 255, 0.9)",
-  glassBg: "rgba(255, 255, 255, 0.06)",
-  glassBorder: "rgba(255, 255, 255, 0.12)",
-  levelBarBg: "rgba(255, 255, 255, 0.08)",
-  navBg: "#0a0a0c",
-  navActiveBg: "#fd267a",
-} as const;
-
 export const LIGHT_COLORS = {
   bg: "#ffffff",
   bgTop: "#ffffff",
@@ -84,40 +41,9 @@ export const LIGHT_COLORS = {
   navActiveBg: "#fd267a",
 } as const;
 
-export type ThemeColors = { readonly [K in keyof typeof DARK_COLORS]: string };
+export type ThemeColors = { readonly [K in keyof typeof LIGHT_COLORS]: string };
 
-export const COLORS = DARK_COLORS;
-
-export const DARK_SHADOWS = {
-  card: {
-    shadowColor: "#fd267a",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  glow: {
-    shadowColor: "#fd267a",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  pinkGlow: {
-    shadowColor: "#fd267a",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 8,
-  },
-  subtle: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-};
+export const COLORS = LIGHT_COLORS;
 
 export const LIGHT_SHADOWS = {
   card: {
@@ -150,7 +76,7 @@ export const LIGHT_SHADOWS = {
   },
 };
 
-export const SHADOWS = DARK_SHADOWS;
+export const SHADOWS = LIGHT_SHADOWS;
 
 export const GRADIENTS = {
   hero: { start: "#fd267a", end: "#ff6036" },

@@ -1,21 +1,16 @@
 import { useMemo } from 'react';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export function useTw() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   return useMemo(
     () => ({
-      isDark,
       container: {
         flex: 1,
-        backgroundColor: isDark ? '#0d0d10' : '#ffffff',
+        backgroundColor: '#ffffff',
       },
       text: {
-        color: isDark ? '#ffffff' : '#000000',
+        color: '#000000',
       },
     }),
-    [isDark]
+    []
   );
 }

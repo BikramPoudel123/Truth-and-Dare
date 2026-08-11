@@ -9,8 +9,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RADIUS } from "@/constants/design-system";
 import { useTheme } from "@/contexts/ThemeContext";
-import { FlameBackground } from "@/components/FlameBackground";
-import { Bell, Moon, Volume2, Info } from "lucide-react-native";
+import { AppBackground } from "@/components/AppBackground";
+import { Bell, Volume2, Info } from "lucide-react-native";
 
 function Toggle({ value, onChange, disabled }: { value: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
@@ -26,7 +26,7 @@ function Toggle({ value, onChange, disabled }: { value: boolean; onChange?: (v: 
 }
 
 export default function SettingsScreen() {
-  const { colors, shadows, isDark, toggleTheme } = useTheme();
+  const { colors, shadows } = useTheme();
   const [sound, setSoundState] = useState(true);
   const [vibrate, setVibrate] = useState(true);
 
@@ -44,8 +44,8 @@ export default function SettingsScreen() {
   const c = colors;
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: c.bg }]}>
-      <FlameBackground />
+    <SafeAreaView style={s.safe}>
+      <AppBackground />
       <View style={[s.header, { borderBottomColor: c.border }]}>
         <View style={s.headerTitle}>
           <Text style={[s.title, { color: c.text }]}>Settings</Text>
@@ -76,17 +76,6 @@ export default function SettingsScreen() {
           </View>
 
           <View style={[s.divider, { backgroundColor: c.border }]} />
-
-          <View style={s.row}>
-            <View style={s.rowLeft}>
-              <View style={[s.iconBox, { backgroundColor: c.purpleLight }]}><Moon size={16} color={c.purple} /></View>
-              <View>
-                <Text style={[s.rowLabel, { color: c.text }]}>Dark Mode</Text>
-                <Text style={[s.rowHint, { color: c.subAlt }]}>{isDark ? "On" : "Off"}</Text>
-              </View>
-            </View>
-            <Toggle value={isDark} onChange={() => toggleTheme()} />
-          </View>
         </View>
 
         <View style={[s.section, { backgroundColor: c.card, borderColor: c.border }, shadows.subtle]}>

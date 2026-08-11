@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useGame } from "@/contexts/GameContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AlertTriangle, WifiOff, RefreshCw, Home } from "lucide-react-native";
+import { AppBackground } from "@/components/AppBackground";
 
 export default function ErrorScreen() {
   const { error, reset, reconnect, isConnected } = useGame();
@@ -26,7 +27,8 @@ export default function ErrorScreen() {
   const accent = opponentLeft ? colors.gold : colors.red;
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
+    <SafeAreaView style={s.safe}>
+      <AppBackground />
       <View style={s.center}>
         <View style={[s.iconWrap, { borderColor: accent }]}>
           {opponentLeft ? <AlertTriangle size={40} color={accent} /> : <WifiOff size={40} color={accent} />}
@@ -51,14 +53,14 @@ export default function ErrorScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0d0d10" },
+  safe: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 16 },
   iconWrap: {
     width: 88, height: 88, borderRadius: 44,
     borderWidth: 2,
     alignItems: "center", justifyContent: "center",
   },
-  title: { color: "#ffffff", fontSize: 22, fontWeight: "800" },
+  title: { color: "#1c1c1e", fontSize: 22, fontWeight: "800" },
   message: { fontSize: 14, textAlign: "center", lineHeight: 21 },
   btn: { borderRadius: 14, paddingVertical: 14, width: "100%", alignItems: "center" },
   btnText: { color: "#fff", fontSize: 15, fontWeight: "800" },

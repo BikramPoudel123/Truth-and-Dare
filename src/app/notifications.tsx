@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RADIUS } from "@/constants/design-system";
 import { useTheme } from "@/contexts/ThemeContext";
-import { FlameBackground } from "@/components/FlameBackground";
+import { AppBackground } from "@/components/AppBackground";
 import { getHttpBase } from "@/utils/http";
 import { timeAgo } from "@/utils/format";
 import { ArrowLeft, Bell, Heart, UserPlus, UserX } from "lucide-react-native";
@@ -60,7 +60,7 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
     const isFriendRequest = n.type === "friend_request";
     const card = (
       <View style={[s.card, { backgroundColor: colors.glassBg, borderColor: colors.border }]}>
-        <View style={[s.iconWrap, { backgroundColor: n.read ? "rgba(255,255,255,0.04)" : `${colors.purple}20` }]}>
+        <View style={[s.iconWrap, { backgroundColor: n.read ? "rgba(0,0,0,0.05)" : `${colors.purple}20` }]}>
           <Icon size={18} color={n.read ? colors.sub : colors.purple} />
         </View>
         <View style={s.cardBody}>
@@ -88,8 +88,8 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
   );
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: colors.bg }]}>
-      <FlameBackground />
+    <SafeAreaView style={s.safe}>
+      <AppBackground />
       <View style={[s.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={onBack} style={[s.backBtn, { backgroundColor: colors.glassBg, borderColor: colors.border }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <ArrowLeft size={18} color={colors.text} />
@@ -121,7 +121,7 @@ export default function NotificationsScreen({ onBack, onNavigateFriends }: { onB
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0d0d10" },
+  safe: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -129,14 +129,14 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.08)",
+    borderBottomColor: "rgba(0, 0, 0, 0.08)",
   },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  title: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
-  subtitle: { color: "#a0a0ac", fontSize: 12, marginTop: 1 },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#f0f0f2", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(0, 0, 0, 0.08)" },
+  title: { color: "#1c1c1e", fontSize: 18, fontWeight: "900" },
+  subtitle: { color: "#5c5c66", fontSize: 12, marginTop: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyState: { alignItems: "center", paddingTop: 80, gap: 12 },
-  emptyText: { color: "#a0a0ac", fontSize: 14, textAlign: "center" },
+  emptyText: { color: "#5c5c66", fontSize: 14, textAlign: "center" },
   list: { padding: 16, gap: 8, flexGrow: 1 },
   card: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: RADIUS.cardSm, padding: 14, borderWidth: 1 },
   iconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },

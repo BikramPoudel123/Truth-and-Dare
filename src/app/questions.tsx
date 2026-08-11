@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RADIUS } from "@/constants/design-system";
-import { FlameBackground } from "@/components/FlameBackground";
+import { AppBackground } from "@/components/AppBackground";
 
 const iconMap: Record<string, any> = { Sparkles, SmilePlus, MessageCircle, Flame, Handshake, Waves, Balloon, Heart, Skull };
 
@@ -49,9 +49,9 @@ const QuestionCard = memo(function QuestionCard({ item }: { item: Question }) {
         <View style={[s.typeBadge, isTruth ? s.typeBadgeTruth : s.typeBadgeDare, isTruth ? { backgroundColor: `${colors.brand}20`, borderColor: `${colors.brand}40` } : { backgroundColor: `${colors.dare}20`, borderColor: `${colors.dare}40` }]}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
             {isTruth ? <Eye size={12} color={colors.brand} /> : <Flame size={12} color={colors.dare} />}
-            <Text style={[s.typeBadgeText, { color: isTruth ? colors.brand : colors.dare }]}>
-              {isTruth ? "TRUTH" : "DARE"}
-            </Text>
+          <Text style={[s.typeBadgeText, { color: isTruth ? colors.brand : colors.dare }]}>
+            {isTruth ? "TRUTH" : "DARE"}
+          </Text>
           </View>
         </View>
         <View style={s.tagRow}>
@@ -82,8 +82,8 @@ export default function QuestionsScreen({ onUse }: Props) {
   const keyExtractor = useCallback((i: Question) => String(i.id), []);
 
   return (
-    <SafeAreaView edges={["top"]} style={[s.safe, { backgroundColor: colors.bg }]}>
-      <FlameBackground />
+    <SafeAreaView edges={["top"]} style={s.safe}>
+      <AppBackground />
       <View style={s.header}>
         <View style={{ flex: 1 }}>
           <Text style={[s.title, { color: colors.text }]}>Question Bank</Text>
@@ -133,21 +133,21 @@ export default function QuestionsScreen({ onUse }: Props) {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0d0d10" },
+  safe: { flex: 1 },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   moodBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: RADIUS.small, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1 },
   moodBadgeLabel: { fontSize: 11, fontWeight: "800" },
-  title: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
-  subtitle: { color: "#a0a0ac", fontSize: 12, marginTop: 1 },
+  title: { color: "#1c1c1e", fontSize: 18, fontWeight: "900" },
+  subtitle: { color: "#5c5c66", fontSize: 12, marginTop: 1 },
   typeRow: { flexDirection: "row", paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
-  typeBtn: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.small, alignItems: "center", backgroundColor: "rgba(28, 28, 34, 0.6)", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  typeBtnText: { fontSize: 13, fontWeight: "700", color: "#a0a0ac" },
+  typeBtn: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.small, alignItems: "center", backgroundColor: "#f5f5f6", borderWidth: 1, borderColor: "rgba(0, 0, 0, 0.08)" },
+  typeBtnText: { fontSize: 13, fontWeight: "700", color: "#5c5c66" },
   tagScrollWrap: { height: 52, justifyContent: "center" },
-  tagChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: "rgba(28, 28, 34, 0.6)", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
-  tagChipText: { fontSize: 12, fontWeight: "700", color: "#a0a0ac" },
-  countText: { color: "#6e6e7a", fontSize: 11, fontWeight: "700", paddingHorizontal: 16, paddingVertical: 6 },
+  tagChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: "#f5f5f6", borderWidth: 1, borderColor: "rgba(0, 0, 0, 0.08)" },
+  tagChipText: { fontSize: 12, fontWeight: "700", color: "#5c5c66" },
+  countText: { color: "#8a8a94", fontSize: 11, fontWeight: "700", paddingHorizontal: 16, paddingVertical: 6 },
   list: { paddingHorizontal: 16, paddingBottom: 32, gap: 10 },
-  qCard: { backgroundColor: "rgba(28, 28, 34, 0.7)", borderRadius: RADIUS.cardSm, padding: 16, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.08)" },
+  qCard: { backgroundColor: "#f5f5f6", borderRadius: RADIUS.cardSm, padding: 16, borderWidth: 1, borderColor: "rgba(0, 0, 0, 0.08)" },
   qCardTruth: { borderLeftWidth: 4, borderLeftColor: "#fd267a" },
   qCardDare:  { borderLeftWidth: 4, borderLeftColor: "#ff6036" },
   qTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
@@ -157,5 +157,5 @@ const s = StyleSheet.create({
   typeBadgeText: { fontSize: 11, fontWeight: "900", letterSpacing: 1 },
   tagRow: { flexDirection: "row", gap: 4 },
   tagPill: { fontSize: 16 },
-  qText: { color: "#ffffff", fontSize: 15, fontWeight: "600", lineHeight: 22 },
+  qText: { color: "#1c1c1e", fontSize: 15, fontWeight: "600", lineHeight: 22 },
 });

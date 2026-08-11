@@ -1,6 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import { BrandGradient } from "@/components/BrandGradient";
-import { FlameBackground } from "@/components/FlameBackground";
+import { AppBackground } from "@/components/AppBackground";
 import { ProfileModal, ProfileModalData, DEFAULT_MODAL_DATA } from "@/components/ProfileModal";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -267,8 +267,8 @@ export default function CommunityScreen() {
   ), [playerId, likePost, openProfile, colors, shadows]);
 
   return (
-    <SafeAreaView edges={["top"]} style={[s.safe, { backgroundColor: colors.bg }]}>
-      <FlameBackground />
+    <SafeAreaView edges={["top"]} style={s.safe}>
+      <AppBackground />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -392,7 +392,7 @@ export default function CommunityScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0d0d10" },
+  safe: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -400,8 +400,8 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  title: { color: "#ffffff", fontSize: 18, fontWeight: "900" },
-  subtitle: { color: "#a0a0ac", fontSize: 12, marginTop: 1 },
+  title: { color: "#1c1c1e", fontSize: 18, fontWeight: "900" },
+  subtitle: { color: "#5c5c66", fontSize: 12, marginTop: 1 },
   compose: {
     padding: 14,
     gap: 8,
@@ -412,21 +412,21 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: RADIUS.small,
     alignItems: "center",
-    backgroundColor: "rgba(28, 28, 34, 0.6)",
+    backgroundColor: "#f5f5f6",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
-  composeTypeTxt: { fontSize: 13, fontWeight: "700", color: "#a0a0ac" },
+  composeTypeTxt: { fontSize: 13, fontWeight: "700", color: "#5c5c66" },
   composeRow: { flexDirection: "row", gap: 8, alignItems: "flex-end" },
   composeInput: {
     flex: 1,
-    backgroundColor: "rgba(28, 28, 34, 0.5)",
+    backgroundColor: "#f5f5f6",
     borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
     borderRadius: RADIUS.small,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: "#ffffff",
+    color: "#1c1c1e",
     fontSize: 14,
     minHeight: 44,
     textAlignVertical: "top",
@@ -454,19 +454,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: RADIUS.small,
-    backgroundColor: "rgba(28, 28, 34, 0.6)",
+    backgroundColor: "#f5f5f6",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
-  filterBtnTxt: { fontSize: 12, fontWeight: "700", color: "#a0a0ac" },
-  postCount: { color: "#6e6e7a", fontSize: 11, fontWeight: "700" },
+  filterBtnTxt: { fontSize: 12, fontWeight: "700", color: "#5c5c66" },
+  postCount: { color: "#8a8a94", fontSize: 11, fontWeight: "700" },
   list: { padding: 16, gap: 12 },
   postCard: {
-    backgroundColor: "rgba(28, 28, 34, 0.7)",
+    backgroundColor: "#f5f5f6",
     borderRadius: RADIUS.cardSm,
     padding: 16,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
     gap: 10,
   },
   postTop: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -483,11 +483,11 @@ const s = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
   postAvatarTxt: { color: "#fd267a", fontSize: 13, fontWeight: "800" },
-  postAuthor: { color: "#ffffff", fontSize: 13, fontWeight: "700" },
-  postTime: { color: "#6e6e7a", fontSize: 11 },
+  postAuthor: { color: "#1c1c1e", fontSize: 13, fontWeight: "700" },
+  postTime: { color: "#8a8a94", fontSize: 11 },
   postTypeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   postTypeTruth: {
     backgroundColor: "#fd267a15",
@@ -500,7 +500,7 @@ const s = StyleSheet.create({
     borderColor: "#ff603630",
   },
   postTypeText: { fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  postText: { color: "#ffffff", fontSize: 14, lineHeight: 21, fontWeight: "500" },
+  postText: { color: "#1c1c1e", fontSize: 14, lineHeight: 21, fontWeight: "500" },
   postActions: { flexDirection: "row", alignItems: "center" },
   likeBtn: {
     flexDirection: "row",
@@ -509,12 +509,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "#f0f0f2",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.08)",
   },
   likeBtnActive: { backgroundColor: "#ff4d4d20", borderColor: "#ff4d4d40" },
-  likeBtnText: { fontSize: 13, fontWeight: "700", color: "#ffffff" },
+  likeBtnText: { fontSize: 13, fontWeight: "700", color: "#1c1c1e" },
   empty: { alignItems: "center", paddingTop: 60, gap: 10 },
-  emptyText: { color: "#a0a0ac", fontSize: 14, textAlign: "center" },
+  emptyText: { color: "#5c5c66", fontSize: 14, textAlign: "center" },
 });

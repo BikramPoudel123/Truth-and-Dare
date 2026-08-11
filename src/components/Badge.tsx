@@ -24,9 +24,9 @@ const styles = StyleSheet.create({
     borderColor: '#ff4d4d',
   },
   info: {
-    backgroundColor: '#1c1c22',
+    backgroundColor: '#f5f5f6',
     borderWidth: 1,
-    borderColor: '#27272a',
+    borderColor: '#e8e8ec',
   },
   truthText: {
     color: '#fd267a',
@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   infoText: {
-    color: '#6e6e7a',
+    color: '#5c5c66',
     fontWeight: '700',
     textTransform: 'uppercase',
     fontSize: 14,
