@@ -48,6 +48,12 @@
         "projectId": "8adad93d-f4e8-4c47-bd92-6231427fa469"
       }
     },
-    "owner": "bikrampoudel01"
+    "owner": "bikrampoudel01",
+    "ios": {
+      "bundleIdentifier": "com.truthdare.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
   }
 }

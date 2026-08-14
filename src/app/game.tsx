@@ -15,19 +15,23 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
+  ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RADIUS } from "@/constants/design-system";
 import { getHttpBase, fetchProfileCached, sendFriendRequest as sendFriendRequestApi, fetchFriendIdsAndSent } from "@/utils/http";
-import { ArrowLeft, CalendarDays, Crown, Eye, Flame, Heart, Mic, PartyPopper, Skull, SmilePlus, Sparkles, Star, Timer as TimerIcon, Paperclip, Send, Camera, Check, X, Flag, UserPlus, UserMinus, UserCheck, Users, Zap, Target } from "lucide-react-native";
+import { ArrowLeft, CalendarDays, Crown, Eye, Flame, Heart, Mic, PartyPopper, Skull, SmilePlus, Sparkles, Star, Timer as TimerIcon, Paperclip, Send, Camera, Check, X, Flag, UserPlus, UserMinus, UserCheck, Users, Zap, Target, Pencil } from "lucide-react-native";
 import { BrandGradient } from "@/components/BrandGradient";
 import { AppBackground } from "@/components/AppBackground";
 import { ParticleBurst } from "@/components/ParticleBurst";
@@ -197,30 +201,25 @@ const mb = StyleSheet.create({
   text:  { fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
 });
 
-function TimerBar({ seconds, moodColor, maxSeconds = 60 }: { seconds: number; moodColor: string; maxSeconds?: number }) {
+function TimerBar({ seconds, moodColor, maxSeconds = 60, style }: { seconds: number; moodColor: string; maxSeconds?: number; style?: StyleProp<ViewStyle> }) {
   const { colors } = useTheme();
   const urgent = seconds <= 10;
   const pct = Math.max(0, seconds / maxSeconds);
   return (
-    <View style={tib.wrap}>
-      <View style={tib.row}>
-        {urgent ? <Flame size={14} color={colors.red} /> : <TimerIcon size={14} color={moodColor} />}
-        <Text style={[tib.time, { color: moodColor }, urgent && { color: colors.red }]}>
-          {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
-        </Text>
-      </View>
+    <View style={[tib.wrap, style]}>
       <View style={[tib.track, { backgroundColor: `${moodColor}20` }]}>
         <View style={[tib.fill, { width: `${pct * 100}%` as any, backgroundColor: urgent ? colors.red : moodColor }]} />
       </View>
+      {urgent ? <Flame size={14} color={colors.red} /> : <TimerIcon size={14} color={moodColor} />}
+      <Text style={[tib.time, { color: urgent ? colors.red : moodColor }]}>{seconds}s</Text>
     </View>
   );
 }
 const tib = StyleSheet.create({
-  wrap:  { gap: 4, marginBottom: 4 },
-  row:   { flexDirection: "row", alignItems: "center", gap: 6 },
-  time:  { fontSize: 16, fontWeight: "800" },
-  track: { height: 4, borderRadius: 2, overflow: "hidden" },
-  fill:  { height: "100%", borderRadius: 2 },
+  wrap:  { flexDirection: "row", alignItems: "center", gap: 8 },
+  time:  { fontSize: 14, fontWeight: "800", minWidth: 30, textAlign: "right" },
+  track: { flex: 1, height: 6, borderRadius: 3, overflow: "hidden" },
+  fill:  { height: "100%", borderRadius: 3 },
 });
 
 function ModeCard({ icon, label, sub, color, onPress, burstColors }: { icon: React.ReactNode; label: string; sub: string; color: string; onPress: () => void; burstColors?: string[] }) {
@@ -277,7 +276,7 @@ export default function GameScreen() {
     players, currentTurn, phase, currentMode, currentQuestion,
     answer, media, answerMediaList, playerName, chooserName,
     askerName, responderName, profilePic, chooseMode, submitQuestion,
-    submitAnswer, submitMedia, nextRound, quitGame, forfeit, gameMood,
+    submitAnswer, submitMedia, nextRound, skipRound, quitGame, forfeit, gameMood,
     reaction, sendReaction, questionReaction, sendQuestionReaction, playerId,
     setSoundCallbacks,
   } = useGame();
@@ -294,6 +293,7 @@ export default function GameScreen() {
   if (currentMode === "truth") moodCfg = { ...moodCfg, color: colors.truth, accentColor: colors.truth };
   if (currentMode === "dare") moodCfg = { ...moodCfg, color: colors.dare, accentColor: colors.dare };
   const answerInputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   const [inputQ, setInputQ]       = useState("");
   const [qMedia, setQMedia]       = useState<SelectedMedia[]>([]);
@@ -306,11 +306,14 @@ export default function GameScreen() {
   const [showAAudio, setShowAAudio] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [showQuestionReactions, setShowQuestionReactions] = useState(false);
+  const [kbOpen, setKbOpen] = useState(false);
   const [timer, setTimer]         = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [timeUpMsg, setTimeUpMsg] = useState<string | null>(null);
   const [pfModal, setPfModal] = useState<ProfileModalData>(DEFAULT_MODAL_DATA);
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const { height: screenH } = useWindowDimensions();
 
   const base = getHttpBase();
 
@@ -442,7 +445,6 @@ export default function GameScreen() {
     }
   }, [submitQuestion, qMedia, submitMedia, playerId, base]);
   const handleSendQ = useCallback(() => { if (canSendQ) sendQ(inputQ); }, [canSendQ, sendQ, inputQ]);
-  const autoSendQ = useCallback(() => sendQ(inputQ), [sendQ, inputQ]);
 
   useEffect(() => {
     const prev = prevTimerRef.current;
@@ -451,18 +453,41 @@ export default function GameScreen() {
       playTick();
     }
     if (prev === 1 && timer === 0) {
-      if (phase === "answering" && isMyTurn) forfeit();
+      if (phase === "answering" && isMyTurn) { playFail(); setTimeUpMsg("⏰ Time's up! Round skipped"); skipRound(); }
       if (phase === "choosing" && isMyTurn) chooseMode("truth");
-      if (phase === "question_set" && isMyQ) autoSendQ();
+      if (phase === "question_set" && isMyQ) { playFail(); setTimeUpMsg("⏰ Time's up! Round skipped"); skipRound(); }
       if (phase === "reveal") nextRound();
     }
-  }, [timer, phase, isMyTurn, isMyQ, forfeit, chooseMode, autoSendQ, nextRound, playTick]);
+  }, [timer, phase, isMyTurn, isMyQ, forfeit, chooseMode, nextRound, playTick, playFail, skipRound]);
 
   useEffect(() => {
-    if (phase === "answering" && isMyTurn) {
-      setTimeout(() => answerInputRef.current?.focus(), 300);
+    if (timeUpMsg) {
+      const t = setTimeout(() => setTimeUpMsg(null), 2500);
+      return () => clearTimeout(t);
     }
-  }, [phase, isMyTurn]);
+  }, [timeUpMsg]);
+
+  useEffect(() => {
+    const showEvt = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKbOpen(true),
+    );
+    const hideEvt = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKbOpen(false),
+    );
+    return () => {
+      showEvt.remove();
+      hideEvt.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (kbOpen && phase === "answering" && isMyTurn) {
+      const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+      return () => clearTimeout(t);
+    }
+  }, [kbOpen, phase, isMyTurn]);
 
   useEffect(() => {
     if (phase === "choosing") {
@@ -514,25 +539,35 @@ export default function GameScreen() {
 
         <PlayerBar players={players} currentTurn={currentTurn} playerName={playerName} selfId={playerId} profilePic={profilePic} onAvatarPress={onAvatarPress} selfLevel={selfLevel} playerLevels={playerLevels} />
 
+        {phase === "answering" && (
+          <View style={[s.stickyTimer, { backgroundColor: `${moodCfg.color}10`, borderColor: `${moodCfg.color}25` }]}>
+            <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
+          </View>
+        )}
+
+        {timeUpMsg && (
+          <View style={[s.timeUpBanner, { backgroundColor: `${colors.red}15`, borderColor: `${colors.red}40` }]}>
+            <TimerIcon size={16} color={colors.red} />
+            <Text style={[s.timeUpTxt, { color: colors.red }]}>{timeUpMsg}</Text>
+          </View>
+        )}
+
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={s.scroll}
           keyboardShouldPersistTaps="handled"
           bounces={false}
           showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => {
+            if (kbOpen && phase === "answering" && isMyTurn)
+              scrollRef.current?.scrollToEnd({ animated: false });
+          }}
         >
 
           {phase === "choosing" && isMyTurn && (
             <View style={s.chooseWrap}>
               <Text style={[s.chooseLabel, { color: colors.sub }]}>Your turn — pick a mode</Text>
-              <View style={[s.choiceTimer, timer <= 3 && s.choiceTimerUrgent, timer <= 3 && { backgroundColor: `${colors.red}10` }]}>
-                <TimerIcon size={12} color={timer <= 3 ? colors.red : colors.sub} />
-                <Text style={[s.choiceTimerTxt, { color: colors.sub }, timer <= 3 && { color: colors.red }]}>
-                  Choose in {timer}s
-                </Text>
-                <View style={[s.choiceTrack, { backgroundColor: `${moodCfg.color}15` }]}>
-                  <View style={[s.choiceFill, { width: `${(timer / 7) * 100}%` as any, backgroundColor: timer <= 3 ? colors.red : moodCfg.color }]} />
-                </View>
-              </View>
+              <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
 
               <View style={s.modeRow}>
                 <ModeCard
@@ -561,6 +596,7 @@ export default function GameScreen() {
                 <ActivityIndicator size="large" color={moodCfg.color} />
                 <Text style={[s.waitTitle, { color: colors.text }]}>{chooserName_}{youSuffix(chooserName_)} is choosing…</Text>
                 <Text style={[s.waitSub, { color: colors.sub }]}>Truth or Dare?</Text>
+                <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={7} style={{ marginTop: 8 }} />
               </View>
             </View>
           )}
@@ -579,7 +615,7 @@ export default function GameScreen() {
                 </View>
               </TouchableOpacity>
               <TextInput
-                style={[s.textBox, { borderColor: moodCfg.borderColor, color: colors.text, backgroundColor: colors.surface }]}
+                style={[s.textBox, { borderColor: moodCfg.color, color: colors.text, backgroundColor: colors.surface }]}
                 placeholder={currentMode === "truth" ? "Type your question…" : "Describe the dare…"}
                 placeholderTextColor={colors.subAlt}
                 value={inputQ}
@@ -614,39 +650,33 @@ export default function GameScreen() {
                 <Text style={[s.waitTitle, { color: colors.text }]}>
                   {currentMode === "truth" ? "Waiting for question…" : "Waiting for dare…"}
                 </Text>
+                <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} style={{ marginTop: 8 }} />
               </View>
             </View>
           )}
 
           {phase === "answering" && isMyTurn && (
-            <View style={s.answerContainer}>
-              <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
-              <View style={[s.questionPill, { backgroundColor: `${moodCfg.color}15`, borderColor: `${moodCfg.color}30` }]}>
+            <View style={[s.answerPanel, { ...shadows.glow }, kbOpen && s.answerPanelCompact]}>
+              <View style={[s.questionPill, { backgroundColor: "#ffffff", borderColor: moodCfg.color, borderWidth: 2 }]}>
                 <ModeBadge mode={currentMode} />
-                <Text style={[s.questionText, { color: colors.sub }]}>{currentQuestion}</Text>
-                <View style={{ position: "absolute", top: -8, right: -4, zIndex: 20 }}>
-                  {showQuestionReactions ? (
-                    <View style={[s.emojiPicker, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      {["😂", "🔥", "😍", "😮", "💀", "😢", "🎉", "👏"].map(e => (
-                        <TouchableOpacity key={e} onPress={() => { playPop(); sendQuestionReaction(e); setShowQuestionReactions(false); }} activeOpacity={0.7} style={s.emojiBtn}>
-                          <Text style={s.emojiTxt}>{e}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  ) : (
-                    <TouchableOpacity onPress={() => setShowQuestionReactions(true)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <SmilePlus size={20} color={colors.sub} />
-                    </TouchableOpacity>
-                  )}
+                <Text
+                  style={[s.questionText, { color: "#000000", fontWeight: "800" }]}
+                >
+                  {currentQuestion}
+                </Text>
+                <View style={s.reactIconAbs}>
+                  <TouchableOpacity onPress={() => setShowQuestionReactions(true)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <SmilePlus size={20} color={colors.sub} />
+                  </TouchableOpacity>
                 </View>
                 {questionReaction && (
-                  <View style={[s.reactDisplay, { bottom: -12, right: -8, backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={[s.reactDisplay, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <Text style={s.reactEmoji}>{questionReaction}</Text>
                   </View>
                 )}
               </View>
               {media.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
                   {media.map((m, i) => (
                     <View key={i} style={m.type === "audio" ? { marginRight: 8, width: 240 } : { marginRight: 8 }}>
                       <MediaDisplay media={m} size="small" />
@@ -654,25 +684,32 @@ export default function GameScreen() {
                   ))}
                 </ScrollView>
               )}
-              <TextInput
-                ref={answerInputRef}
-                style={[s.answerInput, { borderColor: moodCfg.color, color: colors.text, backgroundColor: colors.surface }]}
-                placeholder={currentMode === "truth" ? "Your truth…" : "What did you do?"}
-                placeholderTextColor={colors.subAlt}
-                value={inputA}
-                onChangeText={setInputA}
-                multiline
-                textAlignVertical="top"
-              />
+              <View style={[s.answerInputRow, kbOpen && s.answerInputRowCompact]}>
+                <Pencil size={18} color={colors.purple} />
+                <TextInput
+                  ref={answerInputRef}
+                  style={[s.answerInput, { color: colors.text, maxHeight: kbOpen ? Math.max(56, Math.min(110, screenH * 0.16)) : 140 }, kbOpen && s.answerInputCompact]}
+                  placeholder="Type your answer..."
+                  placeholderTextColor="#8f84ad"
+                  value={inputA}
+                  onChangeText={setInputA}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
             </View>
           )}
 
-          {phase === "answering" && !isMyTurn && (
+        {phase === "answering" && !isMyTurn && (
             <View style={s.answerContainer}>
-              <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
-              <View style={[s.questionPill, { backgroundColor: `${moodCfg.color}15`, borderColor: `${moodCfg.color}30` }]}>
+              <View style={[s.questionPill, { backgroundColor: "#ffffff", borderColor: moodCfg.color, borderWidth: 2 }]}>
                 <ModeBadge mode={currentMode} />
-                <Text style={[s.questionText, { color: colors.sub }]}>{currentQuestion}</Text>
+                <Text style={[s.questionText, { color: "#000000", fontWeight: "800" }]}>{currentQuestion}</Text>
+                {questionReaction && (
+                  <View style={[s.reactDisplay, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <Text style={s.reactEmoji}>{questionReaction}</Text>
+                  </View>
+                )}
               </View>
               {media.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
@@ -694,9 +731,14 @@ export default function GameScreen() {
             <View style={s.revealContainer}>
               <Text style={[s.revealLabel, { color: colors.text }]}>Round Results</Text>
 
-              <View style={[s.questionPill, { backgroundColor: `${moodCfg.color}08`, borderColor: `${moodCfg.color}20` }]}>
+              <View style={[s.questionPill, { backgroundColor: "#ffffff", borderColor: moodCfg.color, borderWidth: 2 }]}>
                 <ModeBadge mode={currentMode} />
-                <Text style={[s.questionText, { color: colors.sub }]}>{currentQuestion}</Text>
+                <Text style={[s.questionText, { color: "#000000", fontWeight: "800" }]}>{currentQuestion}</Text>
+                {questionReaction && (
+                  <View style={[s.reactDisplay, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <Text style={s.reactEmoji}>{questionReaction}</Text>
+                  </View>
+                )}
               </View>
 
               <View style={s.divider}>
@@ -718,25 +760,15 @@ export default function GameScreen() {
               )}
 
               {answer || answerMediaList.length > 0 ? (
-                <View style={[s.answerCard, { backgroundColor: `${moodCfg.color}18`, borderColor: `${moodCfg.color}35` }]}>
+                <View style={[s.answerCard, { backgroundColor: "#f6f2ff", borderColor: moodCfg.color, borderWidth: 2 }]}>
                   {isMyQ && (
                     <View style={s.reactRow}>
-                      {showReactions ? (
-                        <View style={[s.emojiPicker, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                          {["😂", "🔥", "😍", "😮", "💀", "😢", "🎉", "👏"].map(e => (
-                            <TouchableOpacity key={e} onPress={() => { playPop(); sendReaction(e); setShowReactions(false); }} activeOpacity={0.7} style={s.emojiBtn}>
-                              <Text style={s.emojiTxt}>{e}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      ) : (
-                        <TouchableOpacity onPress={() => setShowReactions(true)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <SmilePlus size={20} color={colors.sub} />
-                        </TouchableOpacity>
-                      )}
+                      <TouchableOpacity onPress={() => setShowReactions(true)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <SmilePlus size={20} color={colors.sub} />
+                      </TouchableOpacity>
                     </View>
                   )}
-                  {answer ? <Text style={[s.answerText, { color: colors.text }]}>{answer}</Text> : null}
+                  {answer ? <Text style={[s.answerText, { color: "#000000", fontWeight: "800" }]}>{answer}</Text> : null}
                   {answerMediaList.length > 0 && (
                     <View style={{ gap: 8, marginTop: 8, alignSelf: "stretch", alignItems: "center" }}>
                       {answerMediaList.map((m, i) => (
@@ -845,6 +877,32 @@ export default function GameScreen() {
           </View>
         )}
 
+        {showQuestionReactions && (
+          <View style={s.reactOverlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowQuestionReactions(false)} />
+            <View style={[s.emojiPicker, s.reactPickerFixed, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {["😂", "🔥", "😍", "😮", "💀", "😢", "🎉", "👏"].map(e => (
+                <TouchableOpacity key={e} onPress={() => { playPop(); sendQuestionReaction(e); setShowQuestionReactions(false); }} activeOpacity={0.7} style={s.emojiBtn}>
+                  <Text style={s.emojiTxt}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {showReactions && (
+          <View style={s.reactOverlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowReactions(false)} />
+            <View style={[s.emojiPicker, s.reactPickerFixed, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {["😂", "🔥", "😍", "😮", "💀", "😢", "🎉", "👏"].map(e => (
+                <TouchableOpacity key={e} onPress={() => { playPop(); sendReaction(e); setShowReactions(false); }} activeOpacity={0.7} style={s.emojiBtn}>
+                  <Text style={s.emojiTxt}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Profile modal */}
         <ProfileModal
           data={pfModal}
@@ -884,26 +942,25 @@ const s = StyleSheet.create({
   topBtnTxt: { color: "#1c1c1e", fontSize: 18, fontWeight: "700" },
   topTitleWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
 
-  scroll: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24, paddingTop: 8 },
+  scroll: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 20, paddingTop: 6 },
 
-  centerFill: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 32 },
-  chooseWrap: { alignItems: "center", paddingVertical: 32, width: "100%", flex: 1, justifyContent: "center" },
-  section:    { gap: 14, paddingTop: 8 },
-
-  chooseLabel: { color: "#5c5c66", fontSize: 14, textAlign: "center", fontWeight: "600", marginBottom: 4 },
-
-  choiceTimer: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    marginBottom: 20, paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: RADIUS.small,
+  timeUpBanner: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    marginHorizontal: 16, marginTop: 10,
+    paddingVertical: 10, paddingHorizontal: 14,
+    borderRadius: RADIUS.cardSm,
+    borderWidth: 1,
   },
-  choiceTimerUrgent: { backgroundColor: "#ff4d4d10" },
-  choiceTimerTxt: { color: "#5c5c66", fontSize: 12, fontWeight: "700" },
-  choiceTrack: { height: 3, borderRadius: 2, flex: 1, overflow: "hidden", minWidth: 60 },
-  choiceFill: { height: "100%", borderRadius: 2 },
+  timeUpTxt: { fontSize: 14, fontWeight: "800" },
+
+  centerFill: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 20 },
+  chooseWrap: { alignItems: "center", paddingVertical: 20, width: "100%", flex: 1, justifyContent: "center" },
+  section:    { gap: 10, paddingTop: 6 },
+
+  chooseLabel: { color: "#5c5c66", fontSize: 14, textAlign: "center", fontWeight: "600", marginBottom: 2 },
 
   waitingCard: {
-    borderRadius: RADIUS.cardSm, padding: 28, alignItems: "center", gap: 12,
+    borderRadius: RADIUS.cardSm, padding: 20, alignItems: "center", gap: 8,
     borderWidth: 1, width: "100%",
   },
 
@@ -919,35 +976,52 @@ const s = StyleSheet.create({
   },
   browseBtnText: { fontSize: 12, fontWeight: "800", letterSpacing: 0.3 },
 
-  modeRow: { flexDirection: "row", gap: 12, width: "100%", marginTop: 20 },
+  modeRow: { flexDirection: "row", gap: 12, width: "100%", marginTop: 12 },
   modeCard: {
-    flex: 1, borderRadius: RADIUS.cardSm, paddingVertical: 32,
+    flex: 1, borderRadius: RADIUS.cardSm, paddingVertical: 22,
     alignItems: "center", justifyContent: "center",
-    borderWidth: 2, gap: 10,
+    borderWidth: 2, gap: 8,
   },
   modeIconWrap: { width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center" },
   modeWord:  { fontSize: 22, fontWeight: "900", letterSpacing: 2 },
   modeSub:   { color: "#5c5c66", fontSize: 12 },
 
   textBox: {
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderRadius: RADIUS.cardSm,
     paddingHorizontal: 14, paddingVertical: 12,
-    color: "#1c1c1e", fontSize: 15, minHeight: 90, textAlignVertical: "top",
+    color: "#1c1c1e", fontSize: 15, minHeight: 44, textAlignVertical: "top",
     backgroundColor: "#f5f5f6",
   },
 
   // ── Answer-centric UI ──
   answerContainer: {
-    flex: 1,
-    paddingTop: 12,
-    gap: 10,
+    gap: 8,
+    paddingTop: 8,
+  },
+  stickyTimer: {
+    marginHorizontal: 16,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderRadius: RADIUS.small,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  answerPanel: {
+    backgroundColor: "#ffffff",
+    borderRadius: RADIUS.card,
+    padding: 16,
+    gap: 8,
+  },
+  answerPanelCompact: {
+    padding: 12,
+    gap: 8,
   },
   questionPill: {
     borderRadius: RADIUS.cardSm,
-    padding: 12,
+    padding: 10,
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     borderWidth: 1,
     position: "relative",
   },
@@ -958,24 +1032,41 @@ const s = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
-  answerInput: {
-    borderWidth: 2,
-    borderRadius: RADIUS.cardSm,
+  answerInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1.5,
+    borderColor: "#cdbdf0",
+    backgroundColor: "#f6f2ff",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 4,
+  },
+  answerInputRowCompact: {
+    paddingVertical: 2,
+  },
+  answerInput: {
+    flex: 1,
     color: "#1c1c1e",
-    fontSize: 17,
-    minHeight: 140,
+    fontSize: 16,
+    minHeight: 44,
+    maxHeight: 140,
+    paddingVertical: 10,
     textAlignVertical: "top",
-    backgroundColor: "#f5f5f6",
-    lineHeight: 24,
+    lineHeight: 22,
+  },
+  answerInputCompact: {
+    minHeight: 40,
+    paddingVertical: 8,
+    lineHeight: 20,
   },
   waitingAnswer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 32,
+    paddingVertical: 14,
   },
   waitingAnswerText: {
     color: "#5c5c66",
@@ -985,9 +1076,8 @@ const s = StyleSheet.create({
 
   // ── Reveal ──
   revealContainer: {
-    flex: 1,
     paddingTop: 4,
-    gap: 12,
+    gap: 8,
   },
   revealLabel: {
     color: "#1c1c1e",
@@ -1007,7 +1097,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: 8,
   },
   responderAvatar: {
     width: 32,
@@ -1020,12 +1110,12 @@ const s = StyleSheet.create({
   responderName: { color: "#1c1c1e", fontSize: 12, fontWeight: "600" },
   answerCard: {
     borderRadius: RADIUS.cardSm,
-    padding: 28,
+    padding: 20,
     borderWidth: 1,
     borderColor: "rgba(0, 0, 0, 0.08)",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 160,
+    minHeight: 120,
   },
   answerText: {
     color: "#1c1c1e",
@@ -1056,10 +1146,36 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   emojiTxt: { fontSize: 18 },
+  reactIconAbs: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    zIndex: 20,
+  },
+  reactOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 100,
+    backgroundColor: "rgba(0, 0, 0, 0.15)",
+  },
+  reactPickerFixed: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
   reactDisplay: {
     position: "absolute",
-    bottom: -12,
-    right: -8,
+    bottom: 8,
+    right: 8,
     backgroundColor: "#f5f5f6",
     borderRadius: 16,
     width: 36,
@@ -1077,12 +1193,12 @@ const s = StyleSheet.create({
     gap: 8,
     backgroundColor: "#ff4d4d15",
     borderRadius: RADIUS.small,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 20,
     alignSelf: "center",
   },
   forfeitTxt: { color: "#ff4d4d", fontSize: 14, fontWeight: "700" },
-  nextBtnGrad: { borderRadius: RADIUS.button, paddingVertical: 16, alignItems: "center" },
+  nextBtnGrad: { borderRadius: RADIUS.button, paddingVertical: 12, alignItems: "center" },
   nextBtnDisabled: { opacity: 0.4 },
   nextBtnTxt: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: 1 },
 
@@ -1097,13 +1213,13 @@ const s = StyleSheet.create({
   badgeTxt:   { color: "#fff", fontSize: 11, fontWeight: "800" },
 
   sticky: {
-    paddingHorizontal: 16, paddingVertical: 10,
-    gap: 8,
+    paddingHorizontal: 16, paddingVertical: 8,
+    gap: 6,
     backgroundColor: "#e8e8ec",
     borderTopWidth: 1,
     borderTopColor: "rgba(0, 0, 0, 0.08)",
   },
-  stickyBtn:      { flex: 1, borderRadius: RADIUS.small, paddingVertical: 15, alignItems: "center" },
+  stickyBtn:      { flex: 1, borderRadius: RADIUS.small, paddingVertical: 12, alignItems: "center" },
   stickyGreen:    { backgroundColor: "#34c271" },
   stickyRed:      { backgroundColor: "#ff4d4d15", borderWidth: 1, borderColor: "#ff4d4d30" },
   stickyDisabled: { opacity: 0.35 },
@@ -1112,7 +1228,7 @@ const s = StyleSheet.create({
   submitBtn: {
     flex: 1,
     borderRadius: RADIUS.button,
-    paddingVertical: 15,
+    paddingVertical: 12,
     alignItems: "center",
   },
   submitBtnDisabled: { opacity: 0.35 },

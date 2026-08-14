@@ -41,6 +41,12 @@ const sizeDimensions = {
   large: { width: "100%" as const, height: 256 },
 };
 
+const videoDimensions = {
+  small: { width: 280, aspectRatio: 16 / 9 },
+  medium: { width: 320, aspectRatio: 16 / 9 },
+  large: { width: "100%" as const, aspectRatio: 16 / 9 },
+};
+
 // On web, create a Blob URL from base64. On native, try a temp file first.
 // If either path fails, fall back to a data URI so the UI stays usable.
 async function base64ToFileUri(data: string, ext: string): Promise<string> {
@@ -186,12 +192,14 @@ function VideoPlayer({ data, style }: { data: string; style: any }) {
   }
 
   return (
-    <VideoView
-      player={player}
-      style={style}
-      contentFit="contain"
-      nativeControls
-    />
+    <View style={style}>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFill}
+        contentFit="contain"
+        nativeControls
+      />
+    </View>
   );
 }
 
@@ -233,43 +241,40 @@ function AudioPlayer({ data }: { data: string }) {
     return () => {
       cancelled = true;
       playerRef.current?.remove();
+      playerRef.current = null;
     };
   }, [data]);
 
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player || !playing) return;
-    const id = setInterval(() => {
-      if (player.playing) {
-        setCurrentTime(player.currentTime);
-      } else {
-        setPlaying(false);
-        setCurrentTime(0);
-      }
-    }, 100);
-    return () => clearInterval(id);
-  }, [playing]);
+  const ensurePlayer = () => {
+    if (!fileUri) return null;
+    if (!playerRef.current) {
+      const player = createAudioPlayer({ uri: fileUri });
+      playerRef.current = player;
+      player.addListener("playbackStatusUpdate", (status) => {
+        setDuration(status.duration || 0);
+        setCurrentTime(status.didJustFinish ? 0 : status.currentTime);
+        setPlaying(status.playing);
+      });
+      setDuration(player.duration || 0);
+      setTimeout(() => {
+        if (player.duration > 0) setDuration(player.duration);
+      }, 300);
+    }
+    return playerRef.current;
+  };
 
   const togglePlay = () => {
-    if (!fileUri) return;
-    const player = playerRef.current;
-    if (player) {
-      if (player.playing) {
-        player.pause();
-        setPlaying(false);
-        return;
-      }
-      player.play();
-      setPlaying(true);
+    const player = ensurePlayer();
+    if (!player) return;
+    if (player.playing) {
+      player.pause();
+      setPlaying(false);
       return;
     }
-    const newPlayer = createAudioPlayer({ uri: fileUri });
-    playerRef.current = newPlayer;
-    setDuration(newPlayer.duration || 0);
-    setTimeout(() => {
-      if (newPlayer.duration > 0) setDuration(newPlayer.duration);
-    }, 300);
-    newPlayer.play();
+    if (player.duration > 0 && player.currentTime >= player.duration) {
+      player.seekTo(0);
+    }
+    player.play();
     setPlaying(true);
   };
 
@@ -357,7 +362,7 @@ export function MediaDisplay({ media, size = "medium" }: MediaDisplayProps) {
 
   if (media.type === "video") {
     return (
-      <View style={[styles.container, { backgroundColor: colors.card }, dims]}>
+      <View style={[styles.container, { backgroundColor: colors.card }, videoDimensions[size]]}>
         <VideoPlayer data={media.data} style={styles.fill} />
       </View>
     );

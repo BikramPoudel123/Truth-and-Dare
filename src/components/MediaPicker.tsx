@@ -24,8 +24,7 @@ interface MediaPickerProps {
 }
 
 const MAX_ATTACHMENTS_PER_BATCH = 3;
-const MAX_IMAGE_BASE64_CHARS = 2_000_000;
-const MAX_VIDEO_BASE64_CHARS = 4_000_000;
+const MAX_BASE64_CHARS = 420_000_000; // ~300MB in base64
 
 async function convertToBase64(uri: string): Promise<string> {
   try {
@@ -58,9 +57,7 @@ async function processAssets(
           ? (asset.base64 ?? (await convertToBase64(asset.uri)))
           : await convertToBase64(asset.uri);
 
-      const maxChars =
-        type === "video" ? MAX_VIDEO_BASE64_CHARS : MAX_IMAGE_BASE64_CHARS;
-      if (!raw || raw.length > maxChars) {
+      if (!raw || raw.length > MAX_BASE64_CHARS) {
         return null;
       }
 
@@ -136,13 +133,15 @@ export function MediaPicker({ selected, onChange }: MediaPickerProps) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: "videos",
       allowsMultipleSelection: true,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+      quality: 0.7,
     });
     if (!result.canceled) {
       const processed = await processAssets(result.assets, "video");
       if (processed.length === 0 && result.assets.length > 0) {
         Alert.alert(
-          "Large file",
-          "Please choose a smaller video to keep the chat stable.",
+          "File too large",
+          "Videos up to 300MB are supported. Please choose a smaller video.",
         );
       }
       add(processed);
@@ -172,13 +171,15 @@ export function MediaPicker({ selected, onChange }: MediaPickerProps) {
     if (!(await requestCameraPermission())) return;
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: "videos",
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+      quality: 0.7,
     });
     if (!result.canceled) {
       const processed = await processAssets(result.assets, "video");
       if (processed.length === 0 && result.assets.length > 0) {
         Alert.alert(
-          "Large file",
-          "This video is too large to send safely. Please choose a smaller video or send fewer files.",
+          "File too large",
+          "Videos up to 300MB are supported. The recording was compressed automatically.",
         );
       }
       add(processed);

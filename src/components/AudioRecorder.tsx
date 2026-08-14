@@ -91,6 +91,9 @@ export function AudioRecorder({ onRecorded, accentColor = COLORS.purple }: Props
         setPlaying(false);
         return;
       }
+      if (player.duration > 0 && player.currentTime >= player.duration) {
+        player.seekTo(0);
+      }
       player.play();
       setPlaying(true);
       return;

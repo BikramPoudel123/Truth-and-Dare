@@ -37,10 +37,10 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 // ─── Express + HTTP + WebSocket ──────────────────────────────────────────────
 const app = express();
 app.use(cors({ origin: CORS_ORIGIN.split(",").map(s => s.trim()), credentials: true }));
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "500mb" }));
 
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server, path: SOCKET_PATH });
+const wss = new WebSocket.Server({ server, path: SOCKET_PATH, maxPayload: 500 * 1024 * 1024 });
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────────
 const RATE_WINDOW = Number(process.env.RATE_LIMIT_WINDOW_MS || 60000);
@@ -115,6 +115,7 @@ redisClient.connect()
   .catch((err) => logger.warn({ err }, "Redis connection failed — using in-memory fallback"));
 
 // ─── In-Memory Stores ──────────────────────────────────────────────────────
+const roomTimers = new Map();
 const playerSockets = new Map();
 const memStore = {
   rooms: new Map(),
@@ -145,6 +146,7 @@ async function saveRoom(room) {
 }
 
 async function deleteRoom(roomId) {
+  clearRoomTimer(roomId);
   if (!redisReady) {
     memStore.rooms.delete(roomId);
     memStore.openRooms.delete(roomId);
@@ -449,6 +451,80 @@ function broadcastOnlineCount() {
   }
 }
 
+// ─── Round Timers ────────────────────────────────────────────────────────────
+const ROUND_TIMEOUTS = {
+  choosing: 7,
+  question_set: 30,
+  answering: 60,
+  answering_dare: 180,
+  reveal: 30,
+  reveal_dare: 60,
+};
+
+function getRoundTimeoutSeconds(room) {
+  if (room.phase === "answering") return room.current_mode === "dare" ? ROUND_TIMEOUTS.answering_dare : ROUND_TIMEOUTS.answering;
+  if (room.phase === "reveal") return room.current_mode === "dare" ? ROUND_TIMEOUTS.reveal_dare : ROUND_TIMEOUTS.reveal;
+  return ROUND_TIMEOUTS[room.phase] ?? 0;
+}
+
+function clearRoomTimer(roomId) {
+  const handle = roomTimers.get(roomId);
+  if (handle) {
+    clearTimeout(handle);
+    roomTimers.delete(roomId);
+  }
+}
+
+async function startNewRound(room) {
+  room.current_turn = 1 - room.current_turn;
+  room.phase = "choosing";
+  room.current_mode = null;
+  room.current_question = null;
+  room.player1_answer = null;
+  room.player2_answer = null;
+  room.reaction = null;
+  room.question_reaction = null;
+  await saveRoom(room);
+  broadcastToRoom(room, { type: "round_started", current_turn: room.current_turn });
+  scheduleRoomTimer(room);
+}
+
+async function scheduleRoomTimer(room) {
+  clearRoomTimer(room.room_id);
+  const seconds = getRoundTimeoutSeconds(room);
+  if (!seconds || !room.room_id) return;
+
+  const handle = setTimeout(async () => {
+    roomTimers.delete(room.room_id);
+    const current = await getRoom(room.room_id);
+    if (!current || current.players.length < 2 || current.phase !== room.phase) return;
+    if (room.phase === "choosing") {
+      if (current.current_mode || current.phase !== "choosing") return;
+      current.current_mode = "truth";
+      current.phase = "question_set";
+      await saveRoom(current);
+      broadcastToRoom(current, {
+        type: "mode_chosen",
+        chooser_name: current.players[current.current_turn]?.name,
+        mode: "truth",
+        asker_name: current.players[1 - current.current_turn]?.name,
+      });
+      scheduleRoomTimer(current);
+    } else if (room.phase === "question_set") {
+      if (current.current_question || current.phase !== "question_set") return;
+      await startNewRound(current);
+    } else if (room.phase === "answering") {
+      if (current.player1_answer || current.player2_answer || current.phase !== "answering") return;
+      await startNewRound(current);
+    } else if (room.phase === "reveal") {
+      if (current.phase !== "reveal") return;
+      await startNewRound(current);
+    }
+  }, seconds * 1000);
+
+  roomTimers.set(room.room_id, handle);
+}
+
 function normalizeMediaData(mediaData) {
   if (Array.isArray(mediaData)) return mediaData.join("");
   if (typeof mediaData === "string") return mediaData;
@@ -550,15 +626,23 @@ app.post("/upload", uploadLimiter, (req, res) => {
 
     let ext = "jpg", buffer;
     if (base64.startsWith("data:")) {
-      const matches = base64.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
-      if (!matches) return res.status(400).json({ error: "Invalid base64 image" });
-      ext = matches[1] === "jpeg" ? "jpg" : matches[1];
-      buffer = Buffer.from(matches[2], "base64");
+      const matches = base64.match(/^data:([a-z0-9]+\/[a-z0-9.+-]+);base64,(.+)$/i);
+      if (!matches) return res.status(400).json({ error: "Invalid base64 file" });
+      const mime = matches[1];
+      const data = matches[2];
+      if (mime.startsWith("image/")) {
+        ext = mime.split("/")[1] === "jpeg" ? "jpg" : mime.split("/")[1] || "jpg";
+      } else if (mime.startsWith("video/")) {
+        ext = mime.split("/")[1] || "mp4";
+      } else if (mime.startsWith("audio/")) {
+        ext = mime.split("/")[1] || "mp3";
+      }
+      buffer = Buffer.from(data, "base64");
     } else {
       buffer = Buffer.from(base64, "base64");
     }
 
-    if (buffer.length > 10 * 1024 * 1024) return res.status(413).json({ error: "File too large (max 10MB)" });
+    if (buffer.length > 300 * 1024 * 1024) return res.status(413).json({ error: "File too large (max 300MB)" });
 
     const safeName = `${filename.replace(/[^a-zA-Z0-9_-]/g, "")}-${Date.now()}.${ext}`;
     fs.writeFile(path.join(UPLOADS_DIR, safeName), buffer, (err) => {
@@ -857,7 +941,7 @@ wss.on("connection", (ws) => {
             sendToPlayer(player_id, { type: "room_joined", room_id: availableRoom.room_id });
             const pProfile = await getProfile(player_id);
             broadcastToRoom(availableRoom, { type: "player_joined", players: availableRoom.players.map(p => ({ id: p.id, name: p.name, profile_pic: p.profile_pic ?? null, level: Math.floor((pProfile?.gamesPlayed ?? 0) / 10) + 1 })) });
-            if (availableRoom.players.length === 2) broadcastToRoom(availableRoom, { type: "game_started", current_turn: 0 });
+            if (availableRoom.players.length === 2) { broadcastToRoom(availableRoom, { type: "game_started", current_turn: 0 }); scheduleRoomTimer(availableRoom); }
             break;
           }
 
@@ -880,7 +964,7 @@ wss.on("connection", (ws) => {
           if (room.players.length === 2) { room.phase = "choosing"; room.current_turn = 0; await markRoomClosed(room_id); }
           await saveRoom(room);
           broadcastToRoom(room, { type: "player_joined", players: room.players.map(p => ({ id: p.id, name: p.name, profile_pic: p.profile_pic ?? null })) });
-          if (room.players.length === 2) broadcastToRoom(room, { type: "game_started", current_turn: 0 });
+          if (room.players.length === 2) { broadcastToRoom(room, { type: "game_started", current_turn: 0 }); scheduleRoomTimer(room); }
           break;
         }
 
@@ -893,6 +977,7 @@ wss.on("connection", (ws) => {
           room.phase = "question_set";
           await saveRoom(room);
           broadcastToRoom(room, { type: "mode_chosen", chooser_name: room.players.find(p => p.id === player_id)?.name, mode, asker_name: room.players[1 - room.current_turn].name });
+          scheduleRoomTimer(room);
           break;
         }
 
@@ -906,6 +991,7 @@ wss.on("connection", (ws) => {
           room.phase = "answering";
           await saveRoom(room);
           broadcastToRoom(room, { type: "question_ready", question: room.current_question, asker_name: asker.name, responder_name: room.players[room.current_turn].name });
+          scheduleRoomTimer(room);
           break;
         }
 
@@ -918,6 +1004,7 @@ wss.on("connection", (ws) => {
           room.phase = "reveal";
           await saveRoom(room);
           broadcastToRoom(room, { type: "both_answered", answer: room.player1_answer, responder_name: room.players[room.current_turn].name });
+          scheduleRoomTimer(room);
           break;
         }
 
@@ -930,6 +1017,7 @@ wss.on("connection", (ws) => {
           await saveRoom(room);
           const responder = room.players[room.current_turn];
           broadcastToRoom(room, { type: "answer_with_media_multiple", answer: room.player1_answer, media_list: normalizeMediaList(media_list), player_name: responder.name, player_id: responder.id });
+          scheduleRoomTimer(room);
           break;
         }
 
@@ -942,6 +1030,7 @@ wss.on("connection", (ws) => {
           await saveRoom(room);
           const responder = room.players[room.current_turn];
           broadcastToRoom(room, { type: "answer_with_media", answer: room.player1_answer, media_type, media_data: normalizeMediaData(media_data), player_name: responder.name, player_id: responder.id });
+          scheduleRoomTimer(room);
           break;
         }
 
@@ -962,6 +1051,7 @@ wss.on("connection", (ws) => {
           room.phase = "reveal";
           await saveRoom(room);
           broadcastToRoom(room, { type: "forfeit", forfeiter_name: forfeiter.name, answer: null, responder_name: forfeiter.name });
+          scheduleRoomTimer(room);
           break;
         }
 
@@ -1009,16 +1099,15 @@ wss.on("connection", (ws) => {
           const { room_id } = message;
           const room = await getRoom(room_id);
           if (!room || room.phase !== "reveal") break;
-          room.current_turn = 1 - room.current_turn;
-          room.phase = "choosing";
-          room.current_mode = null;
-          room.current_question = null;
-          room.player1_answer = null;
-          room.player2_answer = null;
-          room.reaction = null;
-          room.question_reaction = null;
-          await saveRoom(room);
-          broadcastToRoom(room, { type: "round_started", current_turn: room.current_turn });
+          await startNewRound(room);
+          break;
+        }
+
+        case "skip_round": {
+          const { room_id } = message;
+          const room = await getRoom(room_id);
+          if (!room || !["question_set", "answering"].includes(room.phase)) break;
+          await startNewRound(room);
           break;
         }
 
@@ -1026,6 +1115,7 @@ wss.on("connection", (ws) => {
           const { room_id, player_id } = message;
           const room = await getRoom(room_id);
           if (!room) break;
+          clearRoomTimer(room_id);
           room.players = room.players.filter(p => p.id !== player_id);
           playerSockets.delete(player_id);
           broadcastOnlineCount();
@@ -1048,6 +1138,7 @@ wss.on("connection", (ws) => {
             current_question: room.current_question, players: room.players.map(p => ({ id: p.id, name: p.name })),
             answer: room.player1_answer,
           });
+          scheduleRoomTimer(room);
           break;
         }
       }

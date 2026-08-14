@@ -70,8 +70,10 @@ export default function MenuScreen({ onNavigate, initialMode, onModeChange }: { 
   const { createRoom, autoJoin, joinRoom, roomId, players, isConnected, phase, reconnect, error, quitGame, setInterests, gameMood, setGameMood, playersOnline, notificationCount } = useGame();
   const { profile, isProfileReady, setName, setBio, setPic, toggleInterest, reactions, playedSince, playerId } = useProfile();
   const { colors, shadows } = useTheme();
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const isSmall = screenW < 380;
+  const duoImgH = Math.max(screenH - 540, 220);
+  const duoImgW = duoImgH * 0.5;
   
   const [code, setCode] = useState("");
   const [mode, setMode] = useState<ScreenMode>((initialMode as ScreenMode) || "home");
@@ -152,13 +154,10 @@ export default function MenuScreen({ onNavigate, initialMode, onModeChange }: { 
     <SafeAreaView edges={["top"]} style={s.safe}>
       <AppBackground />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-        <ScrollView scrollEnabled={mode !== "home"} contentContainerStyle={[s.scroll, { paddingBottom: 110 }, mode === "random_waiting" && s.waitingCenter]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView scrollEnabled={mode !== "home"} contentContainerStyle={[s.scroll, { paddingBottom: 110 }, mode === "home" && s.homeFill, mode === "random_waiting" && s.waitingCenter]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
             {mode === "home" && (
               <View style={s.homeCenter}>
-                {/* Flame hero banner */}
-                <BrandGradient variant="hero" style={s.heroBanner} pointerEvents="none" />
-                <BrandGradient variant="primary" style={s.heroBannerSmall} pointerEvents="none" />
 
                 {/* Header with Logo */}
                 <View style={s.header}>
@@ -256,10 +255,10 @@ export default function MenuScreen({ onNavigate, initialMode, onModeChange }: { 
                 </View>
               </TouchableOpacity>
 
-              {/* Character duo at the bottom: boy left, girl right */}
-              <View style={s.duoRow} pointerEvents="none">
-                <Image source={require("../../assets/images/Boy ho hai.png")} style={[s.duoImg, s.boyImg]} contentFit="contain" />
-                <Image source={require("../../assets/images/Girl ho hai.png")} style={[s.duoImg, s.girlImg]} contentFit="contain" />
+              {/* Character duo filling the gap below the private game card: boy left, girl right */}
+              <View style={s.duoWrap} pointerEvents="none">
+                <Image source={require("../../assets/images/Boy ho hai.png")} style={[s.duoImg, { width: duoImgW, height: duoImgH }]} contentFit="contain" />
+                <Image source={require("../../assets/images/Girl ho hai.png")} style={[s.duoImg, { width: duoImgW, height: duoImgH }]} contentFit="contain" />
               </View>
 
             </View>
@@ -529,18 +528,17 @@ export default function MenuScreen({ onNavigate, initialMode, onModeChange }: { 
 const s = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { paddingHorizontal: 20, paddingBottom: 48 },
+  homeFill: { flexGrow: 1 },
   waitingCenter: { flexGrow: 1, justifyContent: "center" },
   disabled: { opacity: 0.4 },
 
   // ── Home Center ──
-  homeCenter: { flex: 1, justifyContent: "center" },
+  homeCenter: { flex: 1, justifyContent: "flex-start" },
 
   // ── Background Particles ──
 
   // ── Header ──
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 16, paddingBottom: 12, columnGap: 16 },
-  heroBanner: { position: "absolute", top: -80, left: -70, right: -70, height: 220, borderRadius: 120, opacity: 0.22 },
-  heroBannerSmall: { position: "absolute", top: -24, right: -50, width: 160, height: 160, borderRadius: 80, opacity: 0.14 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#f0f0f2", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
   notifBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#f0f0f2", borderWidth: 1, borderColor: "rgba(0,0,0,0.12)", alignItems: "center", justifyContent: "center" },
@@ -571,10 +569,14 @@ const s = StyleSheet.create({
     elevation: 4,
   },
   matchCardPrivate: { backgroundColor: "#ffffff", borderColor: "rgba(0, 0, 0, 0.08)", paddingVertical: 4 },
-  duoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 28, paddingHorizontal: 8 },
-  duoImg: { height: 170 },
-  boyImg: { width: 112 },
-  girlImg: { width: 104 },
+  duoWrap: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginTop: 20,
+    marginHorizontal: -20,
+  },
+  duoImg: {},
   quickMatchCard: { paddingVertical: 6 },
   matchContent: { flexDirection: "row", alignItems: "center", padding: 18 },
   quickMatchContent: { padding: 22 },

@@ -90,6 +90,7 @@ export interface GameContextType {
   ) => void;
   submitMedia: (mediaType: "photo" | "video" | "audio", base64: string) => void;
   nextRound: () => void;
+  skipRound: () => void;
   quitGame: () => void;
   forfeit: () => void;
   reset: () => void;
@@ -632,6 +633,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   }, [sendMessage]);
 
+  const skipRound = useCallback(() => {
+    if (roomIdRef.current) {
+      sendMessage({
+        type: "skip_round",
+        room_id: roomIdRef.current,
+        player_id: playerId.current,
+      });
+    }
+  }, [sendMessage]);
+
   // FIX: quitGame no longer depends on reset (avoids circular dep)
   const quitGame = useCallback(() => {
     if (roomIdRef.current) {
@@ -703,6 +714,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     sendReaction,
     sendQuestionReaction,
     nextRound,
+    skipRound,
     quitGame,
     forfeit,
     reset,
@@ -717,7 +729,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setProfilePic, setInterests, setGameMood,
     createRoom, autoJoin, joinRoom, chooseMode,
     submitQuestion, submitAnswer, submitMedia,
-    sendReaction, sendQuestionReaction, nextRound, quitGame, forfeit, reset, reconnect,
+    sendReaction, sendQuestionReaction, nextRound, skipRound, quitGame, forfeit, reset, reconnect,
     setSoundCallbacks,
   ]);
 
