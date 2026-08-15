@@ -24,10 +24,18 @@
       "expo-splash-screen",
       "expo-status-bar",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-9535862781635221~1085297598",
+          "iosAppId": "ca-app-pub-9535862781635221~1085297598"
+        }
+      ],
+      "expo-asset"
     ],
     "android": {
-      "package": "com.truthdare.app",
+      "package": "com.truthordares.app",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -50,7 +58,7 @@
     },
     "owner": "bikrampoudel01",
     "ios": {
-      "bundleIdentifier": "com.truthdare.app",
+      "bundleIdentifier": "com.truthordares.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

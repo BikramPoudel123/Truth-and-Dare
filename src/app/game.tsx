@@ -36,6 +36,8 @@ import { BrandGradient } from "@/components/BrandGradient";
 import { AppBackground } from "@/components/AppBackground";
 import { ParticleBurst } from "@/components/ParticleBurst";
 import { Logo } from "@/components/Logo";
+import { ADS } from "@/constants/ads";
+import { adsAvailable, initAds, loadInterstitial, loadRewardedAd, showInterstitial, showRewardedAd } from "@/utils/ads";
 
 const PlayerAvatarItem = memo(function PlayerAvatarItem({
   player, active, playerId, playerName, profilePic, onAvatarPress, moodColor,
@@ -309,6 +311,10 @@ export default function GameScreen() {
   const [kbOpen, setKbOpen] = useState(false);
   const [timer, setTimer]         = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerPausedRef = useRef(false);
+  const bonusUsedRef = useRef(false);
+  const roundCountRef = useRef(0);
+  const [saveRoundOffer, setSaveRoundOffer] = useState(false);
   const [timeUpMsg, setTimeUpMsg] = useState<string | null>(null);
   const [pfModal, setPfModal] = useState<ProfileModalData>(DEFAULT_MODAL_DATA);
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
@@ -408,14 +414,24 @@ export default function GameScreen() {
     const dur = getTimerDuration();
     if (dur > 0) {
       setTimer(dur);
-      timerRef.current = setInterval(() =>
-        setTimer(p => { if (p <= 1) { clearInterval(timerRef.current!); return 0; } return p - 1; }), 1000);
+      timerPausedRef.current = false;
+      bonusUsedRef.current = false;
+      timerRef.current = setInterval(() => {
+        if (timerPausedRef.current) return;
+        setTimer(p => { if (p <= 1) { clearInterval(timerRef.current!); return 0; } return p - 1; });
+      }, 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
       setTimer(0);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [phase, currentMode]);
+
+  useEffect(() => {
+    initAds();
+    loadInterstitial();
+    loadRewardedAd();
+  }, []);
 
   const sendQ = useCallback(async (q: string) => {
     playSend();
@@ -453,12 +469,54 @@ export default function GameScreen() {
       playTick();
     }
     if (prev === 1 && timer === 0) {
-      if (phase === "answering" && isMyTurn) { playFail(); setTimeUpMsg("⏰ Time's up! Round skipped"); skipRound(); }
-      if (phase === "choosing" && isMyTurn) chooseMode("truth");
-      if (phase === "question_set" && isMyQ) { playFail(); setTimeUpMsg("⏰ Time's up! Round skipped"); skipRound(); }
-      if (phase === "reveal") nextRound();
+      if (phase === "answering" && isMyTurn && adsAvailable() && !bonusUsedRef.current) {
+        playFail();
+        setSaveRoundOffer(true);
+      } else {
+        if (phase === "answering" && isMyTurn) { playFail(); setTimeUpMsg("⏰ Time's up! Round skipped"); skipRound(); }
+        if (phase === "choosing" && isMyTurn) chooseMode("truth");
+        if (phase === "question_set" && isMyQ) { playFail(); setTimeUpMsg("⏰ Time's up! Round skipped"); skipRound(); }
+        if (phase === "reveal") nextRound();
+      }
     }
   }, [timer, phase, isMyTurn, isMyQ, forfeit, chooseMode, nextRound, playTick, playFail, skipRound]);
+
+  useEffect(() => {
+    setSaveRoundOffer(false);
+  }, [phase]);
+
+  const handleWatchAd = useCallback(() => {
+    const ok = showRewardedAd({
+      onOpen: () => { timerPausedRef.current = true; },
+      onReward: () => {
+        timerPausedRef.current = false;
+        bonusUsedRef.current = true;
+        setSaveRoundOffer(false);
+        setTimer(t => t + ADS.rewardSeconds);
+        if (!timerRef.current) {
+          timerRef.current = setInterval(() => {
+            if (timerPausedRef.current) return;
+            setTimer(p => { if (p <= 1) { clearInterval(timerRef.current!); return 0; } return p - 1; });
+          }, 1000);
+        }
+        setTimeUpMsg(`🎁 +${ADS.rewardSeconds}s added!`);
+      },
+      onClose: () => { timerPausedRef.current = false; },
+    });
+    if (!ok) setTimeUpMsg("Ad not ready — try again in a second");
+  }, []);
+
+  const handleNextRound = useCallback(() => {
+    playNextRound();
+    nextRound();
+    roundCountRef.current += 1;
+    if (roundCountRef.current % ADS.interstitialEveryRound === 0) {
+      showInterstitial({
+        onOpen: () => { timerPausedRef.current = true; },
+        onClose: () => { timerPausedRef.current = false; },
+      });
+    }
+  }, [nextRound, playNextRound]);
 
   useEffect(() => {
     if (timeUpMsg) {
@@ -540,8 +598,16 @@ export default function GameScreen() {
         <PlayerBar players={players} currentTurn={currentTurn} playerName={playerName} selfId={playerId} profilePic={profilePic} onAvatarPress={onAvatarPress} selfLevel={selfLevel} playerLevels={playerLevels} />
 
         {phase === "answering" && (
-          <View style={[s.stickyTimer, { backgroundColor: `${moodCfg.color}10`, borderColor: `${moodCfg.color}25` }]}>
-            <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
+          <View style={s.adArea}>
+            <View style={[s.stickyTimer, { backgroundColor: `${moodCfg.color}10`, borderColor: `${moodCfg.color}25` }]}>
+              <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />
+            </View>
+            {adsAvailable() && isMyTurn && !bonusUsedRef.current && timer > 0 && timer <= 15 && (
+              <TouchableOpacity style={[s.adBonusBtn, { borderColor: `${colors.gold}60`, backgroundColor: `${colors.gold}15` }]} onPress={handleWatchAd} activeOpacity={0.85}>
+                <Zap size={14} color={colors.gold} />
+                <Text style={[s.adBonusTxt, { color: colors.gold }]}>Low on time — watch ad for +{ADS.rewardSeconds}s</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -791,7 +857,7 @@ export default function GameScreen() {
 
               {timer > 0 && <TimerBar seconds={timer} moodColor={moodCfg.color} maxSeconds={getTimerDuration()} />}
               <ActionButton
-                onPress={() => { playNextRound(); nextRound(); }}
+                onPress={handleNextRound}
                 disabled={!isMyQ}
                 style={[{ borderRadius: RADIUS.button }, !isMyQ && s.nextBtnDisabled]}
               >
@@ -903,6 +969,25 @@ export default function GameScreen() {
           </View>
         )}
 
+        {saveRoundOffer && (
+          <View style={s.reactOverlay}>
+            <View style={[s.saveRoundCard, { backgroundColor: colors.card, borderColor: colors.red }]}>
+              <TimerIcon size={30} color={colors.red} />
+              <Text style={[s.saveRoundTitle, { color: colors.text }]}>Time's up!</Text>
+              <Text style={[s.saveRoundSub, { color: colors.sub }]}>
+                Your answer wasn't submitted. Watch a quick ad to get +{ADS.rewardSeconds}s and save your round.
+              </Text>
+              <TouchableOpacity style={[s.saveRoundPrimary, { backgroundColor: colors.gold }]} onPress={handleWatchAd} activeOpacity={0.85}>
+                <Zap size={16} color="#fff" />
+                <Text style={s.saveRoundPrimaryTxt}>Watch Ad — +{ADS.rewardSeconds}s</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setSaveRoundOffer(false); playFail(); setTimeUpMsg("⏰ Time's up! Round skipped"); skipRound(); }} activeOpacity={0.7} style={{ paddingVertical: 8 }}>
+                <Text style={[s.saveRoundSkip, { color: colors.sub }]}>Skip round</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Profile modal */}
         <ProfileModal
           data={pfModal}
@@ -1007,6 +1092,24 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
+  adArea: { marginHorizontal: 16, marginBottom: 6, gap: 6 },
+  adBonusBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    borderWidth: 1, borderRadius: RADIUS.small, paddingVertical: 8, paddingHorizontal: 12,
+  },
+  adBonusTxt: { fontSize: 12, fontWeight: "800" },
+  saveRoundCard: {
+    borderRadius: RADIUS.card, padding: 22, width: "86%", alignItems: "center", gap: 10,
+    borderWidth: 2,
+  },
+  saveRoundTitle: { fontSize: 22, fontWeight: "900" },
+  saveRoundSub: { fontSize: 13, textAlign: "center", lineHeight: 19 },
+  saveRoundPrimary: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    borderRadius: RADIUS.button, paddingVertical: 12, paddingHorizontal: 20, width: "100%", marginTop: 4,
+  },
+  saveRoundPrimaryTxt: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  saveRoundSkip: { fontSize: 13, fontWeight: "600" },
   answerPanel: {
     backgroundColor: "#ffffff",
     borderRadius: RADIUS.card,
